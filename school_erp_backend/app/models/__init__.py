@@ -14,6 +14,14 @@ from app.models.academic import (  # noqa: F401
 )
 from app.models.attendance import StudentAttendance, StudentAttendanceStatus  # noqa: F401
 from app.models.audit import AuditLog  # noqa: F401
+from app.models.billing import (  # noqa: F401
+    BillingInvoice,
+    BillingInvoiceStatus,
+    BillingPayment,
+    BillingPaymentMethod,
+    BillingPaymentStatus,
+    BillingRefund,
+)
 from app.models.comms import (  # noqa: F401
     Announcement,
     AnnouncementAudience,
