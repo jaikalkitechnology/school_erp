@@ -3,6 +3,7 @@ import { SuperAdminLayout } from "@/components/layouts/SuperAdminLayout";
 import { LoginPage } from "@/features/auth/LoginPage";
 import { DashboardPage } from "@/features/dashboard/DashboardPage";
 import { Placeholder } from "@/features/placeholder/Placeholder";
+import { SchoolsPage } from "@/features/schools/SchoolsPage";
 import { useAuth } from "@/stores/auth";
 
 function RequireAuth({ children }: { children: React.ReactNode }) {
@@ -23,7 +24,7 @@ export const routes: RouteObject[] = [
     children: [
       { index: true, element: <Navigate to="/dashboard" replace /> },
       { path: "dashboard", element: <DashboardPage /> },
-      { path: "schools", element: <Placeholder title="Schools" phase="Phase 3 (Super Admin onboarding)" /> },
+      { path: "schools", element: <SchoolsPage /> },
       { path: "plans", element: <Placeholder title="Plans & Billing" phase="Phase 21 (Subscription & Billing)" /> },
       { path: "staff", element: <Placeholder title="Platform Staff" phase="Phase 2 (Auth & RBAC)" /> },
       { path: "audit", element: <Placeholder title="Audit & Security" phase="Phase 22 (Final hardening)" /> },
