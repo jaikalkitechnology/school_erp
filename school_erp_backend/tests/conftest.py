@@ -73,7 +73,13 @@ async def _truncate_all() -> None:
         SectionSubject,
         Syllabus,
     )
-    from app.models.parent import Parent, ParentChildMapping, ParentSession, Student
+    from app.models.parent import (
+        LeaveApplication,
+        Parent,
+        ParentChildMapping,
+        ParentSession,
+        Student,
+    )
     from app.models.sis import Admission, StudentDocument
     from app.models.teacher import Teacher, TeacherAttendance, TeacherSubject
     from app.models.tenant import (
@@ -98,6 +104,8 @@ async def _truncate_all() -> None:
             TeacherAttendance, TeacherSubject, Teacher,
             # Phase 6
             StudentDocument, Admission,
+            # Phase 8
+            LeaveApplication,
             # Phase 2
             ParentSession, ParentChildMapping, Parent, Student,
             RefreshToken, UserRole, RolePermission, Permission, Role, User,

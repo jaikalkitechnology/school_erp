@@ -176,6 +176,11 @@ async def admit_student(
         raise
     await session.refresh(student)
     await _auto_link_siblings(session, tenant_id, student)
+    # Phase 8: auto-link parent if contact info was supplied. Local import to
+    # avoid a circular dependency between sis and parents services.
+    from app.services.parents import autolink_parent_for_student
+
+    await autolink_parent_for_student(session, tenant_id, student)
     await session.refresh(student)
     return student
 
