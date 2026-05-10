@@ -1,0 +1,91 @@
+# ---- Claude Code / AI tooling ----
+.claude/
+.aider*
+
+# ---- OS ----
+.DS_Store
+Thumbs.db
+ehthumbs.db
+desktop.ini
+
+# ---- Editors / IDEs (sub-projects keep their own .gitignore as well) ----
+.idea/
+*.iml
+*.swp
+*.swo
+*~
+.vscode/*
+!.vscode/extensions.json
+!.vscode/settings.json.example
+
+# ---- Python (FastAPI backend) ----
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg
+*.egg-info/
+.eggs/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.tox/
+.coverage
+.coverage.*
+htmlcov/
+coverage.xml
+*.cover
+.hypothesis/
+
+# Virtual environments
+venv/
+.venv/
+env/
+ENV/
+env.bak/
+venv.bak/
+
+# Build artifacts
+build/
+dist/
+*.manifest
+*.spec
+
+# ---- Secrets / env ----
+.env
+.env.*
+!.env.example
+!.env.sample
+*.pem
+*.key
+*.crt
+*.p12
+secrets/
+credentials.json
+
+# ---- Node (root-level only — react_admin/.gitignore handles its own tree) ----
+/node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# ---- Logs ----
+*.log
+logs/
+
+# ---- Database / uploads (created by app at runtime) ----
+*.sqlite
+*.sqlite3
+*.db
+db.sqlite3-journal
+uploads/
+media/
+storage/
+minio-data/
+
+# ---- Backups ----
+*.sql.gz
+*.dump
+*.bak
+backup/
+backups/

@@ -1,0 +1,3146 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Jaikalki School ERP — Fresh Identity & Design System</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,wght@0,400;0,500;0,600;0,700;1,500;1,600&family=DM+Sans:wght@400;500;600;700&family=Noto+Sans+Devanagari:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    /* ═══ BRAND PRIMARY · SAFFRON ═══ */
+    --saffron: #E85D2E;
+    --saffron-dark: #C44419;
+    --saffron-darker: #8C2F0E;
+    --saffron-light: #FF7A4D;
+    --saffron-lighter: #FFB394;
+    --saffron-pale: #FEE5DA;
+
+    /* ═══ SECONDARY · FOREST TEAL ═══ */
+    --teal: #0F766E;
+    --teal-dark: #115E59;
+    --teal-darker: #0A3D38;
+    --teal-light: #2C9489;
+    --teal-lighter: #99D4CC;
+    --teal-pale: #D1F0EC;
+
+    /* ═══ ACCENT · MARIGOLD ═══ */
+    --marigold: #FFB800;
+    --marigold-bright: #FFC72E;
+    --marigold-light: #FFD659;
+    --marigold-pale: #FFF3D6;
+    --marigold-dark: #C28800;
+
+    /* ═══ HERITAGE · DEEP INDIGO ═══ */
+    --indigo: #2E1A6B;
+    --indigo-dark: #1F1248;
+    --indigo-light: #4C32A0;
+    --indigo-pale: #DCD5F2;
+
+    /* ═══ SURFACES ═══ */
+    --ivory: #FFF9F0;
+    --mint-cream: #F0F9F4;
+    --warm-white: #FFFCF7;
+    --cream-50: #FDF7E9;
+
+    /* ═══ TEXT ═══ */
+    --text-primary: #1F1248;
+    --text-secondary: #4C4068;
+    --text-tertiary: #8A85A0;
+
+    /* ═══ SEMANTIC ═══ */
+    --success: #16A34A;
+    --success-light: #DCFCE7;
+    --warning: #F59E0B;
+    --warning-light: #FEF3C7;
+    --error: #DC2626;
+    --error-light: #FEE2E2;
+    --info: #0284C7;
+    --info-light: #DBEAFE;
+
+    /* ═══ EDUCATION STATUS ═══ */
+    --att-present: #16A34A;
+    --att-absent: #DC2626;
+    --att-late: #F59E0B;
+    --att-leave: #0284C7;
+
+    --grade-aplus: #FFB800;
+    --grade-a: #16A34A;
+    --grade-b: #0284C7;
+    --grade-c: #F59E0B;
+    --grade-d: #EA580C;
+    --grade-f: #DC2626;
+
+    --fee-paid: #16A34A;
+    --fee-pending: #F59E0B;
+    --fee-overdue: #DC2626;
+    --fee-waived: #8B5CF6;
+
+    /* ═══ FONTS ═══ */
+    --font-display: 'Fraunces', serif;
+    --font-body: 'DM Sans', sans-serif;
+    --font-hindi: 'Noto Sans Devanagari', 'DM Sans', sans-serif;
+    --font-mono: 'JetBrains Mono', monospace;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    font-family: var(--font-body);
+    background: var(--ivory);
+    color: var(--text-primary);
+    line-height: 1.55;
+    overflow-x: hidden;
+  }
+
+  body::before {
+    content: '';
+    position: fixed; inset: 0;
+    background-image:
+      radial-gradient(circle at 12% 20%, rgba(232,93,46,0.06), transparent 50%),
+      radial-gradient(circle at 88% 70%, rgba(15,118,110,0.05), transparent 50%);
+    pointer-events: none; z-index: 0;
+  }
+
+  .wrapper { position: relative; z-index: 1; }
+
+  .hero {
+    padding: 100px 40px 60px;
+    text-align: center;
+    background:
+      radial-gradient(ellipse at top, rgba(255,184,0,0.16) 0%, transparent 55%),
+      radial-gradient(ellipse at bottom right, rgba(15,118,110,0.08) 0%, transparent 50%);
+    position: relative;
+  }
+
+  .hero-eyebrow {
+    display: inline-flex; align-items: center; gap: 10px;
+    padding: 10px 20px;
+    background: rgba(232,93,46,0.1);
+    border: 1px solid rgba(232,93,46,0.3);
+    border-radius: 999px;
+    font-family: var(--font-mono);
+    font-size: 11px; letter-spacing: 0.25em;
+    color: var(--saffron-dark);
+    text-transform: uppercase;
+    margin-bottom: 32px; font-weight: 600;
+  }
+
+  .hero-eyebrow .dot {
+    width: 8px; height: 8px;
+    background: var(--saffron); border-radius: 50%;
+    box-shadow: 0 0 12px var(--saffron);
+  }
+
+  .hero-logo {
+    width: 180px; height: 180px;
+    margin: 0 auto 32px;
+    background: var(--warm-white);
+    border-radius: 32px;
+    display: flex; align-items: center; justify-content: center;
+    box-shadow:
+      0 30px 80px -20px rgba(232,93,46,0.4),
+      0 0 0 1px rgba(232,93,46,0.15);
+    position: relative;
+  }
+
+  .hero-logo::before {
+    content: '';
+    position: absolute; inset: -16px;
+    background: radial-gradient(circle, rgba(255,184,0,0.35) 0%, transparent 70%);
+    border-radius: 50%; z-index: -1;
+    animation: pulse-glow 3s ease-in-out infinite;
+  }
+
+  @keyframes pulse-glow {
+    0%, 100% { transform: scale(1); opacity: 0.6; }
+    50% { transform: scale(1.18); opacity: 1; }
+  }
+
+  .logo-svg { width: 130px; height: 130px; }
+
+  .hero h1 {
+    font-family: var(--font-display);
+    font-size: clamp(46px, 7.5vw, 90px);
+    font-weight: 600;
+    color: var(--text-primary);
+    letter-spacing: -0.025em;
+    line-height: 1; margin-bottom: 18px;
+  }
+
+  .hero h1 em { font-style: italic; color: var(--saffron); font-weight: 500; }
+
+  .hero-namaste {
+    font-family: var(--font-hindi);
+    font-size: 22px; font-weight: 500;
+    color: var(--saffron-dark);
+    margin-bottom: 20px;
+  }
+
+  .hero p {
+    max-width: 700px;
+    margin: 0 auto 40px;
+    color: var(--text-secondary);
+    font-size: 17px;
+  }
+
+  .hero-meta {
+    display: flex; justify-content: center; gap: 40px;
+    flex-wrap: wrap;
+    padding-top: 32px;
+    border-top: 1px solid rgba(232,93,46,0.15);
+    margin-top: 24px;
+  }
+
+  .meta-item { text-align: center; }
+  .meta-num {
+    font-family: var(--font-display);
+    font-size: 36px; font-weight: 700;
+    color: var(--saffron);
+    line-height: 1;
+  }
+  .meta-lbl {
+    font-family: var(--font-mono);
+    font-size: 10px;
+    color: var(--text-secondary);
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    margin-top: 6px;
+  }
+
+  .section { padding: 100px 40px; max-width: 1400px; margin: 0 auto; }
+
+  .section-head { text-align: center; margin-bottom: 60px; }
+
+  .section-label {
+    display: inline-flex; align-items: center; gap: 12px;
+    font-family: var(--font-mono);
+    font-size: 11px; color: var(--saffron-dark);
+    letter-spacing: 0.3em; text-transform: uppercase;
+    margin-bottom: 16px; font-weight: 600;
+  }
+
+  .section-label::before, .section-label::after {
+    content: ''; width: 28px; height: 1px;
+    background: var(--saffron);
+  }
+
+  .section-title {
+    font-family: var(--font-display);
+    font-size: clamp(32px, 5vw, 56px);
+    font-weight: 600;
+    color: var(--text-primary);
+    line-height: 1.05;
+    letter-spacing: -0.02em;
+    margin-bottom: 16px;
+  }
+
+  .section-title em { font-style: italic; color: var(--saffron); font-weight: 500; }
+
+  .section-sub {
+    max-width: 600px; margin: 0 auto;
+    color: var(--text-secondary);
+    font-size: 16px;
+  }
+
+  /* LOGO SHOWCASE */
+  .logo-showcase {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+    gap: 18px;
+  }
+
+  .logo-tile {
+    border-radius: 18px;
+    overflow: hidden;
+    border: 1px solid rgba(232,93,46,0.15);
+    background: var(--warm-white);
+  }
+
+  .logo-tile-preview {
+    height: 200px;
+    display: flex; align-items: center; justify-content: center;
+  }
+
+  .logo-tile-preview svg { width: 130px; height: 130px; }
+
+  .logo-tile-preview.ivory { background: var(--ivory); }
+  .logo-tile-preview.saffron { background: var(--saffron); }
+  .logo-tile-preview.indigo { background: var(--indigo); }
+  .logo-tile-preview.mint { background: var(--mint-cream); }
+
+  .logo-tile-info {
+    padding: 14px 18px;
+    border-top: 1px solid rgba(232,93,46,0.1);
+  }
+
+  .logo-tile-name {
+    font-family: var(--font-display);
+    font-size: 15px; font-weight: 600;
+    color: var(--text-primary);
+  }
+
+  .logo-tile-meta {
+    font-family: var(--font-mono);
+    font-size: 10px;
+    color: var(--text-secondary);
+    letter-spacing: 0.05em;
+    margin-top: 3px;
+  }
+
+  /* COLOR PALETTE */
+  .palette-group { margin-bottom: 56px; }
+
+  .palette-group-title {
+    font-family: var(--font-display);
+    font-size: 26px; font-weight: 700;
+    color: var(--text-primary);
+    margin-bottom: 6px;
+  }
+  .palette-group-title em { font-style: italic; color: var(--saffron); font-weight: 600; }
+
+  .palette-group-sub {
+    color: var(--text-secondary);
+    font-size: 13px; margin-bottom: 24px;
+    font-family: var(--font-mono);
+    letter-spacing: 0.05em;
+  }
+
+  .swatch-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: 14px;
+  }
+
+  .swatch {
+    border-radius: 14px; overflow: hidden;
+    background: var(--warm-white);
+    border: 1px solid rgba(232,93,46,0.1);
+    transition: transform 0.2s, box-shadow 0.2s;
+  }
+
+  .swatch:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 16px 32px -10px rgba(232,93,46,0.18);
+  }
+
+  .swatch-color {
+    height: 96px;
+    display: flex; align-items: flex-end;
+    padding: 10px 12px;
+  }
+
+  .swatch.dark .swatch-color { color: var(--warm-white); }
+  .swatch.light .swatch-color { color: var(--text-primary); }
+
+  .swatch-tag {
+    font-family: var(--font-mono);
+    font-size: 9px; letter-spacing: 0.15em;
+    text-transform: uppercase;
+    opacity: 0.85; font-weight: 600;
+  }
+
+  .swatch-info { padding: 12px 14px; }
+
+  .swatch-name {
+    font-family: var(--font-display);
+    font-size: 14px; font-weight: 600;
+    color: var(--text-primary);
+    margin-bottom: 3px;
+  }
+
+  .swatch-hex {
+    font-family: var(--font-mono);
+    font-size: 10px;
+    color: var(--text-secondary);
+    letter-spacing: 0.05em;
+  }
+
+  /* TYPOGRAPHY */
+  .type-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 20px;
+  }
+
+  .type-card {
+    background: var(--warm-white);
+    border-radius: 18px;
+    padding: 28px;
+    border: 1px solid rgba(232,93,46,0.12);
+  }
+
+  .type-meta {
+    display: flex; justify-content: space-between;
+    align-items: center;
+    margin-bottom: 14px;
+    padding-bottom: 12px;
+    border-bottom: 1px dashed rgba(232,93,46,0.18);
+  }
+
+  .type-meta-name {
+    font-family: var(--font-mono);
+    font-size: 10px;
+    color: var(--saffron-dark);
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    font-weight: 700;
+  }
+
+  .type-meta-spec {
+    font-family: var(--font-mono);
+    font-size: 9px;
+    color: var(--text-secondary);
+  }
+
+  .type-display {
+    font-family: var(--font-display);
+    font-size: 50px; font-weight: 600;
+    color: var(--text-primary);
+    line-height: 1; letter-spacing: -0.02em;
+  }
+  .type-display em { font-style: italic; color: var(--saffron); }
+
+  .type-headline {
+    font-family: var(--font-display);
+    font-size: 32px; font-weight: 600;
+    color: var(--text-primary);
+    line-height: 1.1;
+  }
+  .type-headline em { font-style: italic; color: var(--saffron); }
+
+  .type-title {
+    font-family: var(--font-body);
+    font-size: 20px; font-weight: 600;
+    color: var(--text-primary);
+  }
+
+  .type-body {
+    font-family: var(--font-body);
+    font-size: 15px;
+    color: var(--text-primary);
+    line-height: 1.55;
+  }
+
+  .type-hindi {
+    font-family: var(--font-hindi);
+    font-size: 24px; font-weight: 500;
+    color: var(--saffron-dark);
+    line-height: 1.3;
+  }
+
+  .type-label {
+    font-family: var(--font-mono);
+    font-size: 11px; font-weight: 600;
+    color: var(--saffron-dark);
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+  }
+
+  /* COMPONENTS */
+  .component-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    gap: 20px;
+  }
+
+  .component-card {
+    background: var(--warm-white);
+    border-radius: 18px;
+    padding: 24px;
+    border: 1px solid rgba(232,93,46,0.12);
+  }
+
+  .component-card-title {
+    font-family: var(--font-mono);
+    font-size: 10px;
+    color: var(--saffron-dark);
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    margin-bottom: 14px; font-weight: 700;
+  }
+
+  .btn-stack { display: flex; flex-direction: column; gap: 10px; align-items: flex-start; }
+
+  .btn-primary {
+    display: inline-flex; align-items: center; gap: 8px;
+    padding: 12px 24px;
+    background: linear-gradient(135deg, var(--saffron), var(--saffron-light));
+    color: white;
+    border: none; border-radius: 12px;
+    font-family: var(--font-body);
+    font-size: 13px; font-weight: 700;
+    cursor: pointer;
+    box-shadow: 0 8px 18px -4px rgba(232,93,46,0.4);
+  }
+
+  .btn-secondary {
+    padding: 12px 24px;
+    background: transparent;
+    color: var(--teal);
+    border: 1.5px solid var(--teal);
+    border-radius: 12px;
+    font-size: 13px; font-weight: 600;
+  }
+
+  .btn-text { color: var(--saffron); font-size: 13px; font-weight: 600; padding: 6px 12px; background: transparent; border: 0; }
+
+  .btn-error {
+    padding: 12px 24px;
+    background: var(--error);
+    color: white;
+    border: none; border-radius: 12px;
+    font-size: 13px; font-weight: 700;
+  }
+
+  .input-demo { display: flex; flex-direction: column; gap: 5px; }
+
+  .input-label {
+    font-family: var(--font-mono);
+    font-size: 10px;
+    color: var(--text-secondary);
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    font-weight: 600;
+  }
+
+  .input-field {
+    padding: 12px 14px;
+    background: var(--cream-50);
+    border: 1.5px solid rgba(232,93,46,0.2);
+    border-radius: 12px;
+    color: var(--text-primary);
+    font-size: 13px;
+    font-family: var(--font-body);
+  }
+
+  .input-field.focus {
+    border-color: var(--saffron);
+    background: var(--warm-white);
+    box-shadow: 0 0 0 3px rgba(232,93,46,0.15);
+  }
+
+  .chip-row { display: flex; gap: 6px; flex-wrap: wrap; }
+
+  .chip {
+    display: inline-flex; align-items: center; gap: 4px;
+    padding: 5px 10px;
+    border-radius: 999px;
+    font-size: 10px; font-weight: 600;
+    font-family: var(--font-mono);
+    letter-spacing: 0.05em;
+  }
+
+  .chip.saffron { background: var(--saffron-pale); color: var(--saffron-dark); border: 1px solid var(--saffron); }
+  .chip.teal { background: var(--teal-pale); color: var(--teal); border: 1px solid var(--teal); }
+  .chip.marigold { background: var(--marigold-pale); color: var(--marigold-dark); border: 1px solid var(--marigold); }
+  .chip.indigo { background: var(--indigo-pale); color: var(--indigo); }
+  .chip.success { background: var(--success-light); color: var(--success); }
+  .chip.warning { background: var(--warning-light); color: var(--warning); }
+  .chip.error { background: var(--error-light); color: var(--error); }
+
+  .status-row { display: flex; flex-direction: column; gap: 8px; }
+
+  .status-item {
+    display: flex; align-items: center; gap: 10px;
+    padding: 10px 12px;
+    border-radius: 10px;
+    font-size: 12px; font-weight: 500;
+  }
+
+  .status-item.present { background: var(--success-light); color: var(--success); border-left: 3px solid var(--success); }
+  .status-item.absent { background: var(--error-light); color: var(--error); border-left: 3px solid var(--error); }
+  .status-item.late { background: var(--warning-light); color: var(--warning); border-left: 3px solid var(--warning); }
+  .status-item.leave { background: var(--info-light); color: var(--info); border-left: 3px solid var(--info); }
+
+  .status-icon {
+    width: 22px; height: 22px;
+    border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    color: white; font-weight: 700; font-size: 11px;
+    flex-shrink: 0;
+  }
+  .status-item.present .status-icon { background: var(--success); }
+  .status-item.absent .status-icon { background: var(--error); }
+  .status-item.late .status-icon { background: var(--warning); }
+  .status-item.leave .status-icon { background: var(--info); }
+
+  .grade-row { display: flex; flex-wrap: wrap; gap: 8px; }
+  .grade-pill {
+    width: 36px; height: 36px;
+    border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    color: white; font-weight: 700; font-size: 14px;
+    font-family: var(--font-display);
+    box-shadow: 0 4px 8px -2px rgba(0,0,0,0.15);
+  }
+
+  .stat-card {
+    padding: 16px 18px;
+    background: var(--warm-white);
+    border: 1px solid rgba(232,93,46,0.15);
+    border-left: 4px solid var(--saffron);
+    border-radius: 12px;
+  }
+
+  .stat-card-eyebrow {
+    font-family: var(--font-mono);
+    font-size: 9px; color: var(--saffron-dark);
+    letter-spacing: 0.15em; text-transform: uppercase;
+    font-weight: 600; margin-bottom: 4px;
+  }
+
+  .stat-card-num {
+    font-family: var(--font-display);
+    font-size: 28px; font-weight: 700;
+    color: var(--saffron);
+    line-height: 1;
+  }
+
+  .stat-card-meta {
+    font-size: 11px; color: var(--text-secondary);
+    margin-top: 4px;
+  }
+
+  /* ROLE BADGES */
+  .roles-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    gap: 12px;
+  }
+
+  .role-card {
+    background: var(--warm-white);
+    border-radius: 12px;
+    padding: 16px 12px;
+    border: 1px solid rgba(232,93,46,0.12);
+    text-align: center;
+    transition: transform 0.2s;
+  }
+
+  .role-card:hover { transform: translateY(-3px); }
+  .role-card.highlight-saffron { border: 1px solid var(--saffron); background: var(--saffron-pale); }
+  .role-card.highlight-marigold { border: 1px solid var(--marigold); background: var(--marigold-pale); }
+  .role-card.highlight-teal { border: 1px solid var(--teal); background: var(--teal-pale); }
+
+  .role-avatar {
+    width: 44px; height: 44px;
+    margin: 0 auto 8px;
+    border-radius: 12px;
+    display: flex; align-items: center; justify-content: center;
+    color: white;
+    font-family: var(--font-display);
+    font-weight: 700; font-size: 18px;
+  }
+
+  .role-name {
+    font-family: var(--font-display);
+    font-size: 13px; font-weight: 600;
+    color: var(--text-primary);
+    margin-bottom: 3px;
+    line-height: 1.1;
+  }
+
+  .role-hex {
+    font-family: var(--font-mono);
+    font-size: 8px;
+    color: var(--text-secondary);
+    letter-spacing: 0.05em;
+  }
+
+  /* PHONE MOCKUPS */
+  .screens-grid {
+    display: flex; flex-wrap: wrap;
+    justify-content: center;
+    gap: 32px;
+    padding: 20px 0;
+  }
+
+  .phone-card { text-align: center; }
+
+  .phone {
+    width: 320px; height: 660px;
+    background: #1a0a18;
+    border-radius: 44px;
+    padding: 12px;
+    box-shadow:
+      0 30px 80px -20px rgba(46,26,107,0.3),
+      0 0 0 2px rgba(232,93,46,0.15);
+    position: relative;
+    margin: 0 auto;
+  }
+
+  .phone::before {
+    content: '';
+    position: absolute;
+    top: 12px; left: 50%;
+    transform: translateX(-50%);
+    width: 96px; height: 24px;
+    background: #1a0a18;
+    border-radius: 0 0 16px 16px;
+    z-index: 10;
+  }
+
+  .phone-screen {
+    width: 100%; height: 100%;
+    border-radius: 32px;
+    overflow: hidden;
+    background: var(--ivory);
+    position: relative;
+  }
+
+  .screen-inner {
+    width: 100%; height: 100%;
+    overflow-y: auto; overflow-x: hidden;
+  }
+
+  .screen-inner::-webkit-scrollbar { display: none; }
+
+  .status-bar {
+    height: 42px;
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 0 24px 0 28px;
+    font-size: 11px; font-weight: 700;
+    color: var(--text-primary);
+    flex-shrink: 0;
+  }
+
+  .status-bar.dark { color: white; background: var(--saffron-dark); }
+  .status-bar.indigo { color: white; background: var(--indigo); }
+  .status-bar.teal { color: white; background: var(--teal); }
+  .status-bar.crimson { color: white; background: #BE123C; }
+
+  .phone-card-title {
+    font-family: var(--font-display);
+    font-size: 19px; font-weight: 600;
+    color: var(--text-primary);
+    margin-top: 18px; margin-bottom: 4px;
+  }
+  .phone-card-title em { font-style: italic; color: var(--saffron); }
+
+  .phone-card-desc {
+    font-family: var(--font-mono);
+    font-size: 10px;
+    color: var(--text-secondary);
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+  }
+
+  /* SPLASH */
+  .splash-screen {
+    background:
+      radial-gradient(ellipse at 30% 20%, rgba(255,184,0,0.25) 0%, transparent 60%),
+      radial-gradient(ellipse at 70% 80%, rgba(15,118,110,0.15) 0%, transparent 60%),
+      var(--ivory);
+    height: 100%;
+    display: flex; flex-direction: column;
+    align-items: center; justify-content: center;
+    padding: 60px 28px;
+    position: relative;
+  }
+
+  .splash-logo-anim {
+    width: 130px; height: 130px;
+    background: var(--warm-white);
+    border-radius: 28px;
+    display: flex; align-items: center; justify-content: center;
+    box-shadow:
+      0 20px 50px -15px rgba(232,93,46,0.5),
+      0 0 0 1px rgba(232,93,46,0.2);
+    margin-bottom: 28px;
+    position: relative;
+  }
+
+  .splash-logo-anim::before {
+    content: '';
+    position: absolute; inset: -14px;
+    background: radial-gradient(circle, rgba(255,184,0,0.45) 0%, transparent 70%);
+    border-radius: 50%;
+    animation: pulse-glow 2s ease-in-out infinite;
+  }
+
+  .splash-logo-anim .logo-svg { width: 90px; height: 90px; }
+
+  .splash-title {
+    font-family: var(--font-display);
+    font-size: 30px; font-weight: 600;
+    color: var(--text-primary);
+    line-height: 1; margin-bottom: 4px;
+  }
+  .splash-title em { font-style: italic; color: var(--saffron); }
+
+  .splash-tag {
+    font-family: var(--font-mono);
+    font-size: 9px;
+    color: var(--saffron);
+    letter-spacing: 0.3em;
+    text-transform: uppercase;
+    margin-bottom: 24px;
+    font-weight: 600;
+  }
+
+  .splash-namaste {
+    font-family: var(--font-hindi);
+    font-size: 18px;
+    color: var(--saffron-dark);
+    margin-bottom: 4px;
+  }
+
+  .splash-loading {
+    margin-top: 40px;
+    width: 60px; height: 4px;
+    background: rgba(232,93,46,0.2);
+    border-radius: 2px;
+    overflow: hidden;
+    position: relative;
+  }
+
+  .splash-loading::after {
+    content: '';
+    position: absolute; inset: 0;
+    background: linear-gradient(90deg, var(--saffron), var(--marigold));
+    width: 60%;
+    border-radius: 2px;
+    animation: loading 1.5s ease-in-out infinite;
+  }
+
+  @keyframes loading {
+    0% { transform: translateX(-100%); }
+    100% { transform: translateX(200%); }
+  }
+
+  .splash-bottom {
+    position: absolute;
+    bottom: 32px; left: 0; right: 0;
+    text-align: center;
+    font-family: var(--font-mono);
+    font-size: 9px;
+    color: var(--text-tertiary);
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+  }
+
+  /* LOGIN */
+  .login-screen {
+    background:
+      radial-gradient(ellipse at top, rgba(232,93,46,0.1) 0%, transparent 50%),
+      var(--warm-white);
+    min-height: 100%;
+    padding: 50px 26px 28px;
+    text-align: center;
+  }
+
+  .login-logo {
+    width: 100px; height: 100px;
+    margin: 0 auto 18px;
+    background: var(--ivory);
+    border-radius: 22px;
+    display: flex; align-items: center; justify-content: center;
+    box-shadow:
+      0 16px 40px -12px rgba(232,93,46,0.4),
+      0 0 0 1px rgba(232,93,46,0.15);
+  }
+
+  .login-logo .logo-svg { width: 72px; height: 72px; }
+
+  .login-namaste-mini {
+    font-family: var(--font-hindi);
+    font-size: 14px;
+    color: var(--saffron-dark);
+    margin-bottom: 4px;
+    font-weight: 500;
+  }
+
+  .login-title {
+    font-family: var(--font-display);
+    font-size: 26px; font-weight: 600;
+    color: var(--text-primary);
+    line-height: 1.1; margin-bottom: 4px;
+    letter-spacing: -0.02em;
+  }
+  .login-title em { font-style: italic; color: var(--saffron); }
+
+  .login-sub {
+    font-size: 11px; color: var(--text-secondary);
+    margin-bottom: 24px;
+  }
+
+  .login-input-block { text-align: left; margin-bottom: 12px; }
+
+  .login-input-label {
+    font-family: var(--font-mono);
+    font-size: 8px;
+    color: var(--text-secondary);
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    margin-bottom: 5px; font-weight: 600;
+  }
+
+  .login-input {
+    display: flex; align-items: center; gap: 8px;
+    padding: 12px 14px;
+    background: var(--cream-50);
+    border: 1.5px solid rgba(232,93,46,0.2);
+    border-radius: 11px;
+  }
+
+  .login-input.active {
+    border-color: var(--saffron);
+    background: var(--warm-white);
+    box-shadow: 0 0 0 3px rgba(232,93,46,0.15);
+  }
+
+  .login-input-icon { color: var(--text-tertiary); flex-shrink: 0; }
+  .login-input.active .login-input-icon { color: var(--saffron); }
+
+  .login-input-value {
+    flex: 1;
+    font-size: 12px; font-weight: 500;
+    color: var(--text-primary);
+  }
+
+  .login-forgot {
+    text-align: right;
+    font-size: 10px; font-weight: 600;
+    color: var(--saffron);
+    margin: 4px 0 18px;
+  }
+
+  .login-submit {
+    width: 100%; padding: 13px;
+    background: linear-gradient(135deg, var(--saffron), var(--saffron-light));
+    color: white;
+    border: none; border-radius: 12px;
+    font-size: 13px; font-weight: 700;
+    letter-spacing: 0.05em;
+    box-shadow: 0 10px 22px -8px rgba(232,93,46,0.5);
+    margin-bottom: 14px;
+  }
+
+  .login-divider {
+    display: flex; align-items: center; gap: 10px;
+    margin: 12px 0;
+    color: var(--text-secondary);
+    font-family: var(--font-mono);
+    font-size: 9px; letter-spacing: 0.15em;
+  }
+
+  .login-divider::before, .login-divider::after {
+    content: ''; flex: 1; height: 1px;
+    background: rgba(232,93,46,0.15);
+  }
+
+  .login-otp-btn {
+    width: 100%; padding: 12px;
+    background: transparent;
+    border: 1.5px solid var(--teal);
+    color: var(--teal);
+    border-radius: 12px;
+    font-size: 12px; font-weight: 600;
+    margin-bottom: 16px;
+  }
+
+  .login-foot {
+    font-size: 10px;
+    color: var(--text-secondary);
+  }
+  .login-foot strong { color: var(--saffron); font-weight: 700; }
+
+  /* PARENT DASHBOARD */
+  .dash-screen { background: var(--ivory); min-height: 100%; }
+
+  .dash-header {
+    background: linear-gradient(135deg, var(--saffron), var(--saffron-dark));
+    padding: 14px 18px 56px;
+    color: white;
+    border-radius: 0 0 22px 22px;
+    position: relative; overflow: hidden;
+  }
+
+  .dash-header::before {
+    content: '';
+    position: absolute;
+    top: -32px; right: -32px;
+    width: 130px; height: 130px;
+    background: radial-gradient(circle, rgba(255,184,0,0.4), transparent 70%);
+    border-radius: 50%;
+  }
+
+  .dash-h-row {
+    display: flex; align-items: center; justify-content: space-between;
+    margin-bottom: 14px;
+    position: relative; z-index: 2;
+  }
+
+  .dash-greeting {
+    font-family: var(--font-mono);
+    font-size: 9px;
+    color: rgba(255,243,214,0.9);
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    margin-bottom: 2px;
+  }
+
+  .dash-namaste {
+    font-family: var(--font-hindi);
+    font-size: 11px;
+    color: var(--marigold-light);
+    margin-bottom: 4px;
+  }
+
+  .dash-name {
+    font-family: var(--font-display);
+    font-size: 18px; font-weight: 600;
+    color: white;
+    line-height: 1;
+  }
+  .dash-name em { font-style: italic; color: var(--marigold-light); }
+
+  .dash-bell {
+    width: 38px; height: 38px;
+    border-radius: 12px;
+    background: rgba(255,255,255,0.12);
+    border: 1px solid rgba(255,184,0,0.3);
+    display: flex; align-items: center; justify-content: center;
+    color: var(--marigold-light);
+    position: relative;
+  }
+
+  .dash-bell-dot {
+    position: absolute;
+    top: 8px; right: 8px;
+    width: 7px; height: 7px;
+    background: var(--marigold);
+    border-radius: 50%;
+    border: 1.5px solid var(--saffron-dark);
+  }
+
+  .child-switcher {
+    margin: -42px 14px 0;
+    background: var(--warm-white);
+    border-radius: 16px;
+    padding: 12px;
+    box-shadow: 0 12px 24px -10px rgba(46,26,107,0.18);
+    position: relative; z-index: 2;
+    display: flex; gap: 10px;
+    overflow-x: auto;
+  }
+
+  .child-card {
+    flex: 0 0 auto;
+    display: flex; align-items: center; gap: 8px;
+    padding: 8px 12px;
+    background: var(--ivory);
+    border: 1px solid rgba(232,93,46,0.15);
+    border-radius: 12px;
+  }
+
+  .child-card.active {
+    border-color: var(--saffron);
+    background: var(--saffron-pale);
+  }
+
+  .child-avatar {
+    width: 32px; height: 32px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, #0EA5E9, #38BDF8);
+    display: flex; align-items: center; justify-content: center;
+    color: white;
+    font-family: var(--font-display);
+    font-weight: 700; font-size: 14px;
+    flex-shrink: 0;
+  }
+
+  .child-card.active .child-avatar { background: linear-gradient(135deg, var(--saffron), var(--saffron-light)); color: white; }
+
+  .child-info { min-width: 0; }
+  .child-name {
+    font-size: 11px; font-weight: 700;
+    color: var(--text-primary);
+    line-height: 1;
+    white-space: nowrap;
+  }
+  .child-class {
+    font-size: 8px;
+    color: var(--text-secondary);
+    font-family: var(--font-mono);
+    letter-spacing: 0.08em;
+    margin-top: 2px;
+  }
+
+  .dash-section { padding: 14px 16px 4px; }
+
+  .dash-section-h {
+    display: flex; justify-content: space-between; align-items: center;
+    margin-bottom: 8px;
+  }
+
+  .dash-section-title {
+    font-family: var(--font-display);
+    font-size: 14px; font-weight: 600;
+    color: var(--text-primary);
+  }
+  .dash-section-title em { font-style: italic; color: var(--saffron); }
+
+  .dash-section-link {
+    font-size: 9px;
+    color: var(--saffron);
+    font-weight: 600;
+    font-family: var(--font-mono);
+    letter-spacing: 0.1em;
+  }
+
+  .quick-stats {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+    padding: 0 16px;
+    margin-bottom: 6px;
+  }
+
+  .qs-tile {
+    background: var(--warm-white);
+    border: 1px solid rgba(232,93,46,0.12);
+    border-left: 3px solid var(--saffron);
+    border-radius: 12px;
+    padding: 10px 12px;
+  }
+
+  .qs-tile.attendance { border-left-color: var(--success); }
+  .qs-tile.fees { border-left-color: var(--warning); }
+  .qs-tile.grade { border-left-color: var(--teal); }
+  .qs-tile.homework { border-left-color: var(--info); }
+
+  .qs-eyebrow {
+    font-family: var(--font-mono);
+    font-size: 7px; letter-spacing: 0.15em;
+    text-transform: uppercase; font-weight: 600;
+    margin-bottom: 4px;
+    color: var(--text-secondary);
+  }
+
+  .qs-value {
+    font-family: var(--font-display);
+    font-size: 18px; font-weight: 700;
+    color: var(--text-primary);
+    line-height: 1;
+  }
+
+  .qs-meta {
+    font-size: 8px;
+    color: var(--text-secondary);
+    margin-top: 3px;
+  }
+
+  .schedule-card {
+    margin: 8px 16px;
+    background: var(--warm-white);
+    border-radius: 12px;
+    border: 1px solid rgba(232,93,46,0.12);
+    overflow: hidden;
+  }
+
+  .sch-row {
+    display: flex; align-items: center;
+    gap: 10px;
+    padding: 8px 12px;
+    border-bottom: 1px dashed rgba(232,93,46,0.08);
+  }
+
+  .sch-row:last-child { border: 0; }
+
+  .sch-time {
+    width: 44px; text-align: right;
+    font-family: var(--font-mono);
+    font-size: 9px; color: var(--text-secondary);
+    font-weight: 600; flex-shrink: 0;
+  }
+
+  .sch-bullet {
+    width: 6px; height: 6px;
+    border-radius: 50%;
+    background: var(--saffron);
+    flex-shrink: 0;
+  }
+
+  .sch-row.now .sch-bullet {
+    background: var(--success);
+    box-shadow: 0 0 0 3px rgba(22,163,74,0.2);
+  }
+
+  .sch-info { flex: 1; min-width: 0; }
+  .sch-subject {
+    font-size: 11px; font-weight: 600;
+    color: var(--text-primary);
+    line-height: 1.2;
+  }
+  .sch-teacher {
+    font-size: 8px;
+    color: var(--text-secondary);
+    margin-top: 1px;
+  }
+
+  .bot-nav {
+    position: sticky; bottom: 0;
+    background: linear-gradient(180deg, var(--indigo), var(--indigo-dark));
+    border-top: 1px solid rgba(255,184,0,0.25);
+    display: flex; justify-content: space-around;
+    padding: 8px 14px 14px;
+    margin-top: 12px;
+  }
+
+  .bn-item {
+    display: flex; flex-direction: column; align-items: center;
+    gap: 3px;
+    color: rgba(220,213,242,0.5);
+    font-size: 8px; font-weight: 600;
+    font-family: var(--font-mono);
+    letter-spacing: 0.05em;
+  }
+
+  .bn-item.active { color: var(--marigold-light); }
+  .bn-item svg { width: 18px; height: 18px; }
+
+  /* STUDENT DASH */
+  .student-dash {
+    background: var(--mint-cream);
+    min-height: 100%;
+  }
+
+  .student-h {
+    background: linear-gradient(135deg, var(--teal), var(--teal-dark));
+    padding: 14px 18px 50px;
+    color: white;
+    border-radius: 0 0 24px 24px;
+    position: relative; overflow: hidden;
+  }
+
+  .student-h::before {
+    content: '★';
+    position: absolute;
+    top: 18px; right: 14px;
+    font-size: 100px;
+    color: rgba(255,184,0,0.18);
+    line-height: 1;
+    font-family: var(--font-display);
+  }
+
+  .student-h-row {
+    display: flex; align-items: center; justify-content: space-between;
+    margin-bottom: 14px;
+    position: relative; z-index: 2;
+  }
+
+  .student-greet {
+    font-family: var(--font-mono);
+    font-size: 9px; color: rgba(209,240,236,0.8);
+    letter-spacing: 0.2em; text-transform: uppercase;
+  }
+
+  .student-name {
+    font-family: var(--font-display);
+    font-size: 19px; font-weight: 600;
+    color: white;
+    line-height: 1;
+  }
+
+  .student-class {
+    font-size: 10px; color: var(--marigold-light);
+    margin-top: 3px;
+    font-family: var(--font-mono);
+    letter-spacing: 0.1em;
+  }
+
+  .student-photo {
+    width: 44px; height: 44px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, var(--marigold), var(--marigold-bright));
+    display: flex; align-items: center; justify-content: center;
+    color: var(--text-primary);
+    font-family: var(--font-display);
+    font-weight: 700; font-size: 18px;
+    border: 2px solid white;
+  }
+
+  .achievement-card {
+    margin: -36px 14px 0;
+    background: linear-gradient(135deg, var(--marigold-pale), #FFE9B0);
+    border: 1px solid var(--marigold);
+    border-radius: 16px;
+    padding: 12px 14px;
+    position: relative;
+    overflow: hidden;
+    box-shadow: 0 12px 24px -10px rgba(255,184,0,0.4);
+    z-index: 2;
+  }
+
+  .achievement-card::after {
+    content: '🏆';
+    position: absolute;
+    top: -8px; right: 10px;
+    font-size: 56px;
+    opacity: 0.3;
+  }
+
+  .ach-eyebrow {
+    font-family: var(--font-mono);
+    font-size: 8px; color: var(--marigold-dark);
+    letter-spacing: 0.2em; text-transform: uppercase;
+    font-weight: 700; margin-bottom: 4px;
+  }
+
+  .ach-title {
+    font-family: var(--font-display);
+    font-size: 16px; font-weight: 600;
+    color: var(--text-primary);
+    line-height: 1.1;
+    margin-bottom: 4px;
+  }
+  .ach-title em { font-style: italic; color: var(--marigold-dark); }
+
+  .ach-meta {
+    font-size: 9px;
+    color: var(--text-secondary);
+    font-family: var(--font-mono);
+    letter-spacing: 0.05em;
+  }
+
+  .progress-grid {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 8px;
+    padding: 0 16px;
+  }
+
+  .progress-row {
+    background: var(--warm-white);
+    border: 1px solid rgba(15,118,110,0.12);
+    border-radius: 12px;
+    padding: 10px 12px;
+  }
+
+  .pr-h {
+    display: flex; justify-content: space-between; align-items: center;
+    margin-bottom: 6px;
+  }
+
+  .pr-subject {
+    font-size: 11px; font-weight: 600;
+    color: var(--text-primary);
+  }
+
+  .pr-pct {
+    font-family: var(--font-display);
+    font-size: 13px; font-weight: 700;
+    color: var(--teal);
+  }
+
+  .pr-bar {
+    height: 5px;
+    background: var(--teal-pale);
+    border-radius: 999px;
+    overflow: hidden;
+  }
+
+  .pr-fill {
+    height: 100%;
+    background: linear-gradient(90deg, var(--teal), var(--teal-light));
+    border-radius: 999px;
+  }
+
+  .badges-row {
+    display: flex; gap: 8px; padding: 0 16px;
+    flex-wrap: wrap;
+  }
+
+  .star-badge {
+    flex: 1;
+    background: var(--warm-white);
+    border: 1px solid rgba(15,118,110,0.12);
+    border-radius: 12px;
+    padding: 10px 6px;
+    text-align: center;
+  }
+
+  .star-badge.gold { background: var(--marigold-pale); border-color: var(--marigold); }
+
+  .star-icon {
+    font-size: 20px;
+    margin-bottom: 3px;
+    line-height: 1;
+  }
+
+  .star-num {
+    font-family: var(--font-display);
+    font-size: 14px; font-weight: 700;
+    color: var(--marigold-dark);
+  }
+
+  .star-lbl {
+    font-size: 7px;
+    color: var(--text-secondary);
+    font-family: var(--font-mono);
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    margin-top: 1px;
+  }
+
+  /* TEACHER */
+  .teacher-screen {
+    background: var(--ivory);
+    min-height: 100%;
+  }
+
+  .teacher-h {
+    background: linear-gradient(135deg, var(--indigo), var(--indigo-dark));
+    padding: 14px 16px 18px;
+    color: white;
+  }
+
+  .teacher-back-row {
+    display: flex; align-items: center; gap: 12px;
+    margin-bottom: 12px;
+  }
+
+  .teacher-back {
+    width: 32px; height: 32px;
+    background: rgba(255,255,255,0.1);
+    border-radius: 10px;
+    display: flex; align-items: center; justify-content: center;
+    color: white;
+  }
+
+  .teacher-h-info { flex: 1; }
+  .teacher-class {
+    font-family: var(--font-display);
+    font-size: 16px; font-weight: 600;
+    color: white;
+  }
+  .teacher-class em { font-style: italic; color: var(--marigold-light); }
+
+  .teacher-period {
+    font-size: 9px;
+    color: var(--indigo-pale);
+    font-family: var(--font-mono);
+    letter-spacing: 0.1em;
+    margin-top: 1px;
+  }
+
+  .att-summary {
+    display: flex; gap: 6px;
+    margin-top: 10px;
+  }
+
+  .att-pill {
+    flex: 1; text-align: center;
+    padding: 6px 4px;
+    border-radius: 8px;
+    background: rgba(255,255,255,0.1);
+    border: 1px solid rgba(255,184,0,0.3);
+  }
+
+  .att-pill-num {
+    font-family: var(--font-display);
+    font-size: 14px; font-weight: 700;
+    color: white; line-height: 1;
+  }
+
+  .att-pill-lbl {
+    font-size: 7px;
+    color: var(--indigo-pale);
+    font-family: var(--font-mono);
+    letter-spacing: 0.1em;
+    margin-top: 2px;
+    text-transform: uppercase;
+  }
+
+  .att-list { padding: 12px; }
+
+  .att-row {
+    display: flex; align-items: center; gap: 10px;
+    padding: 10px 12px;
+    background: var(--warm-white);
+    border: 1px solid rgba(232,93,46,0.1);
+    border-radius: 12px;
+    margin-bottom: 6px;
+  }
+
+  .att-row.present { border-left: 3px solid var(--success); }
+  .att-row.absent { border-left: 3px solid var(--error); }
+  .att-row.late { border-left: 3px solid var(--warning); }
+
+  .att-roll {
+    width: 26px; height: 26px;
+    background: var(--saffron-pale);
+    border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-family: var(--font-mono);
+    font-size: 9px; font-weight: 700;
+    color: var(--saffron-dark);
+    flex-shrink: 0;
+  }
+
+  .att-name {
+    flex: 1;
+    font-size: 11px; font-weight: 600;
+    color: var(--text-primary);
+  }
+
+  .att-pills { display: flex; gap: 4px; }
+
+  .att-pill-btn {
+    width: 24px; height: 24px;
+    border-radius: 6px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 11px; font-weight: 700;
+    color: white;
+    cursor: pointer; opacity: 0.4;
+  }
+
+  .att-pill-btn.active { opacity: 1; box-shadow: 0 4px 8px -2px rgba(0,0,0,0.2); }
+  .att-pill-btn.p { background: var(--success); }
+  .att-pill-btn.a { background: var(--error); }
+  .att-pill-btn.l { background: var(--warning); }
+
+  .att-submit-area {
+    padding: 12px 16px 16px;
+    background: var(--warm-white);
+    border-top: 1px solid rgba(232,93,46,0.1);
+  }
+
+  .att-submit {
+    width: 100%; padding: 12px;
+    background: linear-gradient(135deg, var(--saffron), var(--saffron-light));
+    color: white;
+    border: none; border-radius: 12px;
+    font-size: 12px; font-weight: 700;
+    letter-spacing: 0.05em;
+    box-shadow: 0 8px 18px -4px rgba(232,93,46,0.4);
+  }
+
+  /* PRINCIPAL */
+  .principal-screen { background: var(--ivory); min-height: 100%; }
+
+  .principal-h {
+    background: linear-gradient(135deg, var(--saffron-dark), var(--saffron-darker));
+    padding: 14px 16px 22px;
+    color: white;
+    position: relative; overflow: hidden;
+  }
+
+  .principal-h::before {
+    content: '';
+    position: absolute;
+    top: -30px; right: -30px;
+    width: 110px; height: 110px;
+    background: radial-gradient(circle, rgba(255,184,0,0.35), transparent 70%);
+    border-radius: 50%;
+  }
+
+  .pr-eyebrow {
+    font-family: var(--font-mono);
+    font-size: 8px;
+    color: var(--marigold-light);
+    letter-spacing: 0.25em;
+    text-transform: uppercase;
+    font-weight: 700;
+    margin-bottom: 4px;
+    position: relative; z-index: 2;
+  }
+
+  .pr-title {
+    font-family: var(--font-display);
+    font-size: 18px; font-weight: 600;
+    color: white;
+    margin-bottom: 8px;
+    position: relative; z-index: 2;
+  }
+  .pr-title em { font-style: italic; color: var(--marigold-light); }
+
+  .pr-school {
+    font-size: 10px;
+    color: rgba(255,243,214,0.85);
+    font-family: var(--font-mono);
+    letter-spacing: 0.1em;
+    position: relative; z-index: 2;
+  }
+
+  .big-stats {
+    padding: 14px 14px 4px;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+  }
+
+  .big-stat {
+    padding: 14px;
+    background: var(--warm-white);
+    border: 1px solid rgba(232,93,46,0.12);
+    border-left: 4px solid var(--saffron);
+    border-radius: 12px;
+  }
+
+  .big-stat.green { border-left-color: var(--success); }
+  .big-stat.red { border-left-color: var(--error); }
+  .big-stat.teal { border-left-color: var(--teal); }
+
+  .bs-eyebrow {
+    font-family: var(--font-mono);
+    font-size: 7px;
+    color: var(--text-secondary);
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    font-weight: 600;
+    margin-bottom: 5px;
+  }
+
+  .bs-num {
+    font-family: var(--font-display);
+    font-size: 22px; font-weight: 700;
+    color: var(--text-primary);
+    line-height: 1;
+  }
+
+  .bs-trend {
+    font-size: 9px; margin-top: 4px;
+    font-weight: 600;
+  }
+
+  .bs-trend.up { color: var(--success); }
+  .bs-trend.down { color: var(--error); }
+
+  .trend-card {
+    margin: 8px 14px;
+    background: var(--warm-white);
+    border: 1px solid rgba(232,93,46,0.12);
+    border-radius: 14px;
+    padding: 14px;
+  }
+
+  .trend-h {
+    display: flex; justify-content: space-between; align-items: center;
+    margin-bottom: 12px;
+  }
+
+  .trend-title {
+    font-family: var(--font-display);
+    font-size: 13px; font-weight: 600;
+    color: var(--text-primary);
+  }
+  .trend-title em { font-style: italic; color: var(--saffron); }
+
+  .trend-period {
+    font-size: 9px;
+    color: var(--saffron);
+    font-family: var(--font-mono);
+    letter-spacing: 0.1em;
+    font-weight: 600;
+  }
+
+  .trend-bars {
+    display: flex; align-items: flex-end;
+    justify-content: space-between;
+    gap: 4px;
+    height: 80px;
+  }
+
+  .trend-bar {
+    flex: 1;
+    background: linear-gradient(180deg, var(--saffron), var(--saffron-dark));
+    border-radius: 4px 4px 0 0;
+    position: relative;
+  }
+
+  .trend-bar-lbl {
+    position: absolute;
+    bottom: -16px; left: 0; right: 0;
+    text-align: center;
+    font-size: 7px;
+    color: var(--text-secondary);
+    font-family: var(--font-mono);
+    font-weight: 600;
+  }
+
+  /* ADMIN */
+  .admin-screen { background: var(--ivory); min-height: 100%; }
+
+  .admin-h {
+    background: linear-gradient(135deg, #BE123C, #831843);
+    padding: 14px 16px 18px;
+    color: white;
+  }
+
+  .admin-h-title {
+    font-family: var(--font-display);
+    font-size: 18px; font-weight: 600;
+    line-height: 1;
+    margin-bottom: 6px;
+  }
+  .admin-h-title em { font-style: italic; color: var(--marigold-light); }
+
+  .admin-h-meta {
+    font-size: 10px;
+    color: rgba(255,243,214,0.85);
+    font-family: var(--font-mono);
+    letter-spacing: 0.1em;
+  }
+
+  .admin-tabs {
+    display: flex; gap: 14px;
+    margin-top: 12px;
+  }
+
+  .admin-tab {
+    font-family: var(--font-mono);
+    font-size: 10px;
+    color: rgba(255,255,255,0.6);
+    padding-bottom: 6px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    font-weight: 600;
+  }
+
+  .admin-tab.active {
+    color: var(--marigold-light);
+    border-bottom: 2px solid var(--marigold-light);
+  }
+
+  .approval-list { padding: 12px; }
+
+  .appr-card {
+    background: var(--warm-white);
+    border: 1px solid rgba(232,93,46,0.1);
+    border-left: 3px solid var(--warning);
+    border-radius: 12px;
+    padding: 12px;
+    margin-bottom: 8px;
+  }
+
+  .appr-h-row {
+    display: flex; justify-content: space-between; align-items: flex-start;
+    margin-bottom: 6px;
+  }
+
+  .appr-type {
+    font-family: var(--font-mono);
+    font-size: 8px;
+    color: var(--warning);
+    background: var(--warning-light);
+    padding: 3px 8px;
+    border-radius: 999px;
+    letter-spacing: 0.1em;
+    font-weight: 700;
+    text-transform: uppercase;
+  }
+
+  .appr-time {
+    font-size: 9px;
+    color: var(--text-secondary);
+    font-family: var(--font-mono);
+  }
+
+  .appr-title {
+    font-size: 12px; font-weight: 700;
+    color: var(--text-primary);
+    line-height: 1.3;
+    margin-bottom: 3px;
+  }
+
+  .appr-desc {
+    font-size: 10px;
+    color: var(--text-secondary);
+    margin-bottom: 8px;
+    line-height: 1.4;
+  }
+
+  .appr-actions {
+    display: flex; gap: 6px;
+  }
+
+  .appr-btn {
+    flex: 1;
+    padding: 8px;
+    border-radius: 8px;
+    font-size: 10px; font-weight: 700;
+    border: none; text-align: center;
+  }
+
+  .appr-btn.approve { background: var(--success); color: white; }
+  .appr-btn.reject { background: transparent; color: var(--error); border: 1.5px solid var(--error); }
+  .appr-btn.review { background: var(--saffron-pale); color: var(--saffron-dark); }
+
+  /* NOTIFICATIONS */
+  .notif-screen { background: var(--ivory); min-height: 100%; }
+
+  .notif-h {
+    background: var(--warm-white);
+    padding: 14px 16px 12px;
+    border-bottom: 1px solid rgba(232,93,46,0.1);
+  }
+
+  .notif-h-row {
+    display: flex; align-items: center; justify-content: space-between;
+    margin-bottom: 12px;
+  }
+
+  .notif-title {
+    font-family: var(--font-display);
+    font-size: 18px; font-weight: 600;
+    color: var(--text-primary);
+  }
+  .notif-title em { font-style: italic; color: var(--saffron); }
+
+  .notif-mark-read {
+    font-size: 10px;
+    color: var(--saffron);
+    font-weight: 600;
+    font-family: var(--font-mono);
+    letter-spacing: 0.05em;
+  }
+
+  .notif-filters {
+    display: flex; gap: 6px;
+    overflow-x: auto;
+  }
+
+  .notif-filter {
+    padding: 5px 12px;
+    border-radius: 999px;
+    background: var(--saffron-pale);
+    color: var(--saffron-dark);
+    font-size: 10px;
+    font-weight: 600;
+    font-family: var(--font-mono);
+    letter-spacing: 0.05em;
+    white-space: nowrap;
+  }
+
+  .notif-filter.active {
+    background: var(--saffron);
+    color: white;
+  }
+
+  .notif-list { padding: 12px; }
+
+  .nt-item {
+    display: flex; gap: 10px;
+    padding: 10px 12px;
+    background: var(--warm-white);
+    border: 1px solid rgba(232,93,46,0.1);
+    border-radius: 12px;
+    margin-bottom: 6px;
+  }
+
+  .nt-item.unread { border-left: 3px solid var(--saffron); }
+
+  .nt-icon {
+    width: 36px; height: 36px;
+    border-radius: 10px;
+    flex-shrink: 0;
+    display: flex; align-items: center; justify-content: center;
+    color: white;
+  }
+
+  .nt-icon.urgent { background: var(--error); }
+  .nt-icon.important { background: var(--marigold); color: var(--text-primary); }
+  .nt-icon.info { background: var(--info); }
+  .nt-icon.success { background: var(--success); }
+
+  .nt-info { flex: 1; min-width: 0; }
+
+  .nt-h {
+    display: flex; justify-content: space-between; align-items: flex-start;
+    margin-bottom: 2px;
+  }
+
+  .nt-title {
+    font-size: 11px; font-weight: 700;
+    color: var(--text-primary);
+    line-height: 1.2;
+  }
+
+  .nt-time {
+    font-size: 8px;
+    color: var(--text-secondary);
+    font-family: var(--font-mono);
+    margin-left: 6px;
+    flex-shrink: 0;
+  }
+
+  .nt-desc {
+    font-size: 10px;
+    color: var(--text-secondary);
+    line-height: 1.4;
+  }
+
+  /* PROFILE */
+  .prof-screen { background: var(--ivory); min-height: 100%; }
+
+  .prof-h {
+    background: linear-gradient(135deg, var(--indigo), var(--indigo-dark));
+    padding: 14px 16px 50px;
+    color: white;
+    position: relative;
+  }
+
+  .prof-h-title {
+    font-family: var(--font-display);
+    font-size: 16px; font-weight: 600;
+    color: white;
+    text-align: center;
+  }
+  .prof-h-title em { font-style: italic; color: var(--marigold-light); }
+
+  .prof-card-wrap {
+    margin: -36px 14px 0;
+    background: var(--warm-white);
+    border-radius: 18px;
+    padding: 36px 16px 18px;
+    box-shadow: 0 14px 28px -14px rgba(46,26,107,0.2);
+    text-align: center;
+    position: relative;
+  }
+
+  .prof-photo {
+    position: absolute;
+    top: -32px; left: 50%;
+    transform: translateX(-50%);
+    width: 64px; height: 64px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, var(--marigold), var(--marigold-bright));
+    display: flex; align-items: center; justify-content: center;
+    color: var(--text-primary);
+    font-family: var(--font-display);
+    font-weight: 700; font-size: 26px;
+    border: 4px solid var(--warm-white);
+    box-shadow: 0 6px 16px -4px rgba(255,184,0,0.5);
+  }
+
+  .prof-name {
+    font-family: var(--font-display);
+    font-size: 18px; font-weight: 700;
+    color: var(--text-primary);
+    margin-bottom: 4px;
+  }
+
+  .prof-role-pill {
+    display: inline-flex; align-items: center; gap: 4px;
+    padding: 3px 10px;
+    background: var(--marigold-pale);
+    color: var(--marigold-dark);
+    border: 1px solid var(--marigold);
+    border-radius: 999px;
+    font-family: var(--font-mono);
+    font-size: 8px; font-weight: 700;
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+  }
+
+  .prof-id {
+    font-family: var(--font-mono);
+    font-size: 8px;
+    color: var(--text-secondary);
+    letter-spacing: 0.1em;
+    margin-top: 6px;
+  }
+
+  .prof-section { margin: 12px 14px; }
+
+  .prof-section-h {
+    font-family: var(--font-mono);
+    font-size: 9px;
+    color: var(--saffron);
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    font-weight: 700;
+    margin-bottom: 6px;
+  }
+
+  .settings-card {
+    background: var(--warm-white);
+    border: 1px solid rgba(232,93,46,0.1);
+    border-radius: 12px;
+    overflow: hidden;
+  }
+
+  .setting-row {
+    display: flex; align-items: center; gap: 12px;
+    padding: 10px 12px;
+    border-bottom: 1px dashed rgba(232,93,46,0.08);
+  }
+
+  .setting-row:last-child { border: 0; }
+
+  .setting-icon {
+    width: 30px; height: 30px;
+    border-radius: 8px;
+    background: var(--saffron-pale);
+    color: var(--saffron-dark);
+    display: flex; align-items: center; justify-content: center;
+    flex-shrink: 0;
+  }
+
+  .setting-info { flex: 1; }
+  .setting-name {
+    font-size: 11px; font-weight: 600;
+    color: var(--text-primary);
+  }
+  .setting-meta {
+    font-size: 9px;
+    color: var(--text-secondary);
+    margin-top: 1px;
+  }
+
+  .setting-arrow {
+    color: var(--text-tertiary);
+    flex-shrink: 0;
+  }
+
+  .lang-toggle {
+    display: inline-flex;
+    background: var(--saffron-pale);
+    border-radius: 999px;
+    padding: 2px;
+  }
+
+  .lang-opt {
+    padding: 4px 10px;
+    border-radius: 999px;
+    font-family: var(--font-mono);
+    font-size: 9px; font-weight: 600;
+    color: var(--saffron-dark);
+  }
+
+  .lang-opt.active {
+    background: var(--saffron);
+    color: white;
+  }
+
+  /* DESIGN NOTES */
+  .notes-grid {
+    max-width: 1100px;
+    margin: 60px auto 0;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 18px;
+    padding: 0 40px;
+  }
+
+  .note-card {
+    padding: 24px;
+    background: var(--warm-white);
+    border: 1px solid rgba(232,93,46,0.12);
+    border-left: 4px solid var(--saffron);
+    border-radius: 16px;
+  }
+
+  .note-card.teal-accent { border-left-color: var(--teal); }
+  .note-card.marigold-accent { border-left-color: var(--marigold); }
+  .note-card.indigo-accent { border-left-color: var(--indigo); }
+
+  .note-eyebrow {
+    font-family: var(--font-mono);
+    font-size: 9px;
+    color: var(--saffron);
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    margin-bottom: 8px;
+    font-weight: 700;
+  }
+
+  .note-card.teal-accent .note-eyebrow { color: var(--teal); }
+  .note-card.marigold-accent .note-eyebrow { color: var(--marigold-dark); }
+  .note-card.indigo-accent .note-eyebrow { color: var(--indigo); }
+
+  .note-title {
+    font-family: var(--font-display);
+    font-size: 22px; font-weight: 600;
+    color: var(--text-primary);
+    margin-bottom: 10px;
+    letter-spacing: -0.01em;
+  }
+  .note-title em { font-style: italic; color: var(--saffron); }
+  .note-card.teal-accent .note-title em { color: var(--teal); }
+  .note-card.marigold-accent .note-title em { color: var(--marigold-dark); }
+  .note-card.indigo-accent .note-title em { color: var(--indigo); }
+
+  .note-text {
+    font-size: 13px;
+    color: var(--text-secondary);
+    line-height: 1.6;
+  }
+
+  .note-text strong { color: var(--text-primary); font-weight: 600; }
+
+  .note-text code {
+    font-family: var(--font-mono);
+    font-size: 11px;
+    background: var(--saffron-pale);
+    padding: 2px 6px;
+    border-radius: 4px;
+    color: var(--saffron-dark);
+  }
+
+  .footer {
+    padding: 60px 40px;
+    text-align: center;
+    margin-top: 60px;
+    background: linear-gradient(180deg, transparent, rgba(232,93,46,0.06));
+  }
+
+  .footer-divider {
+    display: flex; align-items: center; justify-content: center;
+    gap: 14px; margin-bottom: 14px;
+  }
+
+  .footer-divider .line {
+    flex: 1; max-width: 90px; height: 1px;
+    background: linear-gradient(90deg, transparent, var(--saffron), transparent);
+  }
+
+  .footer-divider .star { color: var(--saffron); font-size: 16px; }
+
+  .footer-title {
+    font-family: var(--font-display);
+    font-size: 28px; font-weight: 600;
+    color: var(--text-primary);
+    margin-bottom: 6px;
+  }
+  .footer-title em { font-style: italic; color: var(--saffron); }
+
+  .footer-meta {
+    font-family: var(--font-mono);
+    font-size: 10px;
+    color: var(--text-secondary);
+    letter-spacing: 0.3em;
+    text-transform: uppercase;
+  }
+
+  @media (max-width: 768px) {
+    .type-grid, .notes-grid { grid-template-columns: 1fr; }
+    .section { padding: 60px 20px; }
+    .hero { padding: 60px 20px 40px; }
+  }
+</style>
+</head>
+<body>
+<div class="wrapper">
+
+  <!-- HERO -->
+  <header class="hero">
+    <div class="hero-eyebrow"><span class="dot"></span>Jaikalki School ERP · Fresh Identity</div>
+
+    <div class="hero-logo">
+      <svg class="logo-svg" viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg">
+        <defs>
+          <linearGradient id="sunRays" x1="50%" y1="0%" x2="50%" y2="100%">
+            <stop offset="0%" stop-color="#FFD659"/>
+            <stop offset="100%" stop-color="#FFB800"/>
+          </linearGradient>
+          <linearGradient id="bookSpine" x1="0%" y1="0%" x2="0%" y2="100%">
+            <stop offset="0%" stop-color="#E85D2E"/>
+            <stop offset="100%" stop-color="#C44419"/>
+          </linearGradient>
+          <linearGradient id="bookPage" x1="0%" y1="0%" x2="0%" y2="100%">
+            <stop offset="0%" stop-color="#FFFCF7"/>
+            <stop offset="100%" stop-color="#FDF7E9"/>
+          </linearGradient>
+          <linearGradient id="lotusPetal" x1="50%" y1="0%" x2="50%" y2="100%">
+            <stop offset="0%" stop-color="#FF7A4D"/>
+            <stop offset="100%" stop-color="#E85D2E"/>
+          </linearGradient>
+        </defs>
+        <!-- Rising sun rays at top -->
+        <g transform="translate(100,80)">
+          <path d="M 0 -50 L 4 -28 L -4 -28 Z" fill="url(#sunRays)"/>
+          <path d="M 0 -50 L 4 -28 L -4 -28 Z" fill="url(#sunRays)" transform="rotate(30)" opacity="0.85"/>
+          <path d="M 0 -50 L 4 -28 L -4 -28 Z" fill="url(#sunRays)" transform="rotate(-30)" opacity="0.85"/>
+          <path d="M 0 -50 L 4 -28 L -4 -28 Z" fill="url(#sunRays)" transform="rotate(60)" opacity="0.7"/>
+          <path d="M 0 -50 L 4 -28 L -4 -28 Z" fill="url(#sunRays)" transform="rotate(-60)" opacity="0.7"/>
+          <path d="M 0 -50 L 4 -28 L -4 -28 Z" fill="url(#sunRays)" transform="rotate(90)" opacity="0.55"/>
+          <path d="M 0 -50 L 4 -28 L -4 -28 Z" fill="url(#sunRays)" transform="rotate(-90)" opacity="0.55"/>
+          <circle cx="0" cy="0" r="22" fill="url(#sunRays)"/>
+          <circle cx="0" cy="0" r="14" fill="#FFFCF7" opacity="0.9"/>
+        </g>
+        <!-- Open book center -->
+        <g transform="translate(100,135)">
+          <path d="M -45 -8 Q -45 -12 -42 -14 L -2 -8 L -2 22 L -42 18 Q -45 18 -45 14 Z" fill="url(#bookPage)" stroke="#E85D2E" stroke-width="1.5"/>
+          <path d="M 45 -8 Q 45 -12 42 -14 L 2 -8 L 2 22 L 42 18 Q 45 18 45 14 Z" fill="url(#bookPage)" stroke="#E85D2E" stroke-width="1.5"/>
+          <path d="M -2 -8 L 2 -8 L 2 22 L -2 22 Z" fill="url(#bookSpine)"/>
+          <line x1="-38" y1="-3" x2="-8" y2="-1" stroke="#E85D2E" stroke-width="0.8" opacity="0.4"/>
+          <line x1="-38" y1="2" x2="-8" y2="4" stroke="#E85D2E" stroke-width="0.8" opacity="0.4"/>
+          <line x1="-38" y1="7" x2="-8" y2="9" stroke="#E85D2E" stroke-width="0.8" opacity="0.4"/>
+          <line x1="8" y1="-1" x2="38" y2="-3" stroke="#E85D2E" stroke-width="0.8" opacity="0.4"/>
+          <line x1="8" y1="4" x2="38" y2="2" stroke="#E85D2E" stroke-width="0.8" opacity="0.4"/>
+          <line x1="8" y1="9" x2="38" y2="7" stroke="#E85D2E" stroke-width="0.8" opacity="0.4"/>
+        </g>
+        <!-- Lotus petals foundation -->
+        <g transform="translate(100,165)">
+          <ellipse cx="0" cy="0" rx="6" ry="14" fill="url(#lotusPetal)" opacity="0.9"/>
+          <ellipse cx="0" cy="0" rx="6" ry="14" fill="url(#lotusPetal)" transform="rotate(35)" opacity="0.85"/>
+          <ellipse cx="0" cy="0" rx="6" ry="14" fill="url(#lotusPetal)" transform="rotate(-35)" opacity="0.85"/>
+          <ellipse cx="0" cy="0" rx="6" ry="14" fill="url(#lotusPetal)" transform="rotate(70)" opacity="0.75"/>
+          <ellipse cx="0" cy="0" rx="6" ry="14" fill="url(#lotusPetal)" transform="rotate(-70)" opacity="0.75"/>
+          <circle cx="0" cy="0" r="4" fill="#FFB800"/>
+        </g>
+        <text x="100" y="138" font-family="Fraunces, serif" font-style="italic" font-weight="700" font-size="14" fill="#FFB800" text-anchor="middle">J</text>
+      </svg>
+    </div>
+
+    <div class="hero-namaste">विद्या ददाति विनयं · Knowledge gives humility</div>
+    <h1>Jaikalki <em>School ERP</em></h1>
+    <p>A completely fresh visual identity for the school management Flutter app — Saffron + Forest Teal + Marigold + Indigo palette, with a new logo combining open book (knowledge), rising sun (enlightenment), and lotus petals (Indian heritage).</p>
+
+    <div class="hero-meta">
+      <div class="meta-item"><div class="meta-num">13</div><div class="meta-lbl">User Roles</div></div>
+      <div class="meta-item"><div class="meta-num">9</div><div class="meta-lbl">Live Screens</div></div>
+      <div class="meta-item"><div class="meta-num">4</div><div class="meta-lbl">Brand Colors</div></div>
+      <div class="meta-item"><div class="meta-num">हिंदी</div><div class="meta-lbl">Multi-Lang</div></div>
+      <div class="meta-item"><div class="meta-num">WCAG</div><div class="meta-lbl">AA Compliant</div></div>
+    </div>
+  </header>
+
+  <!-- LOGO SHOWCASE -->
+  <section class="section">
+    <div class="section-head">
+      <div class="section-label">★ The New Logo</div>
+      <h2 class="section-title">Three <em>elements</em>, one mark</h2>
+      <p class="section-sub">A completely fresh symbol — combining open book (knowledge), rising sun rays (enlightenment), and lotus petals (Indian heritage). Every element earns its place.</p>
+    </div>
+
+    <div class="logo-showcase">
+      <div class="logo-tile">
+        <div class="logo-tile-preview ivory">
+          <svg viewBox="0 0 200 200">
+            <defs>
+              <linearGradient id="sr1" x1="50%" y1="0%" x2="50%" y2="100%"><stop offset="0%" stop-color="#FFD659"/><stop offset="100%" stop-color="#FFB800"/></linearGradient>
+              <linearGradient id="bs1" x1="0%" y1="0%" x2="0%" y2="100%"><stop offset="0%" stop-color="#E85D2E"/><stop offset="100%" stop-color="#C44419"/></linearGradient>
+              <linearGradient id="bp1" x1="0%" y1="0%" x2="0%" y2="100%"><stop offset="0%" stop-color="#FFFCF7"/><stop offset="100%" stop-color="#FDF7E9"/></linearGradient>
+              <linearGradient id="lp1" x1="50%" y1="0%" x2="50%" y2="100%"><stop offset="0%" stop-color="#FF7A4D"/><stop offset="100%" stop-color="#E85D2E"/></linearGradient>
+            </defs>
+            <g transform="translate(100,80)">
+              <path d="M 0 -50 L 4 -28 L -4 -28 Z" fill="url(#sr1)"/>
+              <path d="M 0 -50 L 4 -28 L -4 -28 Z" fill="url(#sr1)" transform="rotate(30)" opacity="0.85"/>
+              <path d="M 0 -50 L 4 -28 L -4 -28 Z" fill="url(#sr1)" transform="rotate(-30)" opacity="0.85"/>
+              <path d="M 0 -50 L 4 -28 L -4 -28 Z" fill="url(#sr1)" transform="rotate(60)" opacity="0.7"/>
+              <path d="M 0 -50 L 4 -28 L -4 -28 Z" fill="url(#sr1)" transform="rotate(-60)" opacity="0.7"/>
+              <path d="M 0 -50 L 4 -28 L -4 -28 Z" fill="url(#sr1)" transform="rotate(90)" opacity="0.55"/>
+              <path d="M 0 -50 L 4 -28 L -4 -28 Z" fill="url(#sr1)" transform="rotate(-90)" opacity="0.55"/>
+              <circle cx="0" cy="0" r="22" fill="url(#sr1)"/>
+              <circle cx="0" cy="0" r="14" fill="#FFFCF7"/>
+            </g>
+            <g transform="translate(100,135)">
+              <path d="M -45 -8 Q -45 -12 -42 -14 L -2 -8 L -2 22 L -42 18 Q -45 18 -45 14 Z" fill="url(#bp1)" stroke="#E85D2E" stroke-width="1.5"/>
+              <path d="M 45 -8 Q 45 -12 42 -14 L 2 -8 L 2 22 L 42 18 Q 45 18 45 14 Z" fill="url(#bp1)" stroke="#E85D2E" stroke-width="1.5"/>
+              <path d="M -2 -8 L 2 -8 L 2 22 L -2 22 Z" fill="url(#bs1)"/>
+            </g>
+            <g transform="translate(100,165)">
+              <ellipse cx="0" cy="0" rx="6" ry="14" fill="url(#lp1)" opacity="0.9"/>
+              <ellipse cx="0" cy="0" rx="6" ry="14" fill="url(#lp1)" transform="rotate(35)" opacity="0.85"/>
+              <ellipse cx="0" cy="0" rx="6" ry="14" fill="url(#lp1)" transform="rotate(-35)" opacity="0.85"/>
+              <ellipse cx="0" cy="0" rx="6" ry="14" fill="url(#lp1)" transform="rotate(70)" opacity="0.75"/>
+              <ellipse cx="0" cy="0" rx="6" ry="14" fill="url(#lp1)" transform="rotate(-70)" opacity="0.75"/>
+              <circle cx="0" cy="0" r="4" fill="#FFB800"/>
+            </g>
+          </svg>
+        </div>
+        <div class="logo-tile-info">
+          <div class="logo-tile-name">Light · Ivory</div>
+          <div class="logo-tile-meta">PRIMARY · WEB &amp; DOCS</div>
+        </div>
+      </div>
+
+      <div class="logo-tile">
+        <div class="logo-tile-preview saffron">
+          <svg viewBox="0 0 200 200">
+            <g transform="translate(100,80)">
+              <path d="M 0 -50 L 4 -28 L -4 -28 Z" fill="#FFFCF7"/>
+              <path d="M 0 -50 L 4 -28 L -4 -28 Z" fill="#FFFCF7" transform="rotate(30)" opacity="0.85"/>
+              <path d="M 0 -50 L 4 -28 L -4 -28 Z" fill="#FFFCF7" transform="rotate(-30)" opacity="0.85"/>
+              <path d="M 0 -50 L 4 -28 L -4 -28 Z" fill="#FFFCF7" transform="rotate(60)" opacity="0.7"/>
+              <path d="M 0 -50 L 4 -28 L -4 -28 Z" fill="#FFFCF7" transform="rotate(-60)" opacity="0.7"/>
+              <circle cx="0" cy="0" r="22" fill="#FFB800"/>
+              <circle cx="0" cy="0" r="14" fill="#FFFCF7"/>
+            </g>
+            <g transform="translate(100,135)">
+              <path d="M -45 -8 Q -45 -12 -42 -14 L -2 -8 L -2 22 L -42 18 Q -45 18 -45 14 Z" fill="#FFFCF7"/>
+              <path d="M 45 -8 Q 45 -12 42 -14 L 2 -8 L 2 22 L 42 18 Q 45 18 45 14 Z" fill="#FFFCF7"/>
+              <path d="M -2 -8 L 2 -8 L 2 22 L -2 22 Z" fill="#FFB800"/>
+            </g>
+            <g transform="translate(100,165)">
+              <ellipse cx="0" cy="0" rx="6" ry="14" fill="#FFFCF7" opacity="0.95"/>
+              <ellipse cx="0" cy="0" rx="6" ry="14" fill="#FFFCF7" transform="rotate(35)" opacity="0.85"/>
+              <ellipse cx="0" cy="0" rx="6" ry="14" fill="#FFFCF7" transform="rotate(-35)" opacity="0.85"/>
+              <ellipse cx="0" cy="0" rx="6" ry="14" fill="#FFFCF7" transform="rotate(70)" opacity="0.75"/>
+              <ellipse cx="0" cy="0" rx="6" ry="14" fill="#FFFCF7" transform="rotate(-70)" opacity="0.75"/>
+              <circle cx="0" cy="0" r="4" fill="#FFB800"/>
+            </g>
+          </svg>
+        </div>
+        <div class="logo-tile-info">
+          <div class="logo-tile-name">Reverse · Saffron</div>
+          <div class="logo-tile-meta">APP HEADER · COVERS</div>
+        </div>
+      </div>
+
+      <div class="logo-tile">
+        <div class="logo-tile-preview indigo">
+          <svg viewBox="0 0 200 200">
+            <defs>
+              <linearGradient id="srInd" x1="50%" y1="0%" x2="50%" y2="100%"><stop offset="0%" stop-color="#FFD659"/><stop offset="100%" stop-color="#FFB800"/></linearGradient>
+            </defs>
+            <g transform="translate(100,80)">
+              <path d="M 0 -50 L 4 -28 L -4 -28 Z" fill="url(#srInd)"/>
+              <path d="M 0 -50 L 4 -28 L -4 -28 Z" fill="url(#srInd)" transform="rotate(30)" opacity="0.85"/>
+              <path d="M 0 -50 L 4 -28 L -4 -28 Z" fill="url(#srInd)" transform="rotate(-30)" opacity="0.85"/>
+              <path d="M 0 -50 L 4 -28 L -4 -28 Z" fill="url(#srInd)" transform="rotate(60)" opacity="0.7"/>
+              <path d="M 0 -50 L 4 -28 L -4 -28 Z" fill="url(#srInd)" transform="rotate(-60)" opacity="0.7"/>
+              <circle cx="0" cy="0" r="22" fill="url(#srInd)"/>
+              <circle cx="0" cy="0" r="14" fill="#FFFCF7"/>
+            </g>
+            <g transform="translate(100,135)">
+              <path d="M -45 -8 Q -45 -12 -42 -14 L -2 -8 L -2 22 L -42 18 Q -45 18 -45 14 Z" fill="#FF7A4D" stroke="#FFD659" stroke-width="1"/>
+              <path d="M 45 -8 Q 45 -12 42 -14 L 2 -8 L 2 22 L 42 18 Q 45 18 45 14 Z" fill="#FF7A4D" stroke="#FFD659" stroke-width="1"/>
+              <path d="M -2 -8 L 2 -8 L 2 22 L -2 22 Z" fill="#FFB800"/>
+            </g>
+            <g transform="translate(100,165)">
+              <ellipse cx="0" cy="0" rx="6" ry="14" fill="#FF7A4D" opacity="0.9"/>
+              <ellipse cx="0" cy="0" rx="6" ry="14" fill="#FF7A4D" transform="rotate(35)" opacity="0.85"/>
+              <ellipse cx="0" cy="0" rx="6" ry="14" fill="#FF7A4D" transform="rotate(-35)" opacity="0.85"/>
+              <ellipse cx="0" cy="0" rx="6" ry="14" fill="#FF7A4D" transform="rotate(70)" opacity="0.75"/>
+              <ellipse cx="0" cy="0" rx="6" ry="14" fill="#FF7A4D" transform="rotate(-70)" opacity="0.75"/>
+              <circle cx="0" cy="0" r="4" fill="#FFB800"/>
+            </g>
+          </svg>
+        </div>
+        <div class="logo-tile-info">
+          <div class="logo-tile-name">Dark · Indigo</div>
+          <div class="logo-tile-meta">NIGHT THEME · OLED</div>
+        </div>
+      </div>
+
+      <div class="logo-tile">
+        <div class="logo-tile-preview mint">
+          <svg viewBox="0 0 200 200">
+            <defs>
+              <linearGradient id="srM" x1="50%" y1="0%" x2="50%" y2="100%"><stop offset="0%" stop-color="#FFD659"/><stop offset="100%" stop-color="#FFB800"/></linearGradient>
+              <linearGradient id="bsM" x1="0%" y1="0%" x2="0%" y2="100%"><stop offset="0%" stop-color="#E85D2E"/><stop offset="100%" stop-color="#C44419"/></linearGradient>
+            </defs>
+            <g transform="translate(100,80)">
+              <path d="M 0 -50 L 4 -28 L -4 -28 Z" fill="url(#srM)"/>
+              <path d="M 0 -50 L 4 -28 L -4 -28 Z" fill="url(#srM)" transform="rotate(30)" opacity="0.85"/>
+              <path d="M 0 -50 L 4 -28 L -4 -28 Z" fill="url(#srM)" transform="rotate(-30)" opacity="0.85"/>
+              <path d="M 0 -50 L 4 -28 L -4 -28 Z" fill="url(#srM)" transform="rotate(60)" opacity="0.7"/>
+              <path d="M 0 -50 L 4 -28 L -4 -28 Z" fill="url(#srM)" transform="rotate(-60)" opacity="0.7"/>
+              <circle cx="0" cy="0" r="22" fill="url(#srM)"/>
+              <circle cx="0" cy="0" r="14" fill="#FFFCF7"/>
+            </g>
+            <g transform="translate(100,135)">
+              <path d="M -45 -8 Q -45 -12 -42 -14 L -2 -8 L -2 22 L -42 18 Q -45 18 -45 14 Z" fill="#FFFCF7" stroke="#E85D2E" stroke-width="1.5"/>
+              <path d="M 45 -8 Q 45 -12 42 -14 L 2 -8 L 2 22 L 42 18 Q 45 18 45 14 Z" fill="#FFFCF7" stroke="#E85D2E" stroke-width="1.5"/>
+              <path d="M -2 -8 L 2 -8 L 2 22 L -2 22 Z" fill="url(#bsM)"/>
+            </g>
+            <g transform="translate(100,165)">
+              <ellipse cx="0" cy="0" rx="6" ry="14" fill="#E85D2E" opacity="0.9"/>
+              <ellipse cx="0" cy="0" rx="6" ry="14" fill="#E85D2E" transform="rotate(35)" opacity="0.85"/>
+              <ellipse cx="0" cy="0" rx="6" ry="14" fill="#E85D2E" transform="rotate(-35)" opacity="0.85"/>
+              <ellipse cx="0" cy="0" rx="6" ry="14" fill="#E85D2E" transform="rotate(70)" opacity="0.75"/>
+              <ellipse cx="0" cy="0" rx="6" ry="14" fill="#E85D2E" transform="rotate(-70)" opacity="0.75"/>
+              <circle cx="0" cy="0" r="4" fill="#FFB800"/>
+            </g>
+          </svg>
+        </div>
+        <div class="logo-tile-info">
+          <div class="logo-tile-name">Light · Mint Cream</div>
+          <div class="logo-tile-meta">CALM SURFACES · TEAL UI</div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- COLOR PALETTE -->
+  <section class="section">
+    <div class="section-head">
+      <div class="section-label">Token · 01</div>
+      <h2 class="section-title">Color <em>palette</em></h2>
+      <p class="section-sub">A completely fresh palette — Saffron (energy), Forest Teal (growth), Marigold (celebration), Indigo (heritage). Inspired by India, optimized for schools.</p>
+    </div>
+
+    <div class="palette-group">
+      <h3 class="palette-group-title">Brand <em>Primary</em> · Saffron</h3>
+      <p class="palette-group-sub">/// SACRED · WARM · ENERGETIC · INDIAN HERITAGE</p>
+      <div class="swatch-grid">
+        <div class="swatch dark"><div class="swatch-color" style="background:#8C2F0E"><span class="swatch-tag">DARKER</span></div><div class="swatch-info"><div class="swatch-name">Saffron Darker</div><div class="swatch-hex">#8C2F0E</div></div></div>
+        <div class="swatch dark"><div class="swatch-color" style="background:#C44419"><span class="swatch-tag">DARK</span></div><div class="swatch-info"><div class="swatch-name">Saffron Dark</div><div class="swatch-hex">#C44419</div></div></div>
+        <div class="swatch dark"><div class="swatch-color" style="background:#E85D2E"><span class="swatch-tag">★ PRIMARY</span></div><div class="swatch-info"><div class="swatch-name">Brand Saffron</div><div class="swatch-hex">#E85D2E</div></div></div>
+        <div class="swatch dark"><div class="swatch-color" style="background:#FF7A4D"><span class="swatch-tag">LIGHT</span></div><div class="swatch-info"><div class="swatch-name">Saffron Light</div><div class="swatch-hex">#FF7A4D</div></div></div>
+        <div class="swatch light"><div class="swatch-color" style="background:#FFB394"><span class="swatch-tag">LIGHTER</span></div><div class="swatch-info"><div class="swatch-name">Saffron Lighter</div><div class="swatch-hex">#FFB394</div></div></div>
+        <div class="swatch light"><div class="swatch-color" style="background:#FEE5DA"><span class="swatch-tag">PALE</span></div><div class="swatch-info"><div class="swatch-name">Saffron Pale</div><div class="swatch-hex">#FEE5DA</div></div></div>
+      </div>
+    </div>
+
+    <div class="palette-group">
+      <h3 class="palette-group-title">Secondary <em>Forest</em> Teal</h3>
+      <p class="palette-group-sub">/// GROWTH · CALM · CLASSROOM · KNOWLEDGE</p>
+      <div class="swatch-grid">
+        <div class="swatch dark"><div class="swatch-color" style="background:#0A3D38"><span class="swatch-tag">DARKER</span></div><div class="swatch-info"><div class="swatch-name">Teal Darker</div><div class="swatch-hex">#0A3D38</div></div></div>
+        <div class="swatch dark"><div class="swatch-color" style="background:#115E59"><span class="swatch-tag">DARK</span></div><div class="swatch-info"><div class="swatch-name">Teal Dark</div><div class="swatch-hex">#115E59</div></div></div>
+        <div class="swatch dark"><div class="swatch-color" style="background:#0F766E"><span class="swatch-tag">★ PRIMARY</span></div><div class="swatch-info"><div class="swatch-name">Forest Teal</div><div class="swatch-hex">#0F766E</div></div></div>
+        <div class="swatch dark"><div class="swatch-color" style="background:#2C9489"><span class="swatch-tag">LIGHT</span></div><div class="swatch-info"><div class="swatch-name">Teal Light</div><div class="swatch-hex">#2C9489</div></div></div>
+        <div class="swatch light"><div class="swatch-color" style="background:#99D4CC"><span class="swatch-tag">LIGHTER</span></div><div class="swatch-info"><div class="swatch-name">Teal Lighter</div><div class="swatch-hex">#99D4CC</div></div></div>
+        <div class="swatch light"><div class="swatch-color" style="background:#D1F0EC"><span class="swatch-tag">PALE</span></div><div class="swatch-info"><div class="swatch-name">Teal Pale</div><div class="swatch-hex">#D1F0EC</div></div></div>
+      </div>
+    </div>
+
+    <div class="palette-group">
+      <h3 class="palette-group-title">Accent <em>Marigold</em> · Celebration</h3>
+      <p class="palette-group-sub">/// ACHIEVEMENT · PROSPERITY · FESTIVE · INDIAN GOLD</p>
+      <div class="swatch-grid">
+        <div class="swatch light"><div class="swatch-color" style="background:#FFF3D6"><span class="swatch-tag">PALE</span></div><div class="swatch-info"><div class="swatch-name">Marigold Pale</div><div class="swatch-hex">#FFF3D6</div></div></div>
+        <div class="swatch light"><div class="swatch-color" style="background:#FFD659"><span class="swatch-tag">LIGHT</span></div><div class="swatch-info"><div class="swatch-name">Marigold Light</div><div class="swatch-hex">#FFD659</div></div></div>
+        <div class="swatch light"><div class="swatch-color" style="background:#FFC72E"><span class="swatch-tag">BRIGHT</span></div><div class="swatch-info"><div class="swatch-name">Marigold Bright</div><div class="swatch-hex">#FFC72E</div></div></div>
+        <div class="swatch light"><div class="swatch-color" style="background:#FFB800"><span class="swatch-tag">★ ACCENT</span></div><div class="swatch-info"><div class="swatch-name">Brand Marigold</div><div class="swatch-hex">#FFB800</div></div></div>
+        <div class="swatch dark"><div class="swatch-color" style="background:#C28800"><span class="swatch-tag">DARK</span></div><div class="swatch-info"><div class="swatch-name">Marigold Dark</div><div class="swatch-hex">#C28800</div></div></div>
+      </div>
+    </div>
+
+    <div class="palette-group">
+      <h3 class="palette-group-title">Heritage <em>Indigo</em> · Royal &amp; Scholarly</h3>
+      <p class="palette-group-sub">/// TEXT · HEADERS · DEPTH · ROYAL INDIAN</p>
+      <div class="swatch-grid">
+        <div class="swatch dark"><div class="swatch-color" style="background:#1F1248"><span class="swatch-tag">★ TEXT</span></div><div class="swatch-info"><div class="swatch-name">Indigo Dark</div><div class="swatch-hex">#1F1248</div></div></div>
+        <div class="swatch dark"><div class="swatch-color" style="background:#2E1A6B"><span class="swatch-tag">PRIMARY</span></div><div class="swatch-info"><div class="swatch-name">Royal Indigo</div><div class="swatch-hex">#2E1A6B</div></div></div>
+        <div class="swatch dark"><div class="swatch-color" style="background:#4C32A0"><span class="swatch-tag">LIGHT</span></div><div class="swatch-info"><div class="swatch-name">Indigo Light</div><div class="swatch-hex">#4C32A0</div></div></div>
+        <div class="swatch light"><div class="swatch-color" style="background:#DCD5F2"><span class="swatch-tag">PALE</span></div><div class="swatch-info"><div class="swatch-name">Indigo Pale</div><div class="swatch-hex">#DCD5F2</div></div></div>
+      </div>
+    </div>
+
+    <div class="palette-group">
+      <h3 class="palette-group-title">Surfaces &amp; <em>Backgrounds</em></h3>
+      <p class="palette-group-sub">/// IVORY · MINT CREAM · WARM WHITE · NEVER PURE WHITE</p>
+      <div class="swatch-grid">
+        <div class="swatch light"><div class="swatch-color" style="background:#FFF9F0;border:1px solid #FEE5DA"><span class="swatch-tag">★ APP BG</span></div><div class="swatch-info"><div class="swatch-name">Ivory</div><div class="swatch-hex">#FFF9F0</div></div></div>
+        <div class="swatch light"><div class="swatch-color" style="background:#F0F9F4"><span class="swatch-tag">CALM</span></div><div class="swatch-info"><div class="swatch-name">Mint Cream</div><div class="swatch-hex">#F0F9F4</div></div></div>
+        <div class="swatch light"><div class="swatch-color" style="background:#FFFCF7;border:1px solid #FEE5DA"><span class="swatch-tag">CARDS</span></div><div class="swatch-info"><div class="swatch-name">Warm White</div><div class="swatch-hex">#FFFCF7</div></div></div>
+        <div class="swatch light"><div class="swatch-color" style="background:#FDF7E9"><span class="swatch-tag">INPUTS</span></div><div class="swatch-info"><div class="swatch-name">Cream 50</div><div class="swatch-hex">#FDF7E9</div></div></div>
+      </div>
+    </div>
+
+    <div class="palette-group">
+      <h3 class="palette-group-title">Education <em>Status</em></h3>
+      <p class="palette-group-sub">/// CONTEXTUAL COLORS WITH ICONS · COLOR-BLIND ACCESSIBLE</p>
+      <div class="swatch-grid">
+        <div class="swatch dark"><div class="swatch-color" style="background:#16A34A"><span class="swatch-tag">PRESENT ✓</span></div><div class="swatch-info"><div class="swatch-name">Present</div><div class="swatch-hex">#16A34A</div></div></div>
+        <div class="swatch dark"><div class="swatch-color" style="background:#DC2626"><span class="swatch-tag">ABSENT ✗</span></div><div class="swatch-info"><div class="swatch-name">Absent</div><div class="swatch-hex">#DC2626</div></div></div>
+        <div class="swatch dark"><div class="swatch-color" style="background:#F59E0B"><span class="swatch-tag">LATE ⏰</span></div><div class="swatch-info"><div class="swatch-name">Late</div><div class="swatch-hex">#F59E0B</div></div></div>
+        <div class="swatch dark"><div class="swatch-color" style="background:#0284C7"><span class="swatch-tag">ON LEAVE</span></div><div class="swatch-info"><div class="swatch-name">On Leave</div><div class="swatch-hex">#0284C7</div></div></div>
+        <div class="swatch dark"><div class="swatch-color" style="background:#FFB800"><span class="swatch-tag">A+ ★</span></div><div class="swatch-info"><div class="swatch-name">Grade A+</div><div class="swatch-hex">#FFB800</div></div></div>
+        <div class="swatch dark"><div class="swatch-color" style="background:#16A34A"><span class="swatch-tag">A · PAID</span></div><div class="swatch-info"><div class="swatch-name">Excellent / Paid</div><div class="swatch-hex">#16A34A</div></div></div>
+        <div class="swatch dark"><div class="swatch-color" style="background:#F59E0B"><span class="swatch-tag">PENDING</span></div><div class="swatch-info"><div class="swatch-name">Fee Pending</div><div class="swatch-hex">#F59E0B</div></div></div>
+        <div class="swatch dark"><div class="swatch-color" style="background:#8B5CF6"><span class="swatch-tag">WAIVED</span></div><div class="swatch-info"><div class="swatch-name">Fee Waived</div><div class="swatch-hex">#8B5CF6</div></div></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- TYPOGRAPHY -->
+  <section class="section">
+    <div class="section-head">
+      <div class="section-label">Token · 02</div>
+      <h2 class="section-title">Type <em>system</em></h2>
+      <p class="section-sub">Fraunces Display (warm, rounded serif) + DM Sans body (clean, modern) + Noto Sans Devanagari for Hindi.</p>
+    </div>
+
+    <div class="type-grid">
+      <div class="type-card"><div class="type-meta"><div class="type-meta-name">DISPLAY · LARGE</div><div class="type-meta-spec">FRAUNCES · 50 / 600</div></div><div class="type-display">Welcome <em>back</em></div></div>
+      <div class="type-card"><div class="type-meta"><div class="type-meta-name">HEADLINE · MEDIUM</div><div class="type-meta-spec">FRAUNCES · 32 / 600</div></div><div class="type-headline">Today's <em>schedule</em></div></div>
+      <div class="type-card"><div class="type-meta"><div class="type-meta-name">TITLE · LARGE</div><div class="type-meta-spec">DM SANS · 20 / 600</div></div><div class="type-title">Apply for student leave</div></div>
+      <div class="type-card"><div class="type-meta"><div class="type-meta-name">BODY · MEDIUM</div><div class="type-meta-spec">DM SANS · 15 / 400</div></div><div class="type-body">Submit homework by 6 PM. Teacher reviews assignments daily and parents receive a digest at 8 PM.</div></div>
+      <div class="type-card"><div class="type-meta"><div class="type-meta-name">हिंदी · DEVANAGARI</div><div class="type-meta-spec">NOTO SANS · 24 / 500</div></div><div class="type-hindi">विद्या ददाति विनयं</div></div>
+      <div class="type-card"><div class="type-meta"><div class="type-meta-name">LABEL · MONO</div><div class="type-meta-spec">JETBRAINS · 11 / 600</div></div><div class="type-label">★ STUDENT ID · JK-S-2024-0145</div></div>
+    </div>
+  </section>
+
+  <!-- COMPONENTS -->
+  <section class="section">
+    <div class="section-head">
+      <div class="section-label">Token · 03</div>
+      <h2 class="section-title">Core <em>components</em></h2>
+      <p class="section-sub">Buttons, inputs, chips, status, grades — saffron primary with teal complement.</p>
+    </div>
+
+    <div class="component-grid">
+      <div class="component-card">
+        <div class="component-card-title">★ BUTTONS</div>
+        <div class="btn-stack">
+          <button class="btn-primary">Mark Attendance →</button>
+          <button class="btn-secondary">View Details</button>
+          <button class="btn-text">Forgot password?</button>
+          <button class="btn-error">Mark Absent ⊗</button>
+        </div>
+      </div>
+
+      <div class="component-card">
+        <div class="component-card-title">★ INPUTS</div>
+        <div class="input-demo"><div class="input-label">STUDENT ID</div><input class="input-field" placeholder="Enter ID..." /></div>
+        <div class="input-demo" style="margin-top:12px"><div class="input-label">PASSWORD</div><input class="input-field focus" type="password" value="••••••••" /></div>
+      </div>
+
+      <div class="component-card">
+        <div class="component-card-title">★ CHIPS &amp; BADGES</div>
+        <div class="chip-row">
+          <div class="chip marigold">★ PARENT</div>
+          <div class="chip saffron">PRINCIPAL</div>
+          <div class="chip teal">COORDINATOR</div>
+          <div class="chip success">✓ PAID</div>
+          <div class="chip warning">⏰ DUE</div>
+          <div class="chip error">✗ ABSENT</div>
+          <div class="chip indigo">CLASS 8-B</div>
+        </div>
+      </div>
+
+      <div class="component-card">
+        <div class="component-card-title">★ ATTENDANCE STATUS</div>
+        <div class="status-row">
+          <div class="status-item present"><div class="status-icon">✓</div><span>Arjun · Present at 8:18 AM</span></div>
+          <div class="status-item absent"><div class="status-icon">✗</div><span>Priya · Absent</span></div>
+          <div class="status-item late"><div class="status-icon">!</div><span>Karan · Late by 22 min</span></div>
+          <div class="status-item leave"><div class="status-icon">i</div><span>Neha · On medical leave</span></div>
+        </div>
+      </div>
+
+      <div class="component-card">
+        <div class="component-card-title">★ GRADE PILLS</div>
+        <div class="grade-row">
+          <div class="grade-pill" style="background:linear-gradient(135deg,#FFB800,#F59E0B)">A+</div>
+          <div class="grade-pill" style="background:#16A34A">A</div>
+          <div class="grade-pill" style="background:#0284C7">B</div>
+          <div class="grade-pill" style="background:#F59E0B">C</div>
+          <div class="grade-pill" style="background:#EA580C">D</div>
+          <div class="grade-pill" style="background:#DC2626">F</div>
+        </div>
+        <div style="margin-top:12px;font-size:11px;color:var(--text-secondary)">A+ uses marigold gradient for celebration</div>
+      </div>
+
+      <div class="component-card">
+        <div class="component-card-title">★ STAT CARD · SAFFRON BORDER</div>
+        <div class="stat-card">
+          <div class="stat-card-eyebrow">FEES THIS MONTH</div>
+          <div class="stat-card-num">₹12,500</div>
+          <div class="stat-card-meta">Paid · Receipt #4823 · 2 days ago</div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 13 ROLES -->
+  <section class="section">
+    <div class="section-head">
+      <div class="section-label">Token · 04</div>
+      <h2 class="section-title">13 <em>roles</em>, one identity</h2>
+      <p class="section-sub">Distinct accent colors per role — used in avatars and chips only. Saffron+Teal stays dominant.</p>
+    </div>
+
+    <div class="roles-grid">
+      <div class="role-card"><div class="role-avatar" style="background:linear-gradient(135deg,#6B21A8,#581C87)">SA</div><div class="role-name">Super Admin</div><div class="role-hex">#6B21A8</div></div>
+      <div class="role-card"><div class="role-avatar" style="background:linear-gradient(135deg,#BE123C,#9F1239)">SchA</div><div class="role-name">School Admin</div><div class="role-hex">#BE123C</div></div>
+      <div class="role-card highlight-saffron"><div class="role-avatar" style="background:linear-gradient(135deg,#E85D2E,#C44419)">P</div><div class="role-name">Principal ★</div><div class="role-hex">#E85D2E SAFFRON</div></div>
+      <div class="role-card highlight-teal"><div class="role-avatar" style="background:linear-gradient(135deg,#0F766E,#115E59)">C</div><div class="role-name">Coordinator ★</div><div class="role-hex">#0F766E TEAL</div></div>
+      <div class="role-card"><div class="role-avatar" style="background:linear-gradient(135deg,#1D4ED8,#1E3A8A)">CT</div><div class="role-name">Class Teacher</div><div class="role-hex">#1D4ED8</div></div>
+      <div class="role-card"><div class="role-avatar" style="background:linear-gradient(135deg,#5B21B6,#4C1D95)">ST</div><div class="role-name">Subject Teacher</div><div class="role-hex">#5B21B6</div></div>
+      <div class="role-card"><div class="role-avatar" style="background:linear-gradient(135deg,#15803D,#166534)">A</div><div class="role-name">Accountant</div><div class="role-hex">#15803D</div></div>
+      <div class="role-card"><div class="role-avatar" style="background:linear-gradient(135deg,#9D174D,#831843)">L</div><div class="role-name">Librarian</div><div class="role-hex">#9D174D</div></div>
+      <div class="role-card"><div class="role-avatar" style="background:linear-gradient(135deg,#C2410C,#9A3412)">T</div><div class="role-name">Transport</div><div class="role-hex">#C2410C</div></div>
+      <div class="role-card"><div class="role-avatar" style="background:linear-gradient(135deg,#475569,#334155)">H</div><div class="role-name">Hostel Warden</div><div class="role-hex">#475569</div></div>
+      <div class="role-card"><div class="role-avatar" style="background:linear-gradient(135deg,#92400E,#78350F)">O</div><div class="role-name">Office Staff</div><div class="role-hex">#92400E</div></div>
+      <div class="role-card highlight-marigold"><div class="role-avatar" style="background:linear-gradient(135deg,#FFB800,#FFC72E);color:#1F1248">P</div><div class="role-name">Parent ★</div><div class="role-hex">#FFB800 MARIGOLD</div></div>
+      <div class="role-card"><div class="role-avatar" style="background:linear-gradient(135deg,#0EA5E9,#0284C7)">S</div><div class="role-name">Student</div><div class="role-hex">#0EA5E9</div></div>
+    </div>
+  </section>
+
+  <!-- 9 SCREENS -->
+  <section class="section">
+    <div class="section-head">
+      <div class="section-label">Live Preview · 9 Screens</div>
+      <h2 class="section-title">The system, in <em>action</em></h2>
+      <p class="section-sub">Splash, login, and 5 role dashboards — fresh saffron+teal+marigold theme.</p>
+    </div>
+
+    <div class="screens-grid">
+
+      <!-- 1. SPLASH -->
+      <div class="phone-card">
+        <div class="phone"><div class="phone-screen"><div class="screen-inner">
+          <div class="splash-screen">
+            <div class="splash-logo-anim">
+              <svg class="logo-svg" viewBox="0 0 200 200">
+                <defs>
+                  <linearGradient id="sr2" x1="50%" y1="0%" x2="50%" y2="100%"><stop offset="0%" stop-color="#FFD659"/><stop offset="100%" stop-color="#FFB800"/></linearGradient>
+                  <linearGradient id="bs2" x1="0%" y1="0%" x2="0%" y2="100%"><stop offset="0%" stop-color="#E85D2E"/><stop offset="100%" stop-color="#C44419"/></linearGradient>
+                  <linearGradient id="bp2" x1="0%" y1="0%" x2="0%" y2="100%"><stop offset="0%" stop-color="#FFFCF7"/><stop offset="100%" stop-color="#FDF7E9"/></linearGradient>
+                  <linearGradient id="lp2" x1="50%" y1="0%" x2="50%" y2="100%"><stop offset="0%" stop-color="#FF7A4D"/><stop offset="100%" stop-color="#E85D2E"/></linearGradient>
+                </defs>
+                <g transform="translate(100,80)">
+                  <path d="M 0 -50 L 4 -28 L -4 -28 Z" fill="url(#sr2)"/>
+                  <path d="M 0 -50 L 4 -28 L -4 -28 Z" fill="url(#sr2)" transform="rotate(30)" opacity="0.85"/>
+                  <path d="M 0 -50 L 4 -28 L -4 -28 Z" fill="url(#sr2)" transform="rotate(-30)" opacity="0.85"/>
+                  <path d="M 0 -50 L 4 -28 L -4 -28 Z" fill="url(#sr2)" transform="rotate(60)" opacity="0.7"/>
+                  <path d="M 0 -50 L 4 -28 L -4 -28 Z" fill="url(#sr2)" transform="rotate(-60)" opacity="0.7"/>
+                  <circle cx="0" cy="0" r="22" fill="url(#sr2)"/>
+                  <circle cx="0" cy="0" r="14" fill="#FFFCF7"/>
+                </g>
+                <g transform="translate(100,135)">
+                  <path d="M -45 -8 Q -45 -12 -42 -14 L -2 -8 L -2 22 L -42 18 Q -45 18 -45 14 Z" fill="url(#bp2)" stroke="#E85D2E" stroke-width="1.5"/>
+                  <path d="M 45 -8 Q 45 -12 42 -14 L 2 -8 L 2 22 L 42 18 Q 45 18 45 14 Z" fill="url(#bp2)" stroke="#E85D2E" stroke-width="1.5"/>
+                  <path d="M -2 -8 L 2 -8 L 2 22 L -2 22 Z" fill="url(#bs2)"/>
+                </g>
+                <g transform="translate(100,165)">
+                  <ellipse cx="0" cy="0" rx="6" ry="14" fill="url(#lp2)" opacity="0.9"/>
+                  <ellipse cx="0" cy="0" rx="6" ry="14" fill="url(#lp2)" transform="rotate(35)" opacity="0.85"/>
+                  <ellipse cx="0" cy="0" rx="6" ry="14" fill="url(#lp2)" transform="rotate(-35)" opacity="0.85"/>
+                  <ellipse cx="0" cy="0" rx="6" ry="14" fill="url(#lp2)" transform="rotate(70)" opacity="0.75"/>
+                  <ellipse cx="0" cy="0" rx="6" ry="14" fill="url(#lp2)" transform="rotate(-70)" opacity="0.75"/>
+                  <circle cx="0" cy="0" r="4" fill="#FFB800"/>
+                </g>
+              </svg>
+            </div>
+            <div class="splash-namaste">विद्या · Knowledge</div>
+            <div class="splash-title">Jaikalki <em>School</em></div>
+            <div class="splash-tag">EDUCATION ERP · EST 2024</div>
+            <div class="splash-loading"></div>
+            <div class="splash-bottom">A JAIKALKI TECHNOLOGY PVT. LTD. PRODUCT</div>
+          </div>
+        </div></div></div>
+        <div class="phone-card-title">1 · <em>Splash</em></div>
+        <div class="phone-card-desc">IVORY · MARIGOLD GLOW</div>
+      </div>
+
+      <!-- 2. LOGIN -->
+      <div class="phone-card">
+        <div class="phone"><div class="phone-screen"><div class="screen-inner">
+          <div class="status-bar"><span>9:41</span><span>●●●</span></div>
+          <div class="login-screen">
+            <div class="login-logo">
+              <svg class="logo-svg" viewBox="0 0 200 200">
+                <defs>
+                  <linearGradient id="sr3" x1="50%" y1="0%" x2="50%" y2="100%"><stop offset="0%" stop-color="#FFD659"/><stop offset="100%" stop-color="#FFB800"/></linearGradient>
+                  <linearGradient id="bs3" x1="0%" y1="0%" x2="0%" y2="100%"><stop offset="0%" stop-color="#E85D2E"/><stop offset="100%" stop-color="#C44419"/></linearGradient>
+                  <linearGradient id="bp3" x1="0%" y1="0%" x2="0%" y2="100%"><stop offset="0%" stop-color="#FFFCF7"/><stop offset="100%" stop-color="#FDF7E9"/></linearGradient>
+                  <linearGradient id="lp3" x1="50%" y1="0%" x2="50%" y2="100%"><stop offset="0%" stop-color="#FF7A4D"/><stop offset="100%" stop-color="#E85D2E"/></linearGradient>
+                </defs>
+                <g transform="translate(100,80)">
+                  <path d="M 0 -50 L 4 -28 L -4 -28 Z" fill="url(#sr3)"/>
+                  <path d="M 0 -50 L 4 -28 L -4 -28 Z" fill="url(#sr3)" transform="rotate(30)" opacity="0.85"/>
+                  <path d="M 0 -50 L 4 -28 L -4 -28 Z" fill="url(#sr3)" transform="rotate(-30)" opacity="0.85"/>
+                  <path d="M 0 -50 L 4 -28 L -4 -28 Z" fill="url(#sr3)" transform="rotate(60)" opacity="0.7"/>
+                  <path d="M 0 -50 L 4 -28 L -4 -28 Z" fill="url(#sr3)" transform="rotate(-60)" opacity="0.7"/>
+                  <circle cx="0" cy="0" r="22" fill="url(#sr3)"/>
+                  <circle cx="0" cy="0" r="14" fill="#FFFCF7"/>
+                </g>
+                <g transform="translate(100,135)">
+                  <path d="M -45 -8 Q -45 -12 -42 -14 L -2 -8 L -2 22 L -42 18 Q -45 18 -45 14 Z" fill="url(#bp3)" stroke="#E85D2E" stroke-width="1.5"/>
+                  <path d="M 45 -8 Q 45 -12 42 -14 L 2 -8 L 2 22 L 42 18 Q 45 18 45 14 Z" fill="url(#bp3)" stroke="#E85D2E" stroke-width="1.5"/>
+                  <path d="M -2 -8 L 2 -8 L 2 22 L -2 22 Z" fill="url(#bs3)"/>
+                </g>
+                <g transform="translate(100,165)">
+                  <ellipse cx="0" cy="0" rx="6" ry="14" fill="url(#lp3)" opacity="0.9"/>
+                  <ellipse cx="0" cy="0" rx="6" ry="14" fill="url(#lp3)" transform="rotate(35)" opacity="0.85"/>
+                  <ellipse cx="0" cy="0" rx="6" ry="14" fill="url(#lp3)" transform="rotate(-35)" opacity="0.85"/>
+                  <ellipse cx="0" cy="0" rx="6" ry="14" fill="url(#lp3)" transform="rotate(70)" opacity="0.75"/>
+                  <ellipse cx="0" cy="0" rx="6" ry="14" fill="url(#lp3)" transform="rotate(-70)" opacity="0.75"/>
+                  <circle cx="0" cy="0" r="4" fill="#FFB800"/>
+                </g>
+              </svg>
+            </div>
+            <div class="login-namaste-mini">नमस्ते</div>
+            <div class="login-title">Welcome <em>back</em></div>
+            <div class="login-sub">Sign in to your school account</div>
+            <div class="login-input-block">
+              <div class="login-input-label">USER ID</div>
+              <div class="login-input">
+                <svg class="login-input-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="8" r="4"/><path d="M4 21v-2a6 6 0 016-6h4a6 6 0 016 6v2"/></svg>
+                <div class="login-input-value">priya.sharma@school</div>
+              </div>
+            </div>
+            <div class="login-input-block">
+              <div class="login-input-label">PASSWORD</div>
+              <div class="login-input active">
+                <svg class="login-input-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0110 0v4"/></svg>
+                <div class="login-input-value">••••••••</div>
+              </div>
+            </div>
+            <div class="login-forgot">Forgot password?</div>
+            <button class="login-submit">SIGN IN ✦</button>
+            <div class="login-divider">OR CONTINUE WITH</div>
+            <button class="login-otp-btn">📱 OTP via SMS</button>
+            <div class="login-foot">New parent? <strong>Contact school →</strong></div>
+          </div>
+        </div></div></div>
+        <div class="phone-card-title">2 · <em>Login</em></div>
+        <div class="phone-card-desc">SAFFRON CTA · TEAL OTP</div>
+      </div>
+
+      <!-- 3. PARENT DASHBOARD -->
+      <div class="phone-card">
+        <div class="phone"><div class="phone-screen"><div class="screen-inner">
+          <div class="status-bar dark"><span>9:41</span><span>●●●</span></div>
+          <div class="dash-screen">
+            <div class="dash-header">
+              <div class="dash-h-row">
+                <div>
+                  <div class="dash-greeting">★ GOOD MORNING</div>
+                  <div class="dash-namaste">नमस्ते</div>
+                  <div class="dash-name">Sharma <em>Ji</em></div>
+                </div>
+                <div class="dash-bell">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 8a6 6 0 00-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 01-3.46 0"/></svg>
+                  <div class="dash-bell-dot"></div>
+                </div>
+              </div>
+            </div>
+            <div class="child-switcher">
+              <div class="child-card active">
+                <div class="child-avatar">A</div>
+                <div class="child-info"><div class="child-name">Arjun</div><div class="child-class">CLASS 8-B</div></div>
+              </div>
+              <div class="child-card">
+                <div class="child-avatar" style="background:linear-gradient(135deg,#9D174D,#831843)">N</div>
+                <div class="child-info"><div class="child-name">Neha</div><div class="child-class">CLASS 4-A</div></div>
+              </div>
+            </div>
+            <div class="dash-section"><div class="dash-section-h"><div class="dash-section-title">Arjun's <em>today</em></div></div></div>
+            <div class="quick-stats">
+              <div class="qs-tile attendance"><div class="qs-eyebrow">ATTENDANCE</div><div class="qs-value">96%</div><div class="qs-meta">Present · 8:18 AM</div></div>
+              <div class="qs-tile fees"><div class="qs-eyebrow">FEES DUE</div><div class="qs-value">₹4,500</div><div class="qs-meta">Due May 15</div></div>
+              <div class="qs-tile grade"><div class="qs-eyebrow">LAST EXAM</div><div class="qs-value">A · 89%</div><div class="qs-meta">Math · Apr 28</div></div>
+              <div class="qs-tile homework"><div class="qs-eyebrow">HOMEWORK</div><div class="qs-value">3</div><div class="qs-meta">Due tomorrow</div></div>
+            </div>
+            <div class="dash-section"><div class="dash-section-h"><div class="dash-section-title"><em>Schedule</em> today</div><div class="dash-section-link">FULL →</div></div></div>
+            <div class="schedule-card">
+              <div class="sch-row">
+                <div class="sch-time">8:30</div>
+                <div class="sch-bullet"></div>
+                <div class="sch-info"><div class="sch-subject">Mathematics</div><div class="sch-teacher">Mrs. Anjali · Room 204</div></div>
+              </div>
+              <div class="sch-row now">
+                <div class="sch-time">9:30</div>
+                <div class="sch-bullet"></div>
+                <div class="sch-info"><div class="sch-subject" style="color:var(--success)">English (Now)</div><div class="sch-teacher">Mr. Rajesh · Room 102</div></div>
+              </div>
+              <div class="sch-row">
+                <div class="sch-time">10:30</div>
+                <div class="sch-bullet"></div>
+                <div class="sch-info"><div class="sch-subject">Science Lab</div><div class="sch-teacher">Dr. Mehta · Lab 1</div></div>
+              </div>
+            </div>
+            <div class="bot-nav">
+              <div class="bn-item active"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M3 12l9-9 9 9v9a2 2 0 01-2 2h-4v-7H10v7H6a2 2 0 01-2-2z"/></svg>HOME</div>
+              <div class="bn-item"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/></svg>EVENTS</div>
+              <div class="bn-item"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/></svg>FEES</div>
+              <div class="bn-item"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="8" r="4"/><path d="M4 21v-2a6 6 0 016-6h4a6 6 0 016 6v2"/></svg>PROFILE</div>
+            </div>
+          </div>
+        </div></div></div>
+        <div class="phone-card-title">3 · Parent <em>Dashboard</em></div>
+        <div class="phone-card-desc">SAFFRON HEADER · INDIGO NAV</div>
+      </div>
+
+      <!-- 4. STUDENT -->
+      <div class="phone-card">
+        <div class="phone"><div class="phone-screen"><div class="screen-inner">
+          <div class="status-bar teal"><span>9:41</span><span>●●●</span></div>
+          <div class="student-dash">
+            <div class="student-h">
+              <div class="student-h-row">
+                <div>
+                  <div class="student-greet">HELLO STUDENT</div>
+                  <div class="student-name">Arjun Kumar</div>
+                  <div class="student-class">CLASS 8-B · ROLL 14</div>
+                </div>
+                <div class="student-photo">A</div>
+              </div>
+            </div>
+            <div class="achievement-card">
+              <div class="ach-eyebrow">★ NEW ACHIEVEMENT</div>
+              <div class="ach-title">Math <em>Star</em> Badge</div>
+              <div class="ach-meta">SCORED 89% IN APRIL TEST</div>
+            </div>
+            <div class="dash-section"><div class="dash-section-h"><div class="dash-section-title">Subject <em>progress</em></div></div></div>
+            <div class="progress-grid">
+              <div class="progress-row"><div class="pr-h"><div class="pr-subject">📐 Mathematics</div><div class="pr-pct">89%</div></div><div class="pr-bar"><div class="pr-fill" style="width:89%"></div></div></div>
+              <div class="progress-row"><div class="pr-h"><div class="pr-subject">🔬 Science</div><div class="pr-pct">78%</div></div><div class="pr-bar"><div class="pr-fill" style="width:78%"></div></div></div>
+              <div class="progress-row"><div class="pr-h"><div class="pr-subject">📚 English</div><div class="pr-pct">85%</div></div><div class="pr-bar"><div class="pr-fill" style="width:85%"></div></div></div>
+            </div>
+            <div class="dash-section"><div class="dash-section-h"><div class="dash-section-title">Your <em>stars</em></div></div></div>
+            <div class="badges-row">
+              <div class="star-badge gold"><div class="star-icon">⭐</div><div class="star-num">12</div><div class="star-lbl">GOLD</div></div>
+              <div class="star-badge"><div class="star-icon">🏆</div><div class="star-num">3</div><div class="star-lbl">TROPHIES</div></div>
+              <div class="star-badge"><div class="star-icon">🎯</div><div class="star-num">7</div><div class="star-lbl">GOALS</div></div>
+            </div>
+            <div class="bot-nav">
+              <div class="bn-item active"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M3 12l9-9 9 9v9a2 2 0 01-2 2h-4v-7H10v7H6a2 2 0 01-2-2z"/></svg>HOME</div>
+              <div class="bn-item"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/></svg>STUDY</div>
+              <div class="bn-item"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="12 2 15 8 22 9 17 14 18 21 12 18 6 21 7 14 2 9 9 8 12 2"/></svg>STARS</div>
+              <div class="bn-item"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="8" r="4"/><path d="M4 21v-2a6 6 0 016-6h4a6 6 0 016 6v2"/></svg>ME</div>
+            </div>
+          </div>
+        </div></div></div>
+        <div class="phone-card-title">4 · Student <em>Dashboard</em></div>
+        <div class="phone-card-desc">TEAL HEADER · MARIGOLD STARS</div>
+      </div>
+
+      <!-- 5. TEACHER -->
+      <div class="phone-card">
+        <div class="phone"><div class="phone-screen"><div class="screen-inner">
+          <div class="status-bar indigo"><span>9:41</span><span>●●●</span></div>
+          <div class="teacher-screen">
+            <div class="teacher-h">
+              <div class="teacher-back-row">
+                <div class="teacher-back"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 18l-6-6 6-6"/></svg></div>
+                <div class="teacher-h-info">
+                  <div class="teacher-class">Class <em>8-B</em> · Math</div>
+                  <div class="teacher-period">PERIOD 3 · 9:30 – 10:15 AM</div>
+                </div>
+              </div>
+              <div class="att-summary">
+                <div class="att-pill"><div class="att-pill-num">28</div><div class="att-pill-lbl">PRESENT</div></div>
+                <div class="att-pill"><div class="att-pill-num">2</div><div class="att-pill-lbl">ABSENT</div></div>
+                <div class="att-pill"><div class="att-pill-num">1</div><div class="att-pill-lbl">LATE</div></div>
+                <div class="att-pill"><div class="att-pill-num">31</div><div class="att-pill-lbl">TOTAL</div></div>
+              </div>
+            </div>
+            <div class="att-list">
+              <div class="att-row present"><div class="att-roll">14</div><div class="att-name">Arjun Kumar</div><div class="att-pills"><div class="att-pill-btn p active">P</div><div class="att-pill-btn a">A</div><div class="att-pill-btn l">L</div></div></div>
+              <div class="att-row present"><div class="att-roll">15</div><div class="att-name">Bhavna Singh</div><div class="att-pills"><div class="att-pill-btn p active">P</div><div class="att-pill-btn a">A</div><div class="att-pill-btn l">L</div></div></div>
+              <div class="att-row late"><div class="att-roll">16</div><div class="att-name">Karan Mehta</div><div class="att-pills"><div class="att-pill-btn p">P</div><div class="att-pill-btn a">A</div><div class="att-pill-btn l active">L</div></div></div>
+              <div class="att-row absent"><div class="att-roll">17</div><div class="att-name">Priya Sharma</div><div class="att-pills"><div class="att-pill-btn p">P</div><div class="att-pill-btn a active">A</div><div class="att-pill-btn l">L</div></div></div>
+              <div class="att-row present"><div class="att-roll">18</div><div class="att-name">Rohan Verma</div><div class="att-pills"><div class="att-pill-btn p active">P</div><div class="att-pill-btn a">A</div><div class="att-pill-btn l">L</div></div></div>
+              <div class="att-row present"><div class="att-roll">19</div><div class="att-name">Sneha Iyer</div><div class="att-pills"><div class="att-pill-btn p active">P</div><div class="att-pill-btn a">A</div><div class="att-pill-btn l">L</div></div></div>
+            </div>
+            <div class="att-submit-area">
+              <button class="att-submit">SUBMIT ATTENDANCE ✓</button>
+            </div>
+          </div>
+        </div></div></div>
+        <div class="phone-card-title">5 · Teacher <em>Attendance</em></div>
+        <div class="phone-card-desc">INDIGO HEADER · QUICK PILLS</div>
+      </div>
+
+      <!-- 6. PRINCIPAL -->
+      <div class="phone-card">
+        <div class="phone"><div class="phone-screen"><div class="screen-inner">
+          <div class="status-bar dark"><span>9:41</span><span>●●●</span></div>
+          <div class="principal-screen">
+            <div class="principal-h">
+              <div class="pr-eyebrow">★ PRINCIPAL DASHBOARD</div>
+              <div class="pr-title">Good morning, <em>Dr. Anjali</em></div>
+              <div class="pr-school">DELHI PUBLIC SCHOOL · ZONE 4</div>
+            </div>
+            <div class="big-stats">
+              <div class="big-stat green"><div class="bs-eyebrow">ATTENDANCE TODAY</div><div class="bs-num">94.2%</div><div class="bs-trend up">▲ 2.1% vs yesterday</div></div>
+              <div class="big-stat"><div class="bs-eyebrow">FEES COLLECTED</div><div class="bs-num">₹8.4L</div><div class="bs-trend up">▲ 12% vs last month</div></div>
+              <div class="big-stat teal"><div class="bs-eyebrow">TOTAL STUDENTS</div><div class="bs-num">1,248</div><div class="bs-trend up">▲ 24 admissions</div></div>
+              <div class="big-stat red"><div class="bs-eyebrow">PENDING APPROVALS</div><div class="bs-num">7</div><div class="bs-trend down">3 urgent</div></div>
+            </div>
+            <div class="trend-card">
+              <div class="trend-h"><div class="trend-title">Attendance <em>trend</em></div><div class="trend-period">LAST 7 DAYS</div></div>
+              <div class="trend-bars">
+                <div class="trend-bar" style="height:68%"><div class="trend-bar-lbl">MON</div></div>
+                <div class="trend-bar" style="height:75%"><div class="trend-bar-lbl">TUE</div></div>
+                <div class="trend-bar" style="height:82%"><div class="trend-bar-lbl">WED</div></div>
+                <div class="trend-bar" style="height:78%"><div class="trend-bar-lbl">THU</div></div>
+                <div class="trend-bar" style="height:85%"><div class="trend-bar-lbl">FRI</div></div>
+                <div class="trend-bar" style="height:62%"><div class="trend-bar-lbl">SAT</div></div>
+                <div class="trend-bar" style="height:94%"><div class="trend-bar-lbl">TODAY</div></div>
+              </div>
+            </div>
+            <div class="trend-card" style="margin-top:0">
+              <div class="trend-h"><div class="trend-title">Fee <em>collection</em></div><div class="trend-period">THIS QUARTER</div></div>
+              <div style="display:flex;justify-content:space-between;font-family:var(--font-display);align-items:flex-end">
+                <div>
+                  <div style="font-size:32px;font-weight:700;color:var(--saffron);line-height:1">₹24.6L</div>
+                  <div style="font-size:9px;color:var(--text-secondary);font-family:var(--font-mono);letter-spacing:0.1em;margin-top:4px">OF ₹28L TARGET</div>
+                </div>
+                <div style="text-align:right">
+                  <div style="font-size:24px;font-weight:700;color:var(--success);line-height:1">87.8%</div>
+                  <div style="font-size:9px;color:var(--success);font-family:var(--font-mono);letter-spacing:0.1em;margin-top:4px">▲ ON TRACK</div>
+                </div>
+              </div>
+              <div class="pr-bar" style="margin-top:10px;height:6px"><div class="pr-fill" style="width:87.8%;background:linear-gradient(90deg,var(--success),#84CC16)"></div></div>
+            </div>
+          </div>
+        </div></div></div>
+        <div class="phone-card-title">6 · Principal <em>Analytics</em></div>
+        <div class="phone-card-desc">DEEP SAFFRON · MARIGOLD ACCENTS</div>
+      </div>
+
+      <!-- 7. ADMIN -->
+      <div class="phone-card">
+        <div class="phone"><div class="phone-screen"><div class="screen-inner">
+          <div class="status-bar crimson"><span>9:41</span><span>●●●</span></div>
+          <div class="admin-screen">
+            <div class="admin-h">
+              <div class="admin-h-title">Approval <em>Center</em></div>
+              <div class="admin-h-meta">7 PENDING · 3 URGENT</div>
+              <div class="admin-tabs">
+                <div class="admin-tab active">PENDING (7)</div>
+                <div class="admin-tab">APPROVED</div>
+                <div class="admin-tab">REJECTED</div>
+              </div>
+            </div>
+            <div class="approval-list">
+              <div class="appr-card" style="border-left-color:var(--error)">
+                <div class="appr-h-row">
+                  <div class="appr-type" style="background:var(--error-light);color:var(--error)">URGENT · LEAVE</div>
+                  <div class="appr-time">2H AGO</div>
+                </div>
+                <div class="appr-title">Mrs. Rajeshwari · 5-day leave</div>
+                <div class="appr-desc">Class teacher 6-A · Medical emergency · Substitute needed for Math &amp; Science</div>
+                <div class="appr-actions">
+                  <button class="appr-btn approve">✓ Approve</button>
+                  <button class="appr-btn reject">Reject</button>
+                </div>
+              </div>
+              <div class="appr-card">
+                <div class="appr-h-row">
+                  <div class="appr-type">FEE WAIVER</div>
+                  <div class="appr-time">5H AGO</div>
+                </div>
+                <div class="appr-title">Aarav Singh · ₹8,500 waiver</div>
+                <div class="appr-desc">Class 7-C · Financial hardship · Documents submitted · Counselor approved</div>
+                <div class="appr-actions">
+                  <button class="appr-btn approve">✓ Approve</button>
+                  <button class="appr-btn review">Review</button>
+                </div>
+              </div>
+              <div class="appr-card" style="border-left-color:var(--info)">
+                <div class="appr-h-row">
+                  <div class="appr-type" style="background:var(--info-light);color:var(--info)">FIELD TRIP</div>
+                  <div class="appr-time">1D AGO</div>
+                </div>
+                <div class="appr-title">Class 8 · Science Museum</div>
+                <div class="appr-desc">May 22 · 45 students · 3 teachers · Bus arranged · Consent 42/45</div>
+                <div class="appr-actions">
+                  <button class="appr-btn approve">✓ Approve</button>
+                  <button class="appr-btn review">Review</button>
+                </div>
+              </div>
+              <div class="appr-card">
+                <div class="appr-h-row">
+                  <div class="appr-type">PURCHASE</div>
+                  <div class="appr-time">1D AGO</div>
+                </div>
+                <div class="appr-title">Library books · ₹42,000</div>
+                <div class="appr-desc">12 reference books · Vendor: Oxford India · Quotation attached</div>
+                <div class="appr-actions">
+                  <button class="appr-btn approve">✓ Approve</button>
+                  <button class="appr-btn reject">Reject</button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div></div></div>
+        <div class="phone-card-title">7 · Admin <em>Approvals</em></div>
+        <div class="phone-card-desc">CRIMSON · STACKED CARDS</div>
+      </div>
+
+      <!-- 8. NOTIFICATIONS -->
+      <div class="phone-card">
+        <div class="phone"><div class="phone-screen"><div class="screen-inner">
+          <div class="status-bar"><span>9:41</span><span>●●●</span></div>
+          <div class="notif-screen">
+            <div class="notif-h">
+              <div class="notif-h-row">
+                <div class="notif-title"><em>Notifications</em></div>
+                <div class="notif-mark-read">MARK ALL READ</div>
+              </div>
+              <div class="notif-filters">
+                <div class="notif-filter active">ALL · 12</div>
+                <div class="notif-filter">UNREAD · 5</div>
+                <div class="notif-filter">URGENT · 2</div>
+                <div class="notif-filter">FEES</div>
+              </div>
+            </div>
+            <div class="notif-list">
+              <div class="nt-item unread">
+                <div class="nt-icon urgent"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 8v4M12 16h.01"/></svg></div>
+                <div class="nt-info">
+                  <div class="nt-h"><div class="nt-title">Fee overdue · ₹4,500</div><div class="nt-time">2H</div></div>
+                  <div class="nt-desc">Arjun's term 2 fees overdue by 5 days. Pay by May 15 to avoid late fee.</div>
+                </div>
+              </div>
+              <div class="nt-item unread">
+                <div class="nt-icon important"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/></svg></div>
+                <div class="nt-info">
+                  <div class="nt-h"><div class="nt-title">Math homework due tomorrow</div><div class="nt-time">3H</div></div>
+                  <div class="nt-desc">Chapter 12 exercises 1-15 · Submit by 8 AM May 11 · Mrs. Anjali</div>
+                </div>
+              </div>
+              <div class="nt-item">
+                <div class="nt-icon success"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 6L9 17l-5-5"/></svg></div>
+                <div class="nt-info">
+                  <div class="nt-h"><div class="nt-title">Science test result published</div><div class="nt-time">5H</div></div>
+                  <div class="nt-desc">Arjun scored 85% (B+) · Class average 76%</div>
+                </div>
+              </div>
+              <div class="nt-item">
+                <div class="nt-icon info"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 8v4M12 16h.01"/></svg></div>
+                <div class="nt-info">
+                  <div class="nt-h"><div class="nt-title">PTM scheduled · May 18</div><div class="nt-time">1D</div></div>
+                  <div class="nt-desc">Saturday 10 AM-12 PM · Slot booking opens May 12</div>
+                </div>
+              </div>
+              <div class="nt-item">
+                <div class="nt-icon important"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="12 2 15 8 22 9 17 14 18 21 12 18 6 21 7 14 2 9 9 8 12 2"/></svg></div>
+                <div class="nt-info">
+                  <div class="nt-h"><div class="nt-title">Achievement unlocked!</div><div class="nt-time">2D</div></div>
+                  <div class="nt-desc">Arjun earned the Math Star badge · 12 marigold stars total</div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div></div></div>
+        <div class="phone-card-title">8 · <em>Notifications</em></div>
+        <div class="phone-card-desc">4 TYPES · COLOR-CODED</div>
+      </div>
+
+      <!-- 9. PROFILE -->
+      <div class="phone-card">
+        <div class="phone"><div class="phone-screen"><div class="screen-inner">
+          <div class="status-bar indigo"><span>9:41</span><span>●●●</span></div>
+          <div class="prof-screen">
+            <div class="prof-h">
+              <div class="prof-h-title">My <em>Profile</em></div>
+            </div>
+            <div class="prof-card-wrap">
+              <div class="prof-photo">P</div>
+              <div class="prof-name">Priya Sharma</div>
+              <div class="prof-role-pill">★ PARENT</div>
+              <div class="prof-id">PARENT ID · JK-P-2024-0145</div>
+            </div>
+            <div class="prof-section">
+              <div class="prof-section-h">★ ACCOUNT</div>
+              <div class="settings-card">
+                <div class="setting-row">
+                  <div class="setting-icon"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="8" r="4"/><path d="M4 21v-2a6 6 0 016-6h4a6 6 0 016 6v2"/></svg></div>
+                  <div class="setting-info"><div class="setting-name">Personal info</div><div class="setting-meta">Phone, email, address</div></div>
+                  <svg class="setting-arrow" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 18l6-6-6-6"/></svg>
+                </div>
+                <div class="setting-row">
+                  <div class="setting-icon"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/></svg></div>
+                  <div class="setting-info"><div class="setting-name">Children (2)</div><div class="setting-meta">Arjun · 8-B · Neha · 4-A</div></div>
+                  <svg class="setting-arrow" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 18l6-6-6-6"/></svg>
+                </div>
+                <div class="setting-row">
+                  <div class="setting-icon"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0110 0v4"/></svg></div>
+                  <div class="setting-info"><div class="setting-name">Security</div><div class="setting-meta">Password, 2FA</div></div>
+                  <svg class="setting-arrow" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 18l6-6-6-6"/></svg>
+                </div>
+              </div>
+            </div>
+            <div class="prof-section">
+              <div class="prof-section-h">★ PREFERENCES</div>
+              <div class="settings-card">
+                <div class="setting-row">
+                  <div class="setting-icon"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M2 12h20"/></svg></div>
+                  <div class="setting-info"><div class="setting-name">Language</div></div>
+                  <div class="lang-toggle">
+                    <div class="lang-opt active">EN</div>
+                    <div class="lang-opt" style="font-family:var(--font-hindi)">हिं</div>
+                    <div class="lang-opt">मर</div>
+                  </div>
+                </div>
+                <div class="setting-row">
+                  <div class="setting-icon"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 8a6 6 0 00-12 0c0 7-3 9-3 9h18s-3-2-3-9"/></svg></div>
+                  <div class="setting-info"><div class="setting-name">Notifications</div><div class="setting-meta">All on · 8 categories</div></div>
+                  <svg class="setting-arrow" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 18l6-6-6-6"/></svg>
+                </div>
+                <div class="setting-row">
+                  <div class="setting-icon"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="5"/></svg></div>
+                  <div class="setting-info"><div class="setting-name">Theme</div><div class="setting-meta">Light · Auto on sunset</div></div>
+                  <svg class="setting-arrow" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 18l6-6-6-6"/></svg>
+                </div>
+              </div>
+            </div>
+            <div class="prof-section">
+              <div class="settings-card">
+                <div class="setting-row" style="color:var(--error)">
+                  <div class="setting-icon" style="background:var(--error-light);color:var(--error)"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4M16 17l5-5-5-5M21 12H9"/></svg></div>
+                  <div class="setting-info"><div class="setting-name" style="color:var(--error)">Sign out</div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div></div></div>
+        <div class="phone-card-title">9 · <em>Profile</em> &amp; Settings</div>
+        <div class="phone-card-desc">INDIGO · MARIGOLD HALO · EN/हिं/मर</div>
+      </div>
+
+    </div>
+  </section>
+
+  <!-- DESIGN NOTES -->
+  <div class="notes-grid">
+    <div class="note-card">
+      <div class="note-eyebrow">Brand Identity</div>
+      <div class="note-title">Three <em>elements</em>, one mark</div>
+      <div class="note-text">The new logo combines <strong>open book</strong> (knowledge), <strong>rising sun</strong> (enlightenment / new day at school), and <strong>lotus petals</strong> (Indian heritage / blooming child). Every element earns its place.</div>
+    </div>
+
+    <div class="note-card teal-accent">
+      <div class="note-eyebrow">Palette Philosophy</div>
+      <div class="note-title">Saffron + <em>Forest Teal</em></div>
+      <div class="note-text">Saffron <code>#E85D2E</code> = sacred, energetic, Indian flag. Teal <code>#0F766E</code> = classroom blackboard nostalgia, growth, calm. Together they balance <strong>energy &amp; learning</strong> — perfect for schools.</div>
+    </div>
+
+    <div class="note-card marigold-accent">
+      <div class="note-eyebrow">Marigold Accent</div>
+      <div class="note-title">For <em>celebration</em> only</div>
+      <div class="note-text">Marigold <code>#FFB800</code> appears ONLY for achievements, A+ grades, parent role badges, and special notifications. Never for errors. Inspired by <strong>marigold garlands at Indian festivals</strong>.</div>
+    </div>
+
+    <div class="note-card indigo-accent">
+      <div class="note-eyebrow">Indigo Heritage</div>
+      <div class="note-title">Royal <em>scholarly</em> depth</div>
+      <div class="note-text">Indigo <code>#2E1A6B</code> serves as primary text color and replaces pure black. Used for bottom nav, profile headers, and serious sections. Connects to <strong>traditional Indian textile dyes</strong> — gravitas without austerity.</div>
+    </div>
+
+    <div class="note-card">
+      <div class="note-eyebrow">Role-Specific Headers</div>
+      <div class="note-title">Each role, its <em>own header</em></div>
+      <div class="note-text">Parent = saffron header (warm welcome). Student = teal (calm focus). Teacher = indigo (professional). Principal = deep saffron (executive). Admin = crimson (authority). Same components, different headers.</div>
+    </div>
+
+    <div class="note-card teal-accent">
+      <div class="note-eyebrow">Cultural Heritage</div>
+      <div class="note-title"><em>विद्या</em> &amp; नमस्ते</div>
+      <div class="note-text">Splash shows "<strong>विद्या ददाति विनयं</strong>" (Knowledge gives humility — ancient Sanskrit). Login shows नमस्ते. Currency uses <code>₹</code>. EN/हिं/मर toggle in profile. Festival-aware UI possible.</div>
+    </div>
+
+    <div class="note-card marigold-accent">
+      <div class="note-eyebrow">Parent = Marigold</div>
+      <div class="note-title">The most <em>important</em> user</div>
+      <div class="note-text">In School ERP, <strong>parents get marigold</strong> — they're the customers paying fees, the decision-makers, the trust holders. Making their role color the celebration accent visibly tells them: "you matter most here."</div>
+    </div>
+
+    <div class="note-card indigo-accent">
+      <div class="note-eyebrow">Accessibility · WCAG AA</div>
+      <div class="note-title">For <em>everyone</em></div>
+      <div class="note-text">Indigo text on ivory: 13.4:1 (AAA). Saffron buttons with white text: 4.6:1 (AA). 48dp touch targets, 16sp body min. Patterns/icons accompany every status color — works for elderly and color-blind users.</div>
+    </div>
+  </div>
+
+  <!-- FOOTER -->
+  <footer class="footer">
+    <div class="footer-divider">
+      <span class="line"></span>
+      <span class="star">✦</span>
+      <span class="line"></span>
+    </div>
+    <div class="footer-title"><em>Jaikalki</em> · School ERP</div>
+    <div class="footer-meta">FRESH IDENTITY · 13 ROLES · 9 SCREENS · WCAG AA</div>
+  </footer>
+
+</div>
+</body>
+</html>
