@@ -1,4 +1,4 @@
-"""Phase 0 smoke tests: app boots, /health works, tenant middleware attaches state."""
+"""Phase 0 smoke tests: app boots, /health works, tenant-aware uploads guarded."""
 
 import pytest
 from httpx import ASGITransport, AsyncClient
@@ -25,15 +25,19 @@ async def test_health_returns_status():
 
 
 @pytest.mark.asyncio
-async def test_tenant_middleware_marks_platform_request():
+async def test_request_id_header_attached():
     async with AsyncClient(transport=ASGITransport(app=app), base_url="http://localhost") as ac:
         r = await ac.get("/")
-        # x-request-id always emitted by RequestContextMiddleware
         assert "x-request-id" in r.headers
 
 
 @pytest.mark.asyncio
-async def test_upload_requires_tenant_header():
+async def test_upload_requires_tenant_context():
+    """Without a tenant header / subdomain, upload must reject with 400."""
     async with AsyncClient(transport=ASGITransport(app=app), base_url="http://localhost") as ac:
-        r = await ac.post("/v1/uploads", files={"file": ("x.png", b"", "image/png")}, data={"category": "students", "subcategory": "photos"})
+        r = await ac.post(
+            "/v1/uploads",
+            files={"file": ("x.png", b"", "image/png")},
+            data={"category": "students", "subcategory": "photos"},
+        )
         assert r.status_code == 400
