@@ -41,6 +41,16 @@ from app.models.homework import (  # noqa: F401
     HomeworkSubmission,
     SubmissionStatus,
 )
+from app.models.library import (  # noqa: F401
+    Book,
+    BookCopy,
+    BorrowerKind,
+    CopyStatus,
+    Loan,
+    LoanStatus,
+    Reservation,
+    ReservationStatus,
+)
 from app.models.curriculum import (  # noqa: F401
     CalendarEvent,
     CalendarEventKind,

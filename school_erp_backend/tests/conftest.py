@@ -67,6 +67,7 @@ async def _truncate_all() -> None:
         ReportCardTemplate,
     )
     from app.models.homework import Homework, HomeworkSubmission
+    from app.models.library import Book, BookCopy, Loan, Reservation
     from app.models.timetable import PeriodDef, Substitution, TimetableEntry
     from app.models.comms import (
         Announcement,
@@ -128,6 +129,8 @@ async def _truncate_all() -> None:
             TeacherAttendance, TeacherSubject, Teacher,
             # Phase 6
             StudentDocument, Admission,
+            # Phase 17
+            Reservation, Loan, BookCopy, Book,
             # Phase 16
             ReportCard, ReportCardRemark, CoCurricularGrade, ReportCardTemplate,
             # Phase 15

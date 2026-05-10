@@ -11,6 +11,7 @@ from app.api.v1 import (
     fees,
     health,
     homework,
+    library,
     parent,
     report_cards,
     school_admin,
@@ -47,3 +48,5 @@ router.include_router(exams.grade_router)
 router.include_router(exams.parent_router)
 router.include_router(report_cards.router)
 router.include_router(report_cards.parent_router)
+router.include_router(library.router)
+router.include_router(library.parent_router)

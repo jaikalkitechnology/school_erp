@@ -21,12 +21,63 @@ Tracker for the 23-phase build defined in `school_erp_structure/`.
 | 14 | Homework | ✅ Done (core) |
 | 15 | Examination System | ✅ Done (core) |
 | 16 | Report Cards | ✅ Done (core) |
-| 17 | Library | ⬜ |
+| 17 | Library | ✅ Done (core) |
 | 18 | Transport (GPS) | ⬜ |
 | 19 | Hostel | ⬜ |
 | 20 | Reports & Analytics | ⬜ |
 | 21 | Subscription & Billing | ⬜ |
 | 22 | Final Testing & Deployment | ⬜ |
+
+## Phase 17 deliverables (shipped)
+
+External ISBN lookup, barcode-image rendering, and a barcode-scanner UI
+deferred. Barcodes are stored as text per copy and the UI accepts manual
+entry; rendering them as Code-128 PNGs and wiring a webcam scanner is a
+later UX pass.
+
+Backend
+- New tables: `library_books`, `library_copies`, `library_loans`,
+  `library_reservations`. Migration `f8f6d98f330e`. Books are unique
+  on (tenant + isbn); copies on (tenant + barcode); loans + reservations
+  index `(borrower_kind, borrower_id)` for quick borrower history.
+- `/v1/school-admin/library`:
+  - Books CRUD (delete blocked while loans are active) with title /
+    author / ISBN search + category filter; list returns
+    `total_copies` + `available_copies` per row.
+  - Copies single-add + bulk-add (auto-generated barcodes /
+    accession numbers).
+  - `POST /issue` validates the copy is `available`, the borrower is an
+    active student (or trusted teacher user_id), defaults loan duration
+    from the book and flips copy status to `issued`.
+  - `POST /return` computes `(return_date - due_on).days * fine_per_day`,
+    accepts `mark_lost`, validates `fine_paid <= fine_amount`, and
+    promotes the first PENDING reservation for the same book to READY.
+  - `POST /sweep-overdue` flags every ACTIVE loan whose `due_on < today`
+    as `overdue` with the live fine.
+  - `/loans` listing with status / borrower filters.
+  - Reservations: place + auto-promote-to-READY when stock is on hand,
+    duplicate guard, cancel (frees a held copy back to AVAILABLE).
+  - `/reports` returns total / issued / available / overdue counts,
+    outstanding fines, and a per-category breakdown.
+- `/v1/parent/children/{id}/library` returns the child's lending
+  history with parent-link guard.
+
+School Admin React
+- New `/library` page with **Catalog / Circulation / Reservations /
+  Reports** tabs. Catalog has a search bar, an inline copy-counter,
+  and an add-book form with default fine + loan-days. Circulation has
+  one-shot issue, status-filtered loan table, sweep-overdue button,
+  and one-tap return per row. Reservations has a place-form, status
+  pills, and cancel buttons. Reports shows 5 KPI tiles + per-category
+  table.
+- Sidebar /library was already wired; the placeholder route was
+  swapped for the live page.
+
+Tests: 6 new (130 total). Book create + ISBN-duplicate 409 + search,
+issue + double-issue 400 + return with computed fine, overdue sweep
+flips status + bumps fine, reservation places + duplicate 409 +
+auto-promotes to READY when a copy is returned, library reports
+totals + parent-link-guarded child history, super_admin token blocked.
 
 ## Phase 16 deliverables (shipped)
 
