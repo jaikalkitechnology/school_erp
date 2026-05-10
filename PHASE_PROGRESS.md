@@ -17,7 +17,7 @@ Tracker for the 23-phase build defined in `school_erp_structure/`.
 | 10 | Mobile App Polish | ✅ Done (core) |
 | 11 | Fee Management | ✅ Done (core) |
 | 12 | Communication | ✅ Done (core) |
-| 13 | Time Table & Substitution | ⬜ |
+| 13 | Time Table & Substitution | ✅ Done (core) |
 | 14 | Homework | ⬜ |
 | 15 | Examination System | ⬜ |
 | 16 | Report Cards | ⬜ |
@@ -27,6 +27,48 @@ Tracker for the 23-phase build defined in `school_erp_structure/`.
 | 20 | Reports & Analytics | ⬜ |
 | 21 | Subscription & Billing | ⬜ |
 | 22 | Final Testing & Deployment | ⬜ |
+
+## Phase 13 deliverables (shipped)
+
+Auto generator (constraint solver) + PDF export deferred. The grid editor
++ conflict detector is the manual flow; the rest of the schema is ready
+for an optimiser to fill in.
+
+Backend
+- New tables: `PeriodDef` (one row per weekday × period number),
+  `TimetableEntry` (unique on tenant + section + day + period),
+  `Substitution` (unique on tenant + date + section + period). Migration
+  `b8c43d8b501a`.
+- `/v1/school-admin/timetable`:
+  - Periods CRUD with start-before-end validation.
+  - `GET /sections/{id}` returns the saved cells; `PUT` replaces the
+    whole grid in one shot. The save runs a tenant-wide conflict check
+    against every other section's grid - if any cell would put a
+    teacher in two places at the same slot, the save returns `saved=0`
+    + a list of `conflicts` rather than partial-write.
+  - `GET /teachers/{user_id}` returns that teacher's own weekly view.
+  - `POST /substitutions/suggest` walks the absent teacher's day-of-week
+    schedule and ranks per-period substitute candidates (active +
+    available + present + free + qualified for the subject when known).
+  - `POST /substitutions` assigns a sub for a date+section+period;
+    blocks if the substitute is already booked at the same slot.
+  - `POST /{id}/complete` and `POST /{id}/cancel`.
+
+School Admin React
+- New `/timetable` page with **Section grid / Substitutions** tabs.
+  The grid editor is a Mon-Sat × 8-period table where each cell exposes
+  subject + teacher + room selectors. Save is single-button; conflicts
+  surface as a destructive banner with the offending day/period and
+  conflicting section. Substitutions tab picks a date + absent teacher,
+  shows ranked suggestions per period with one-tap "Assign" buttons,
+  plus a list of that day's substitutions with complete/cancel actions.
+
+Tests: 8 new (105 total). Period CRUD with start-before-end check,
+section grid save + conflict detection across sections, in-payload
+duplicate cell rejection, teacher view aggregates correctly, sub
+suggestion picks free + qualified candidate, sub assignment blocked
+when substitute is busy at the same slot, full assign / complete /
+cancel lifecycle, super_admin token blocked.
 
 ## Phase 12 deliverables (shipped)
 

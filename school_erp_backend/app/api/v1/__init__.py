@@ -13,6 +13,7 @@ from app.api.v1 import (
     school_admin,
     sis,
     teachers,
+    timetable,
     uploads,
 )
 
@@ -35,3 +36,4 @@ router.include_router(comms.sa_router)
 router.include_router(comms.router)
 router.include_router(comms.messages_router)
 router.include_router(comms.notif_router)
+router.include_router(timetable.router)

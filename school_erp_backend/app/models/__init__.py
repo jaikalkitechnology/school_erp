@@ -78,6 +78,12 @@ from app.models.teacher import (  # noqa: F401
     TeacherAttendance,
     TeacherSubject,
 )
+from app.models.timetable import (  # noqa: F401
+    PeriodDef,
+    Substitution,
+    SubstitutionStatus,
+    TimetableEntry,
+)
 from app.models.tenant import (  # noqa: F401
     BillingCycle,
     SchoolType,
