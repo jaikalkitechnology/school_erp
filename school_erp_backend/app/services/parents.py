@@ -514,6 +514,53 @@ async def decide_leave(
     leave.decided_at = _now()
     await session.commit()
     await session.refresh(leave)
+
+    # Phase 12: notify the parent who applied. Best-effort; never block the
+    # decision if the comms layer hiccups.
+    try:
+        from app.services.comms import notify
+
+        if leave.parent_id is not None:
+            parent = (
+                await session.execute(
+                    select(Parent).where(Parent.id == leave.parent_id)
+                )
+            ).scalar_one_or_none()
+            student = (
+                await session.execute(
+                    select(Student).where(Student.id == leave.student_id)
+                )
+            ).scalar_one_or_none()
+            if parent is not None:
+                from app.models.auth import User as _User
+
+                user = (
+                    await session.execute(
+                        select(_User).where(_User.id == parent.user_id)
+                    )
+                ).scalar_one_or_none()
+                if user is not None:
+                    await notify(
+                        session,
+                        tenant_id=leave.tenant_id,
+                        template_code="leave.decided",
+                        recipients=[user],
+                        context={
+                            "decision": leave.status,
+                            "student": student.full_name if student else "",
+                            "start": leave.start_date.isoformat(),
+                            "end": leave.end_date.isoformat(),
+                            "remarks": leave.decision_remarks or "",
+                        },
+                        deeplink=f"/parent/dashboard/{leave.student_id}",
+                        source_type="leave",
+                        source_id=leave.id,
+                        kind="leave",
+                    )
+    except Exception:
+        # Comms must never block a school-admin decision.
+        pass
+
     return leave
 
 
