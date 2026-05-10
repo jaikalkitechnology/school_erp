@@ -69,6 +69,17 @@ async def _truncate_all() -> None:
     from app.models.homework import Homework, HomeworkSubmission
     from app.models.library import Book, BookCopy, Loan, Reservation
     from app.models.timetable import PeriodDef, Substitution, TimetableEntry
+    from app.models.transport import (
+        Bus,
+        Driver,
+        FuelLog,
+        MaintenanceLog,
+        Route,
+        Stop,
+        StudentTransport,
+        Trip,
+        TripBoarding,
+    )
     from app.models.comms import (
         Announcement,
         Message,
@@ -129,6 +140,9 @@ async def _truncate_all() -> None:
             TeacherAttendance, TeacherSubject, Teacher,
             # Phase 6
             StudentDocument, Admission,
+            # Phase 18
+            TripBoarding, Trip, StudentTransport, Stop, Route,
+            FuelLog, MaintenanceLog, Driver, Bus,
             # Phase 17
             Reservation, Loan, BookCopy, Book,
             # Phase 16

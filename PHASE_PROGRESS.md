@@ -22,11 +22,65 @@ Tracker for the 23-phase build defined in `school_erp_structure/`.
 | 15 | Examination System | ✅ Done (core) |
 | 16 | Report Cards | ✅ Done (core) |
 | 17 | Library | ✅ Done (core) |
-| 18 | Transport (GPS) | ⬜ |
+| 18 | Transport (GPS) | ✅ Done (core) |
 | 19 | Hostel | ⬜ |
 | 20 | Reports & Analytics | ⬜ |
 | 21 | Subscription & Billing | ⬜ |
 | 22 | Final Testing & Deployment | ⬜ |
+
+## Phase 18 deliverables (shipped)
+
+Live mobile map view, native driver app, panic button + emergency
+contacts, geo-fence alerts, and SMS-on-pickup deferred. The data path
+is fully wired: GPS pings post to `/trips/{id}/ping`, the trip view
+returns the closest stop + ETA so a real map UI can drop in next.
+Boarding events already capture the QR-scan moment - rendering a
+QR on a student card is a UX pass.
+
+Backend
+- New tables: `transport_buses`, `transport_drivers`, `transport_routes`,
+  `transport_stops`, `transport_allocations`, `transport_trips`,
+  `transport_trip_boardings`, `transport_maintenance_logs`,
+  `transport_fuel_logs`. Migration `2088990f161a`.
+  Buses unique on (tenant + registration); drivers on
+  (tenant + license); routes on (tenant + code); allocations one-row-
+  per-student; trips unique on (tenant + route + date + direction);
+  boardings unique on (tenant + trip + student) so re-scans upsert.
+- `/v1/school-admin/transport`:
+  - Buses + drivers CRUD with status enums.
+  - Routes CRUD; routes listing returns `student_count` + `stop_count`
+    in one round-trip.
+  - `PUT /routes/{id}/stops` replaces the whole stop list in one shot
+    with a duplicate-sequence guard.
+  - Allocations upsert (one allocation per student); validates the
+    chosen stops belong to the route.
+  - Trips: `POST /trips/start` (idempotent on the unique),
+    `POST /trips/{id}/ping` writes the latest lat/lng/speed and auto-
+    flips a SCHEDULED trip to IN_PROGRESS, `POST /trips/{id}/complete`,
+    `GET /trips/{id}` returns the TripView with the closest stop +
+    minute ETA via Haversine + last reported speed.
+  - Boardings: idempotent QR-scan endpoint per (trip, student).
+  - Maintenance + fuel CRUD with per-bus history listing.
+- `/v1/parent/children/{id}/transport` returns the student's allocation,
+  the bus reg + driver name/phone, and today's live trip view with
+  ETA so the parent app can render a tracker. Parent-link guarded.
+
+School Admin React
+- New `/transport` page with **Fleet / Routes / Live trip / Logs**
+  tabs. Fleet: add buses + drivers inline. Routes: row table with
+  per-route stop editor (sequence is row order; replaces all on save)
+  + per-student allocation form. Live trip: pick a route + direction,
+  start, send GPS pings with auto-polling every 5 s, see closest stop
+  + ETA, complete. Logs: per-bus maintenance + fuel ledgers.
+- The /transport sidebar entry was already in place; the placeholder
+  route was swapped for the live page.
+
+Tests: 6 new (136 total). Bus + driver + route setup with duplicate
+registration 409, allocation upsert + cross-route stop rejection +
+idempotent re-allocation, trip lifecycle (start, ping, ETA via
+Haversine to the closest stop, complete, ping-after-complete 400),
+boarding upsert + invalid-student 400, maintenance + fuel logs +
+parent-link-guarded transport view, super_admin token blocked.
 
 ## Phase 17 deliverables (shipped)
 

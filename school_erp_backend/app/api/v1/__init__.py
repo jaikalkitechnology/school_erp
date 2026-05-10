@@ -18,6 +18,7 @@ from app.api.v1 import (
     sis,
     teachers,
     timetable,
+    transport,
     uploads,
 )
 
@@ -50,3 +51,5 @@ router.include_router(report_cards.router)
 router.include_router(report_cards.parent_router)
 router.include_router(library.router)
 router.include_router(library.parent_router)
+router.include_router(transport.router)
+router.include_router(transport.parent_router)

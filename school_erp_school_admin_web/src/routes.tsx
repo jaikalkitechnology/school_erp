@@ -12,6 +12,7 @@ import { ReportCardsPage } from "@/features/report_cards/ReportCardsPage";
 import { HomeworkPage } from "@/features/homework/HomeworkPage";
 import { LibraryPage } from "@/features/library/LibraryPage";
 import { TimetablePage } from "@/features/timetable/TimetablePage";
+import { TransportPage } from "@/features/transport/TransportPage";
 import { AcademicPage } from "@/features/setup/AcademicPage";
 import { OrgPage } from "@/features/setup/OrgPage";
 import { SettingsPage } from "@/features/setup/SettingsPage";
@@ -59,7 +60,7 @@ export const routes: RouteObject[] = [
       { path: "fees", element: <FeesPage /> },
       { path: "communication", element: <CommunicationPage /> },
       { path: "library", element: <LibraryPage /> },
-      { path: "transport", element: <Placeholder title="Transport" phase="Phase 18 (Transport + GPS)" /> },
+      { path: "transport", element: <TransportPage /> },
     ],
   },
   { path: "*", element: <Navigate to="/dashboard" replace /> },
