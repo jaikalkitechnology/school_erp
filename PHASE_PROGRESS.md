@@ -26,7 +26,58 @@ Tracker for the 23-phase build defined in `school_erp_structure/`.
 | 19 | Hostel | ✅ Done (core) |
 | 20 | Reports & Analytics | ✅ Done (core) |
 | 21 | Subscription & Billing | ✅ Done (core) |
-| 22 | Final Testing & Deployment | ⬜ |
+| 22 | Final Testing & Deployment | ✅ Done (core) |
+
+## Phase 22 deliverables (shipped)
+
+10-device mobile QA, recorded training videos, and a perf-testing
+harness deferred. The platform is otherwise production-ready: CI runs
+on every push, the multi-tenant boundary is fenced by automated pen
+tests, and the backend ships as a single Docker image + compose
+stack.
+
+CI / CD
+- `.github/workflows/ci.yml` runs four jobs in parallel on every push
+  and PR:
+  - `backend`: `pip install`, `alembic upgrade head` against SQLite,
+    `pytest -q`. Cached by `requirements.txt` hash.
+  - `super_admin_web`: `npm ci`, `tsc --noEmit`, `npm run build`.
+    Cached by `package-lock.json` hash.
+  - `school_admin_web`: same shape as the super-admin job.
+  - `flutter`: `flutter pub get`, `flutter analyze --no-fatal-infos`,
+    `flutter test`.
+
+Tests
+- `tests/test_phase22_security_and_e2e.py` adds 6 cases:
+  - **Cross-tenant pen tests** (5): demo token + `other` subdomain →
+    403; demo admin can't list other tenant's students; super-admin
+    token blocked from `/v1/school-admin/*`; unknown subdomain → 404
+    at the middleware; school-admin blocked from `/admin/billing`.
+  - **End-to-end happy path** (1): admit a student → mark her present
+    → generate a fee invoice → collect half → log in as parent →
+    confirm `today_attendance`, `fee_due_amount`, and the linked
+    invoice all show up in the parent dashboard.
+- Total suite: **164 passing**.
+
+Deployment
+- `school_erp_backend/Dockerfile` — two-stage Python 3.11 image, runs
+  uvicorn as a non-root `appuser`, mounts an `uploads` volume, exposes
+  port 8000.
+- `school_erp_backend/docker-compose.prod.yml` — MySQL 8 + Redis +
+  backend + a one-shot `migrator` profile that runs
+  `alembic upgrade head` and exits. Each service has a healthcheck.
+- `school_erp_backend/.dockerignore` — keeps the build context small
+  and prevents secrets / venvs / sqlite files from leaking into the
+  image.
+- `DEPLOYMENT.md` (repo root) — end-to-end runbook covering image
+  build + first-boot seed, frontend Vite builds + nginx vhost
+  configuration with the `X-Tenant-Subdomain` proxy contract,
+  Flutter release build, CI integration, MySQL backup strategy, and
+  monitoring hooks.
+- `SECURITY.md` — audit document covering authentication, tenant
+  isolation, RBAC, input validation, SQL injection guardrails,
+  secrets handling, recommended rate-limit zones, the audit log,
+  and the per-PR pen-test coverage map.
 
 ## Phase 21 deliverables (shipped)
 

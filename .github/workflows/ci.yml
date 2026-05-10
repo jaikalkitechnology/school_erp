@@ -1,0 +1,99 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  backend:
+    name: Backend (pytest + alembic)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: school_erp_backend
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+          cache-dependency-path: school_erp_backend/requirements.txt
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Apply migrations (SQLite)
+        env:
+          DATABASE_URL: sqlite+aiosqlite:///./test.db
+          SYNC_DATABASE_URL: sqlite:///./test.db
+        run: alembic upgrade head
+
+      - name: Run pytest
+        env:
+          DATABASE_URL: sqlite+aiosqlite:///./test.db
+          SYNC_DATABASE_URL: sqlite:///./test.db
+        run: pytest -q
+
+  super_admin_web:
+    name: Super Admin web (tsc + build)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: school_erp_super_admin_web
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Node 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+          cache-dependency-path: school_erp_super_admin_web/package-lock.json
+
+      - run: npm ci
+      - run: npx tsc --noEmit
+      - run: npm run build
+
+  school_admin_web:
+    name: School Admin web (tsc + build)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: school_erp_school_admin_web
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Node 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+          cache-dependency-path: school_erp_school_admin_web/package-lock.json
+
+      - run: npm ci
+      - run: npx tsc --noEmit
+      - run: npm run build
+
+  flutter:
+    name: Flutter mobile (analyze + test)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: school_erp_mobile/jaikalki
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      - run: flutter pub get
+      - run: flutter analyze --no-fatal-infos
+      - run: flutter test
