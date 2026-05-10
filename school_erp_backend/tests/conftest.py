@@ -75,6 +75,7 @@ async def _truncate_all() -> None:
     )
     from app.models.parent import Parent, ParentChildMapping, ParentSession, Student
     from app.models.sis import Admission, StudentDocument
+    from app.models.teacher import Teacher, TeacherAttendance, TeacherSubject
     from app.models.tenant import (
         Subscription,
         SubscriptionPlan,
@@ -93,6 +94,8 @@ async def _truncate_all() -> None:
             AcademicTerm, AcademicYear, Department,
             # Phase 3
             AuditLog,
+            # Phase 7
+            TeacherAttendance, TeacherSubject, Teacher,
             # Phase 6
             StudentDocument, Admission,
             # Phase 2
