@@ -12,6 +12,7 @@ from app.api.v1 import (
     health,
     homework,
     parent,
+    report_cards,
     school_admin,
     sis,
     teachers,
@@ -44,3 +45,5 @@ router.include_router(homework.parent_router)
 router.include_router(exams.router)
 router.include_router(exams.grade_router)
 router.include_router(exams.parent_router)
+router.include_router(report_cards.router)
+router.include_router(report_cards.parent_router)
