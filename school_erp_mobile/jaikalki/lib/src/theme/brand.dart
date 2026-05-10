@@ -98,4 +98,86 @@ class JaikalkiBrand {
       ),
     );
   }
+
+  static const _darkSurface = Color(0xFF1A1230);
+  static const _darkBg = Color(0xFF110A22);
+  static const _darkBorder = Color(0xFF2C1F4F);
+  static const _darkOnSurface = Color(0xFFEDE7FA);
+  static const _darkOnSurfaceMuted = Color(0xFFB7AFD2);
+
+  static ThemeData darkTheme() {
+    final colorScheme = ColorScheme(
+      brightness: Brightness.dark,
+      primary: saffron,
+      onPrimary: _darkOnSurface,
+      secondary: teal,
+      onSecondary: _darkOnSurface,
+      tertiary: marigold,
+      onTertiary: indigoDark,
+      error: const Color(0xFFFCA5A5),
+      onError: indigoDark,
+      surface: _darkSurface,
+      onSurface: _darkOnSurface,
+      surfaceContainerHighest: _darkBg,
+      outline: _darkBorder,
+    );
+
+    final textTheme = TextTheme(
+      displayLarge: GoogleFonts.fraunces(fontSize: 40, fontWeight: FontWeight.w600, color: _darkOnSurface, height: 1.1),
+      displayMedium: GoogleFonts.fraunces(fontSize: 32, fontWeight: FontWeight.w600, color: _darkOnSurface),
+      headlineMedium: GoogleFonts.fraunces(fontSize: 24, fontWeight: FontWeight.w600, color: _darkOnSurface),
+      titleLarge: GoogleFonts.fraunces(fontSize: 20, fontWeight: FontWeight.w600, color: _darkOnSurface),
+      titleMedium: GoogleFonts.dmSans(fontSize: 16, fontWeight: FontWeight.w600, color: _darkOnSurface),
+      bodyLarge: GoogleFonts.dmSans(fontSize: 15, color: _darkOnSurface),
+      bodyMedium: GoogleFonts.dmSans(fontSize: 14, color: _darkOnSurfaceMuted),
+      labelLarge: GoogleFonts.dmSans(fontSize: 13, fontWeight: FontWeight.w600, letterSpacing: 0.5),
+      labelSmall: GoogleFonts.jetBrainsMono(fontSize: 11, letterSpacing: 1.6, color: marigold),
+    );
+
+    return ThemeData(
+      useMaterial3: true,
+      colorScheme: colorScheme,
+      scaffoldBackgroundColor: _darkBg,
+      textTheme: textTheme,
+      appBarTheme: AppBarTheme(
+        backgroundColor: _darkSurface,
+        foregroundColor: _darkOnSurface,
+        elevation: 0,
+        centerTitle: false,
+        titleTextStyle: GoogleFonts.fraunces(fontSize: 20, fontWeight: FontWeight.w600, color: _darkOnSurface),
+      ),
+      filledButtonTheme: FilledButtonThemeData(
+        style: FilledButton.styleFrom(
+          backgroundColor: saffron,
+          foregroundColor: _darkOnSurface,
+          minimumSize: const Size.fromHeight(52),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+          textStyle: GoogleFonts.dmSans(fontSize: 15, fontWeight: FontWeight.w600),
+        ),
+      ),
+      inputDecorationTheme: InputDecorationTheme(
+        filled: true,
+        fillColor: _darkSurface,
+        labelStyle: TextStyle(color: _darkOnSurfaceMuted),
+        hintStyle: TextStyle(color: _darkOnSurfaceMuted),
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(14),
+          borderSide: const BorderSide(color: _darkBorder),
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(14),
+          borderSide: const BorderSide(color: saffron, width: 2),
+        ),
+      ),
+      cardTheme: CardThemeData(
+        color: _darkSurface,
+        surfaceTintColor: Colors.transparent,
+        elevation: 0,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(20),
+          side: const BorderSide(color: _darkBorder),
+        ),
+      ),
+    );
+  }
 }

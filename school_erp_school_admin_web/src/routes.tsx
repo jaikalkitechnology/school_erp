@@ -3,6 +3,7 @@ import { SchoolAdminLayout } from "@/components/layouts/SchoolAdminLayout";
 import { LoginPage } from "@/features/auth/LoginPage";
 import { DashboardPage } from "@/features/dashboard/DashboardPage";
 import { Placeholder } from "@/features/placeholder/Placeholder";
+import { AttendancePage } from "@/features/attendance/AttendancePage";
 import { CurriculumPage } from "@/features/curriculum/CurriculumPage";
 import { AcademicPage } from "@/features/setup/AcademicPage";
 import { OrgPage } from "@/features/setup/OrgPage";
@@ -43,7 +44,7 @@ export const routes: RouteObject[] = [
       { path: "teachers", element: <TeachersPage /> },
       { path: "teachers/onboard", element: <OnboardTeacherPage /> },
       { path: "teachers/:id", element: <TeacherDetailPage /> },
-      { path: "attendance", element: <Placeholder title="Attendance" phase="Phase 9 (Attendance)" /> },
+      { path: "attendance", element: <AttendancePage /> },
       { path: "timetable", element: <Placeholder title="Timetable" phase="Phase 13 (Timetable & Substitution)" /> },
       { path: "exams", element: <Placeholder title="Exams" phase="Phase 15 (Examination System)" /> },
       { path: "fees", element: <Placeholder title="Fees" phase="Phase 11 (Fee Management)" /> },

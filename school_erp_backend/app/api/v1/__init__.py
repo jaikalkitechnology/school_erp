@@ -2,7 +2,18 @@
 
 from fastapi import APIRouter
 
-from app.api.v1 import auth, curriculum, health, parent, school_admin, sis, teachers, uploads
+from app.api.v1 import (
+    attendance,
+    auth,
+    curriculum,
+    health,
+    notifications,
+    parent,
+    school_admin,
+    sis,
+    teachers,
+    uploads,
+)
 
 router = APIRouter(prefix="/v1")
 router.include_router(health.router)
@@ -15,3 +26,5 @@ router.include_router(sis.admissions_router)
 router.include_router(teachers.router)
 router.include_router(parent.router)
 router.include_router(parent.sa_router)
+router.include_router(attendance.router)
+router.include_router(notifications.router)
