@@ -41,6 +41,20 @@ from app.models.homework import (  # noqa: F401
     HomeworkSubmission,
     SubmissionStatus,
 )
+from app.models.hostel import (  # noqa: F401
+    DisciplinaryRecord,
+    DisciplinarySeverity,
+    Hostel,
+    HostelAllocation,
+    HostelKind,
+    HostelLeave,
+    HostelLeaveStatus,
+    MealType,
+    MessMenu,
+    Room,
+    RoomStatus,
+    VisitorLog,
+)
 from app.models.library import (  # noqa: F401
     Book,
     BookCopy,

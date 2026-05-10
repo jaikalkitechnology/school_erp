@@ -67,6 +67,15 @@ async def _truncate_all() -> None:
         ReportCardTemplate,
     )
     from app.models.homework import Homework, HomeworkSubmission
+    from app.models.hostel import (
+        DisciplinaryRecord,
+        Hostel,
+        HostelAllocation,
+        HostelLeave,
+        MessMenu,
+        Room,
+        VisitorLog,
+    )
     from app.models.library import Book, BookCopy, Loan, Reservation
     from app.models.timetable import PeriodDef, Substitution, TimetableEntry
     from app.models.transport import (
@@ -140,6 +149,9 @@ async def _truncate_all() -> None:
             TeacherAttendance, TeacherSubject, Teacher,
             # Phase 6
             StudentDocument, Admission,
+            # Phase 19
+            HostelLeave, DisciplinaryRecord, VisitorLog, MessMenu,
+            HostelAllocation, Room, Hostel,
             # Phase 18
             TripBoarding, Trip, StudentTransport, Stop, Route,
             FuelLog, MaintenanceLog, Driver, Bus,

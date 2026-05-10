@@ -11,6 +11,7 @@ from app.api.v1 import (
     fees,
     health,
     homework,
+    hostel,
     library,
     parent,
     report_cards,
@@ -53,3 +54,5 @@ router.include_router(library.router)
 router.include_router(library.parent_router)
 router.include_router(transport.router)
 router.include_router(transport.parent_router)
+router.include_router(hostel.router)
+router.include_router(hostel.parent_router)

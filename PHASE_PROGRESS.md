@@ -23,10 +23,63 @@ Tracker for the 23-phase build defined in `school_erp_structure/`.
 | 16 | Report Cards | ✅ Done (core) |
 | 17 | Library | ✅ Done (core) |
 | 18 | Transport (GPS) | ✅ Done (core) |
-| 19 | Hostel | ⬜ |
+| 19 | Hostel | ✅ Done (core) |
 | 20 | Reports & Analytics | ⬜ |
 | 21 | Subscription & Billing | ⬜ |
 | 22 | Final Testing & Deployment | ⬜ |
+
+## Phase 19 deliverables (shipped)
+
+Roommate-matching algorithm + warden mobile UI deferred. Allocation today is
+manual ("put student X in room Y"); the schema is ready for a matcher to
+populate it. The `/hostel` web UI covers wardens for now.
+
+Backend
+- New tables: `hostels`, `hostel_rooms`, `hostel_allocations`,
+  `hostel_mess_menus`, `hostel_visitors`, `hostel_disciplinary`,
+  `hostel_leaves`. Migration `8cb2e7ba59ad`.
+  Hostels unique on (tenant + code); rooms on (tenant + hostel + number);
+  allocations one-row-per-student; mess unique on
+  (tenant + hostel + date + meal); leaves keyed by (hostel + student).
+- `/v1/school-admin/hostel`:
+  - Hostels + rooms CRUD; rooms list returns `occupied` per row.
+  - `POST /allocations` upsert with capacity guard (rejects if room is
+    already at capacity for *other* students), under-maintenance
+    rejection, auto room status flip (full / available). Re-allocating
+    the same student to the same room is idempotent.
+  - `GET /rooms/{id}` returns the room + occupant list (name +
+    admission #).
+  - Mess menu: list-by-date, idempotent upsert per (date + meal).
+  - Visitors: check-in writes `in_at`, `/{id}/checkout` writes `out_at`
+    (rejects double-checkout); listing supports `open_only`.
+  - Disciplinary records: log + list with optional `student_id` filter.
+  - Hostel leaves (overnight pass, distinct from Phase 8 academic
+    leaves): apply with `to_date >= from_date` guard, decide once
+    (approved/rejected, second decide blocked), `mark_returned` only
+    valid for approved leaves.
+  - `/reports` returns 7 KPIs (hostels, rooms, capacity, occupied,
+    available_seats, pending_leaves, open_disciplinary).
+- `/v1/parent/children/{id}/hostel` returns the student's allocation
+  + hostel/room + history of leaves with parent-link guard.
+
+School Admin React
+- New `/hostel` page with **Setup / Allocations / Mess / Visitors /
+  Discipline / Leaves / Reports** tabs. The active hostel is picked
+  once at the top and shared across tabs. Setup tab manages hostels +
+  rooms with occupancy badges; Allocations binds a student ID to a
+  room; Mess tab is a one-day-at-a-time editor; Visitors has a
+  check-in form + per-row checkout; Discipline has a quick-log form
+  + recent list; Leaves tab has the apply / approve / reject /
+  returned lifecycle inline.
+- Sidebar gets a new "Hostel" entry between Transport and Settings.
+
+Tests: 6 new (142 total). Hostel + room setup with duplicate-number
+409, allocation capacity-guard (3rd student into 2-cap room 400) +
+idempotent re-allocation + occupant list, mess upsert by (date,meal)
++ visitor check-in/check-out + double-checkout 400 + disciplinary
+log, full leave lifecycle (apply with bad dates 400, decide once,
+re-decide 400, mark returned, parent-link-guarded child view),
+reports endpoint totals, super_admin token blocked.
 
 ## Phase 18 deliverables (shipped)
 
