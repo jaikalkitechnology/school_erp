@@ -1,18 +1,12 @@
 import { useState } from "react";
+import { Link } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Pause, Play, Plus, Search } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { cn } from "@/lib/utils";
-import {
-  activateTenant,
-  createTenant,
-  listPlans,
-  listTenants,
-  suspendTenant,
-} from "./api";
+import { activateTenant, listTenants, suspendTenant } from "./api";
 import type { Tenant, TenantStatus } from "./types";
 
 const STATUS_TONE: Record<TenantStatus, string> = {
@@ -24,7 +18,6 @@ const STATUS_TONE: Record<TenantStatus, string> = {
 
 export function SchoolsPage() {
   const [search, setSearch] = useState("");
-  const [creating, setCreating] = useState(false);
   const queryClient = useQueryClient();
 
   const tenants = useQuery({
@@ -32,10 +25,7 @@ export function SchoolsPage() {
     queryFn: () => listTenants(search || undefined),
   });
 
-  const plans = useQuery({ queryKey: ["plans"], queryFn: listPlans });
-
   const invalidate = () => queryClient.invalidateQueries({ queryKey: ["tenants"] });
-
   const suspend = useMutation({ mutationFn: suspendTenant, onSuccess: invalidate });
   const activate = useMutation({ mutationFn: activateTenant, onSuccess: invalidate });
 
@@ -44,29 +34,20 @@ export function SchoolsPage() {
       <header className="flex items-end justify-between">
         <div>
           <p className="font-mono text-xs uppercase tracking-[0.3em] text-saffron-dark">
-            Phase 1 · Multi-Tenant
+            Phase 3 · Multi-Tenant
           </p>
           <h1 className="mt-1 font-display text-4xl text-indigo-dark">Schools</h1>
           <p className="mt-2 max-w-xl text-sm text-muted-foreground">
             Every school on Jaikalki gets its own subdomain, plan, branding, and isolated data.
           </p>
         </div>
-        <Button onClick={() => setCreating((v) => !v)}>
-          <Plus className="h-4 w-4" />
-          Onboard school
+        <Button asChild>
+          <Link to="/schools/new">
+            <Plus className="h-4 w-4" />
+            Onboard school
+          </Link>
         </Button>
       </header>
-
-      {creating && plans.data && (
-        <CreateTenantForm
-          planCodes={plans.data.map((p) => p.code)}
-          onClose={() => setCreating(false)}
-          onCreated={() => {
-            setCreating(false);
-            invalidate();
-          }}
-        />
-      )}
 
       <div className="relative max-w-md">
         <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
@@ -81,7 +62,7 @@ export function SchoolsPage() {
       <Card>
         <CardHeader>
           <CardTitle>All schools ({tenants.data?.length ?? "…"})</CardTitle>
-          <CardDescription>Click a row in Phase 3 to drill into a school.</CardDescription>
+          <CardDescription>Click a row to drill in.</CardDescription>
         </CardHeader>
         <CardContent className="p-0">
           {tenants.isLoading ? (
@@ -138,7 +119,9 @@ function TenantRow({
   return (
     <tr className="border-b last:border-b-0 hover:bg-saffron-pale/30">
       <td className="px-6 py-3">
-        <div className="font-medium text-indigo-dark">{tenant.school_name}</div>
+        <Link to={`/schools/${tenant.id}`} className="font-medium text-indigo-dark hover:underline">
+          {tenant.school_name}
+        </Link>
         <div className="text-xs text-muted-foreground">
           {[tenant.city, tenant.state].filter(Boolean).join(", ") || tenant.school_code}
         </div>
@@ -172,92 +155,5 @@ function TenantRow({
         ) : null}
       </td>
     </tr>
-  );
-}
-
-function CreateTenantForm({
-  planCodes,
-  onClose,
-  onCreated,
-}: {
-  planCodes: string[];
-  onClose: () => void;
-  onCreated: () => void;
-}) {
-  const [school_name, setName] = useState("");
-  const [school_code, setCode] = useState("");
-  const [subdomain, setSub] = useState("");
-  const [plan_code, setPlan] = useState(planCodes[0] ?? "basic");
-  const [error, setError] = useState<string | null>(null);
-
-  const create = useMutation({
-    mutationFn: createTenant,
-    onSuccess: onCreated,
-    onError: (err: any) => setError(err?.response?.data?.detail ?? "Could not create school"),
-  });
-
-  return (
-    <Card className="border-saffron">
-      <CardHeader>
-        <CardTitle>Onboard a new school</CardTitle>
-        <CardDescription>
-          Trial period starts today. You can change the plan from the school's detail page later.
-        </CardDescription>
-      </CardHeader>
-      <CardContent>
-        <form
-          className="grid grid-cols-1 gap-4 md:grid-cols-2"
-          onSubmit={(e) => {
-            e.preventDefault();
-            setError(null);
-            create.mutate({ school_name, school_code, subdomain, plan_code });
-          }}
-        >
-          <div className="space-y-1.5">
-            <Label htmlFor="name">School name</Label>
-            <Input id="name" required value={school_name} onChange={(e) => setName(e.target.value)} />
-          </div>
-          <div className="space-y-1.5">
-            <Label htmlFor="code">School code</Label>
-            <Input id="code" required value={school_code} onChange={(e) => setCode(e.target.value)} />
-          </div>
-          <div className="space-y-1.5">
-            <Label htmlFor="sub">Subdomain</Label>
-            <Input
-              id="sub"
-              required
-              pattern="[a-z0-9][a-z0-9-]{1,61}[a-z0-9]"
-              value={subdomain}
-              onChange={(e) => setSub(e.target.value.toLowerCase())}
-              placeholder="e.g. dpsschool"
-            />
-          </div>
-          <div className="space-y-1.5">
-            <Label htmlFor="plan">Plan</Label>
-            <select
-              id="plan"
-              className="flex h-11 w-full rounded-md border border-input bg-background px-3 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-              value={plan_code}
-              onChange={(e) => setPlan(e.target.value)}
-            >
-              {planCodes.map((c) => (
-                <option key={c} value={c}>
-                  {c}
-                </option>
-              ))}
-            </select>
-          </div>
-          {error && <p className="md:col-span-2 text-sm text-destructive">{error}</p>}
-          <div className="md:col-span-2 flex justify-end gap-2">
-            <Button type="button" variant="ghost" onClick={onClose}>
-              Cancel
-            </Button>
-            <Button type="submit" disabled={create.isPending}>
-              {create.isPending ? "Creating…" : "Create school"}
-            </Button>
-          </div>
-        </form>
-      </CardContent>
-    </Card>
   );
 }
