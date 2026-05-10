@@ -59,6 +59,7 @@ async def _truncate_all() -> None:
     )
     from app.models.attendance import StudentAttendance
     from app.models.audit import AuditLog
+    from app.models.exams import Exam, ExamMarks, ExamSubject, GradeScale
     from app.models.homework import Homework, HomeworkSubmission
     from app.models.timetable import PeriodDef, Substitution, TimetableEntry
     from app.models.comms import (
@@ -121,6 +122,8 @@ async def _truncate_all() -> None:
             TeacherAttendance, TeacherSubject, Teacher,
             # Phase 6
             StudentDocument, Admission,
+            # Phase 15
+            ExamMarks, ExamSubject, Exam, GradeScale,
             # Phase 14
             HomeworkSubmission, Homework,
             # Phase 13

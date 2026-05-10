@@ -19,7 +19,7 @@ Tracker for the 23-phase build defined in `school_erp_structure/`.
 | 12 | Communication | ✅ Done (core) |
 | 13 | Time Table & Substitution | ✅ Done (core) |
 | 14 | Homework | ✅ Done (core) |
-| 15 | Examination System | ⬜ |
+| 15 | Examination System | ✅ Done (core) |
 | 16 | Report Cards | ⬜ |
 | 17 | Library | ⬜ |
 | 18 | Transport (GPS) | ⬜ |
@@ -27,6 +27,60 @@ Tracker for the 23-phase build defined in `school_erp_structure/`.
 | 20 | Reports & Analytics | ⬜ |
 | 21 | Subscription & Billing | ⬜ |
 | 22 | Final Testing & Deployment | ⬜ |
+
+## Phase 15 deliverables (shipped)
+
+Online MCQ exams, question bank, hall ticket PDFs, and mobile exam-taking
+deferred — those are dedicated UX flows that ride better on top of the
+written-marks pipeline once Phase 16 (Report Cards) lands the rendering
+infrastructure. The data path is complete: exam → exam-subjects (per
+class) → bulk marks → results aggregator with grading + ranking →
+publish → parent-link-guarded child results.
+
+Backend
+- New tables: `exams`, `exam_subjects`, `exam_marks`, `grade_scales`.
+  `Exam` unique on (tenant + year + name); `ExamSubject` unique on
+  (tenant + exam + class + subject); `ExamMarks` unique on (tenant +
+  exam_subject + student); `GradeScale` carries JSON `bands` and a
+  single-default invariant. Migration `40b1287bddda`.
+- `/v1/school-admin/exams`:
+  - GET / POST exams (validates start &lt; end, default max marks).
+  - POST `/{id}/publish` (idempotent; flips `status=published`).
+  - GET / POST exam-subjects (passing &lt;= max guard, duplicate 400).
+  - GET `/exam-subjects/{id}/roster?section_id=` returns the section
+    roll with any saved marks.
+  - POST `/marks/bulk` upserts marks per (exam_subject, student).
+    Validates obtained &lt;= max, derives status when not provided
+    (absent / pass / fail by passing-mark threshold). Invalid student
+    400.
+  - GET `/{id}/results?section_id=` aggregates per-student totals,
+    percentage, overall grade (from default scale), overall status
+    (any-absent → absent, any-fail → fail, else pass), and
+    `rank_in_section` with ties sharing the same rank.
+- `/v1/school-admin/grade-scales` GET + PUT (sorts bands desc, enforces
+  one default per tenant).
+- `/v1/parent/children/{id}/exam-results` returns published results for
+  linked children only; cross-child access 403.
+
+School Admin React
+- New `/exams` page with **Exams / Marks entry / Results / Grade scale**
+  tabs:
+  - Exams: create form, list with status pills + publish, schedule
+    (class × subject × max × passing) form when an exam is selected.
+  - Marks entry: pick exam → exam-subject → section, edit roster table
+    inline (marks + status + remarks) with overflow validation, save
+    in one shot.
+  - Results: pick exam + section, ranked table with total / % /
+    overall grade / overall status pills.
+  - Grade scale: bands editor (min_pct + grade rows) with
+    is_default toggle.
+
+Tests: 6 new (118 total). Exam + subject setup with passing&gt;max
+rejection, marks bulk over-mark 400 + valid round-trip with absent
+status, grade scale + ranked results with tie / absent precedence
+(Aarav 90% A+ rank 1, Bina 40% C rank 2, Chitra absent rank 3),
+publish + parent-link guarded child results with cross-child 403,
+invalid student 400, super_admin token blocked.
 
 ## Phase 14 deliverables (shipped)
 
