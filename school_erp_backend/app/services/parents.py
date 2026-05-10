@@ -348,6 +348,11 @@ async def dashboard_for_child(
 
     today_status = await today_status_for_student(session, student.id)
 
+    # Phase 11: outstanding fee due across all open invoices.
+    from app.services.fees import fee_due_for_student
+
+    fee_due = await fee_due_for_student(session, student.id)
+
     return ChildDashboard(
         student_id=student.id,
         full_name=student.full_name,
@@ -359,6 +364,7 @@ async def dashboard_for_child(
         sibling_ids=siblings,
         upcoming_events_count=upcoming_events,
         today_attendance=today_status,
+        fee_due_amount=float(fee_due),
     )
 
 
