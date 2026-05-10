@@ -45,6 +45,13 @@ from app.models.sis import (  # noqa: F401
     StudentDocument,
     StudentStatus,
 )
+from app.models.teacher import (  # noqa: F401
+    AttendanceStatus,
+    EmploymentStatus,
+    Teacher,
+    TeacherAttendance,
+    TeacherSubject,
+)
 from app.models.tenant import (  # noqa: F401
     BillingCycle,
     SchoolType,

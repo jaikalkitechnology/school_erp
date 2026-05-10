@@ -11,7 +11,7 @@ Tracker for the 23-phase build defined in `school_erp_structure/`.
 | 4 | School Admin Foundation | ✅ Done (core) |
 | 5 | Academic Setup | ✅ Done (core) |
 | 6 | Student Information System | ✅ Done (core) |
-| 7 | Teacher Management | ⬜ |
+| 7 | Teacher Management | ✅ Done (core) |
 | 8 | Parent Module (Multi-Child) | ⬜ |
 | 9 | Attendance | ⬜ |
 | 10 | Mobile App Polish | ⬜ |
@@ -27,6 +27,51 @@ Tracker for the 23-phase build defined in `school_erp_structure/`.
 | 20 | Reports & Analytics | ⬜ |
 | 21 | Subscription & Billing | ⬜ |
 | 22 | Final Testing & Deployment | ⬜ |
+
+## Phase 7 deliverables (shipped)
+
+Performance tracking + appraisal (7.7) deferred — needs exam results +
+parent feedback to be meaningful (Phase 15 + Phase 12).
+
+- **Schema** — `Teacher`, `TeacherSubject` (qualifications), `TeacherAttendance`.
+  Migration `6a3e8f02e5fa`.
+- **/v1/school-admin/teachers** endpoints (reads gated to all school staff;
+  mutations to school admin / principal / vice principal):
+  - List + filters (search, department, employment status) + pagination.
+  - **Onboard** creates the underlying `User` + assigns role(s) from
+    `{principal, vice_principal, coordinator, class_teacher,
+    subject_teacher}` in one shot. Auto employee number `EMP-YY-NNNN`.
+  - PATCH for profile + status updates.
+  - `PUT /qualified-subjects` replaces the qualified-subject set in one
+    call.
+  - `POST /assign-section-subject` writes `SectionSubject.teacher_user_id`,
+    finally lighting up the column added in Phase 5.
+  - `POST /assign-class-teacher` writes `Section.in_charge_user_id` and
+    flags the teacher as a class teacher.
+  - `GET /workload` server-aggregates `weekly_periods` across all
+    section-subject assignments and reports unique class+subject counts.
+  - `POST /attendance` (idempotent upsert) + `POST /attendance/bulk` for
+    daily roll-call.
+  - `GET /substitution-pool` returns active, available teachers for a
+    target date, sorted by `(present, ascending workload)`. Optional
+    `subject_id` filter to constrain to qualified teachers.
+- **School Admin React** —
+  - **Teachers list** at `/teachers` with search + dept + status filters.
+  - **Onboard form** at `/teachers/onboard` with role chips, qualification
+    chip-list, and live validation.
+  - **Teacher detail** at `/teachers/:id` with **Profile / Subjects /
+    Classes / Workload / Attendance** tabs. Subjects tab is a one-tap
+    qualification toggle; Classes tab picks a section then takes / clears
+    section-subjects and (one-click) makes this teacher the class teacher;
+    Workload tab shows period totals + a per-row schedule; Attendance tab
+    has a date picker + status buttons + history.
+- **Tests** — 67 passing (9 new): onboard creates a loginable user,
+  duplicate email 409, workload sums section-subject `weekly_periods`,
+  class-teacher assignment writes the section, qualified-subjects PUT is
+  a true replace, attendance is idempotent, substitution pool ranks
+  present teachers ahead of absent ones with lower workload first,
+  super-admin token blocked from `/v1/school-admin/teachers`,
+  cross-tenant isolation.
 
 ## Phase 6 deliverables (shipped)
 

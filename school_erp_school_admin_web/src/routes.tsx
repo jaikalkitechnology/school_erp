@@ -10,6 +10,9 @@ import { SettingsPage } from "@/features/setup/SettingsPage";
 import { AdmitStudentPage } from "@/features/students/AdmitStudentPage";
 import { StudentDetailPage } from "@/features/students/StudentDetailPage";
 import { StudentsPage } from "@/features/students/StudentsPage";
+import { OnboardTeacherPage } from "@/features/teachers/OnboardTeacherPage";
+import { TeacherDetailPage } from "@/features/teachers/TeacherDetailPage";
+import { TeachersPage } from "@/features/teachers/TeachersPage";
 import { useAuth } from "@/stores/auth";
 
 function RequireAuth({ children }: { children: React.ReactNode }) {
@@ -37,7 +40,9 @@ export const routes: RouteObject[] = [
       { path: "students", element: <StudentsPage /> },
       { path: "students/admit", element: <AdmitStudentPage /> },
       { path: "students/:id", element: <StudentDetailPage /> },
-      { path: "teachers", element: <Placeholder title="Teachers" phase="Phase 7 (Teacher Management)" /> },
+      { path: "teachers", element: <TeachersPage /> },
+      { path: "teachers/onboard", element: <OnboardTeacherPage /> },
+      { path: "teachers/:id", element: <TeacherDetailPage /> },
       { path: "attendance", element: <Placeholder title="Attendance" phase="Phase 9 (Attendance)" /> },
       { path: "timetable", element: <Placeholder title="Timetable" phase="Phase 13 (Timetable & Substitution)" /> },
       { path: "exams", element: <Placeholder title="Exams" phase="Phase 15 (Examination System)" /> },
