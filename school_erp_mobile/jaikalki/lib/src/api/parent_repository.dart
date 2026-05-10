@@ -116,4 +116,39 @@ class ParentRepository {
       },
     );
   }
+
+  Future<List<AttendanceRow>> attendance(int studentId, {int limit = 30}) async {
+    try {
+      final res = await _api.dio.get<List<dynamic>>(
+        '/v1/parent/children/$studentId/attendance',
+        queryParameters: {'limit': limit},
+      );
+      return (res.data ?? const [])
+          .map((e) => AttendanceRow.fromJson(e as Map<String, dynamic>))
+          .toList();
+    } on DioException {
+      return const [];
+    }
+  }
+}
+
+class AttendanceRow {
+  AttendanceRow({
+    required this.date,
+    required this.period,
+    required this.status,
+    required this.remarks,
+  });
+
+  final String date;
+  final String period;
+  final String status;
+  final String? remarks;
+
+  factory AttendanceRow.fromJson(Map<String, dynamic> j) => AttendanceRow(
+        date: j['date'] as String,
+        period: j['period'] as String,
+        status: j['status'] as String,
+        remarks: j['remarks'] as String?,
+      );
 }

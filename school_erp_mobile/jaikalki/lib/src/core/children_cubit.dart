@@ -1,6 +1,6 @@
 import 'package:flutter_bloc/flutter_bloc.dart';
 
-import '../api/parent_repository.dart';
+import '../api/parent_repository.dart' show ParentRepository, Child, ChildDashboard, AttendanceRow;
 
 sealed class ChildrenState {
   const ChildrenState();
@@ -104,4 +104,7 @@ class ChildrenCubit extends Cubit<ChildrenState> {
       ));
     }
   }
+
+  Future<List<AttendanceRow>> attendance(int studentId) =>
+      _repo.attendance(studentId);
 }

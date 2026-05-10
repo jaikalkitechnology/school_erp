@@ -13,7 +13,7 @@ Tracker for the 23-phase build defined in `school_erp_structure/`.
 | 6 | Student Information System | ✅ Done (core) |
 | 7 | Teacher Management | ✅ Done (core) |
 | 8 | Parent Module (Multi-Child) | ✅ Done (core) |
-| 9 | Attendance | ⬜ |
+| 9 | Attendance | ✅ Done (core) |
 | 10 | Mobile App Polish | ⬜ |
 | 11 | Fee Management | ⬜ |
 | 12 | Communication | ⬜ |
@@ -27,6 +27,50 @@ Tracker for the 23-phase build defined in `school_erp_structure/`.
 | 20 | Reports & Analytics | ⬜ |
 | 21 | Subscription & Billing | ⬜ |
 | 22 | Final Testing & Deployment | ⬜ |
+
+## Phase 9 deliverables (shipped)
+
+Auto-SMS/Push on absence (9.4) deferred to Phase 12 (communication);
+biometric integration (9.9) is optional and stays out for now;
+subject-wise period attendance (9.3) waits for Phase 13 (timetable).
+The model already carries a `period` column so the same table covers
+both modes.
+
+- **Schema** — `student_attendance` (unique on tenant + student + date +
+  period, indexed on section/date and class/date). Migration
+  `64da452807fd`.
+- **/v1/school-admin/attendance** (gated to school staff incl. teachers;
+  mark mutations to school admin / principal / VP / coordinator / class
+  teacher):
+  - `GET /section/{id}` — daily roll for a section, returns a list of
+    students with their saved status (or `present` default with an
+    `unmarked` count) plus aggregate counts.
+  - `POST /mark` — bulk mark-all roll-call. Default status applies to
+    every student in the section; per-student `entries` overrides.
+    Idempotent upsert across re-marks.
+  - `GET /section/{id}/monthly` — per-student attendance %
+    (present + late + 0.5 × half_day) over a calendar month.
+  - `GET /defaulters` — students below a threshold % over a window,
+    optional section filter.
+  - `GET /student/{id}` — recent history (defaults to last 60 rows).
+- **Parent-facing** — Phase 8 dashboard now fills `today_attendance` from
+  the actual roll, and `GET /v1/parent/children/{id}/attendance` returns
+  the per-child history (with the same parent-link guard as documents).
+- **School Admin React** — new `/attendance` page with three tabs:
+  - **Roll-call**: section + date pickers, "Mark all present" shortcut,
+    per-student status toggle (`P / A / L / Lv / ½`) with brand tones,
+    optional remarks per row, save with one click.
+  - **Monthly**: section + year + month → per-student stats with
+    attendance % (red below 75%) and working days.
+  - **Defaulters**: threshold + section + date range → ranked list of
+    low-attendance students.
+- **Flutter** — `ParentRepository.attendance(...)` + an attendance card
+  on the parent dashboard shows the latest 8 marks per selected child
+  with brand-coloured status pills.
+- **Tests** — 82 passing (8 new): unmarked roster default, default +
+  per-student mix, idempotent re-mark, invalid student rejected,
+  monthly attendance % math (50% / 100%), defaulter threshold filter,
+  student history accuracy, parent-link guard on attendance history.
 
 ## Phase 8 deliverables (shipped)
 

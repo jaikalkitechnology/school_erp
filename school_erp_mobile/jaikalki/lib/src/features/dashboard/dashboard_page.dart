@@ -66,6 +66,8 @@ class _DashboardPageState extends State<DashboardPage> {
                   const _ChildSwitcher(),
                   const SizedBox(height: 16),
                   const _ChildDashboardCard(),
+                  const SizedBox(height: 16),
+                  const _AttendanceCard(),
                 ] else ...[
                   const SizedBox(height: 16),
                   _StaffStats(),
@@ -293,6 +295,117 @@ class _StaffStats extends StatelessWidget {
     );
   }
 }
+
+class _AttendanceCard extends StatefulWidget {
+  const _AttendanceCard();
+
+  @override
+  State<_AttendanceCard> createState() => _AttendanceCardState();
+}
+
+class _AttendanceCardState extends State<_AttendanceCard> {
+  int? _loadedFor;
+  Future<List<AttendanceRow>>? _future;
+
+  @override
+  Widget build(BuildContext context) {
+    return BlocBuilder<ChildrenCubit, ChildrenState>(
+      builder: (context, state) {
+        if (state is! ChildrenLoaded || state.selectedId == null) {
+          return const SizedBox.shrink();
+        }
+        final id = state.selectedId!;
+        if (_loadedFor != id) {
+          _loadedFor = id;
+          _future = context.read<ChildrenCubit>().attendance(id);
+        }
+        final t = Theme.of(context).textTheme;
+        return Container(
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: JaikalkiBrand.warmWhite,
+            borderRadius: BorderRadius.circular(20),
+            border: Border.all(color: JaikalkiBrand.saffronPale),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text('ATTENDANCE',
+                  style: t.labelSmall?.copyWith(color: JaikalkiBrand.saffronDark)),
+              const SizedBox(height: 8),
+              FutureBuilder<List<AttendanceRow>>(
+                future: _future,
+                builder: (context, snap) {
+                  if (snap.connectionState != ConnectionState.done) {
+                    return const SizedBox(
+                      height: 40,
+                      child: Center(child: CircularProgressIndicator(strokeWidth: 2)),
+                    );
+                  }
+                  final rows = snap.data ?? const [];
+                  if (rows.isEmpty) {
+                    return Text(
+                      'No attendance recorded yet.',
+                      style: t.bodyMedium,
+                    );
+                  }
+                  return Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: rows.take(8).map((r) {
+                      final tone = _toneFor(r.status);
+                      return Container(
+                        margin: const EdgeInsets.only(bottom: 6),
+                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                        decoration: BoxDecoration(
+                          color: tone.bg,
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        child: Row(
+                          children: [
+                            Text(r.date,
+                                style: t.bodyMedium?.copyWith(
+                                  fontFamily: 'monospace',
+                                  color: tone.fg,
+                                )),
+                            const Spacer(),
+                            Text(r.status.replaceAll('_', ' ').toUpperCase(),
+                                style: t.labelSmall?.copyWith(color: tone.fg)),
+                          ],
+                        ),
+                      );
+                    }).toList(),
+                  );
+                },
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+}
+
+class _StatusTone {
+  const _StatusTone(this.bg, this.fg);
+  final Color bg;
+  final Color fg;
+}
+
+_StatusTone _toneFor(String status) {
+  switch (status) {
+    case 'present':
+      return const _StatusTone(JaikalkiBrand.tealPale, JaikalkiBrand.tealDark);
+    case 'absent':
+      return const _StatusTone(JaikalkiBrand.saffronPale, JaikalkiBrand.saffronDarker);
+    case 'late':
+      return const _StatusTone(JaikalkiBrand.marigoldPale, JaikalkiBrand.indigoDark);
+    case 'half_day':
+      return const _StatusTone(JaikalkiBrand.marigoldPale, JaikalkiBrand.indigoDark);
+    default:
+      return const _StatusTone(JaikalkiBrand.ivory, JaikalkiBrand.textSecondary);
+  }
+}
+
 
 class _Tile extends StatelessWidget {
   const _Tile({required this.label, required this.value, required this.hint});

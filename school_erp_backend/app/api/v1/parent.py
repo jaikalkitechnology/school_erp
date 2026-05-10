@@ -25,6 +25,7 @@ from app.schemas.parent import (
 )
 from app.services.parents import (
     apply_leave,
+    attendance_history_for_parent,
     create_parent_user,
     dashboard_for_child,
     decide_leave,
@@ -95,6 +96,22 @@ async def child_documents(
     session: AsyncSession = Depends(platform_session),
 ):
     return await list_documents_for_child(session, principal.tenant_id, principal.user_id, student_id)
+
+
+@router.get("/children/{student_id}/attendance")
+async def child_attendance(
+    student_id: int,
+    limit: int = 60,
+    principal: AuthPrincipal = Depends(_parent_role),
+    session: AsyncSession = Depends(platform_session),
+):
+    return await attendance_history_for_parent(
+        session,
+        tenant_id=principal.tenant_id,
+        user_id=principal.user_id,
+        student_id=student_id,
+        limit=limit,
+    )
 
 
 @router.get("/leave-applications", response_model=list[LeaveRead])

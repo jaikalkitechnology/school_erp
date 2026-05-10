@@ -343,6 +343,11 @@ async def dashboard_for_child(
             ).scalars().all()
         )
 
+    # Phase 9: today's attendance status if present.
+    from app.services.attendance import today_status_for_student
+
+    today_status = await today_status_for_student(session, student.id)
+
     return ChildDashboard(
         student_id=student.id,
         full_name=student.full_name,
@@ -353,7 +358,36 @@ async def dashboard_for_child(
         documents_count=docs_count,
         sibling_ids=siblings,
         upcoming_events_count=upcoming_events,
+        today_attendance=today_status,
     )
+
+
+async def attendance_history_for_parent(
+    session: AsyncSession,
+    *,
+    tenant_id: int,
+    user_id: int,
+    student_id: int,
+    limit: int = 60,
+):
+    """Parent-facing history. Verifies the student is linked to the parent."""
+    parent = await _find_parent_for_user(session, tenant_id, user_id)
+    if parent is None:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Not a parent account")
+    linked = (
+        await session.execute(
+            select(ParentChildMapping.id).where(
+                ParentChildMapping.parent_id == parent.id,
+                ParentChildMapping.student_id == student_id,
+            )
+        )
+    ).scalar_one_or_none()
+    if linked is None:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Child not linked")
+
+    from app.services.attendance import student_history
+
+    return await student_history(session, student_id=student_id, limit=limit)
 
 
 async def list_documents_for_child(

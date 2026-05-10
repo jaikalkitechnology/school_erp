@@ -12,6 +12,7 @@ from app.models.academic import (  # noqa: F401
     Section,
     Subject,
 )
+from app.models.attendance import StudentAttendance, StudentAttendanceStatus  # noqa: F401
 from app.models.audit import AuditLog  # noqa: F401
 from app.models.curriculum import (  # noqa: F401
     CalendarEvent,
