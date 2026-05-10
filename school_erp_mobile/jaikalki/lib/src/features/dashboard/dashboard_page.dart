@@ -2,8 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 
-import '../../api/api_client.dart';
+import '../../api/parent_repository.dart';
 import '../../core/auth_cubit.dart';
+import '../../core/children_cubit.dart';
 import '../../core/service_locator.dart';
 import '../../theme/brand.dart';
 
@@ -15,35 +16,33 @@ class DashboardPage extends StatefulWidget {
 }
 
 class _DashboardPageState extends State<DashboardPage> {
-  late final Future<Map<String, dynamic>> _health;
-
   @override
   void initState() {
     super.initState();
-    _health = locator<ApiClient>().health().catchError(
-          (_) => <String, dynamic>{
-            'status': 'unreachable',
-            'database': '?',
-            'redis': '?',
-          },
-        );
+    // Fire-and-forget: ChildrenCubit handles the empty case for non-parent users.
+    final cubit = locator<ChildrenCubit>();
+    if (cubit.state is ChildrenInitial) {
+      cubit.load();
+    }
   }
 
   @override
   Widget build(BuildContext context) {
-    final t = Theme.of(context).textTheme;
-    return BlocProvider.value(
-      value: locator<AuthCubit>(),
+    return MultiBlocProvider(
+      providers: [
+        BlocProvider.value(value: locator<AuthCubit>()),
+        BlocProvider.value(value: locator<ChildrenCubit>()),
+      ],
       child: BlocConsumer<AuthCubit, AuthState>(
         listenWhen: (prev, curr) => curr is AuthInitial && prev is AuthAuthenticated,
         listener: (context, state) {
-          if (state is AuthInitial) {
-            context.go('/login');
-          }
+          if (state is AuthInitial) context.go('/login');
         },
-        builder: (context, state) {
-          final user = state is AuthAuthenticated ? state.user : null;
+        builder: (context, authState) {
+          final user = authState is AuthAuthenticated ? authState.user : null;
+          final isParent = (user?.roles ?? const []).contains('parent');
           final greeting = user?.fullName.split(' ').first ?? 'there';
+
           return Scaffold(
             appBar: AppBar(
               title: const Text('Today'),
@@ -58,75 +57,19 @@ class _DashboardPageState extends State<DashboardPage> {
             body: ListView(
               padding: const EdgeInsets.all(20),
               children: [
-                Container(
-                  padding: const EdgeInsets.all(20),
-                  decoration: BoxDecoration(
-                    color: JaikalkiBrand.warmWhite,
-                    borderRadius: BorderRadius.circular(20),
-                    border: Border.all(color: JaikalkiBrand.saffronPale),
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        '${user?.tenantSubdomain ?? "JAIKALKI"} · ${user?.primaryRole?.toUpperCase() ?? "MOBILE"}',
-                        style: t.labelSmall?.copyWith(color: JaikalkiBrand.saffronDark),
-                      ),
-                      const SizedBox(height: 8),
-                      Text('Namaste, $greeting', style: t.displayMedium),
-                      const SizedBox(height: 6),
-                      Text(
-                        user == null
-                            ? 'Loading your school account…'
-                            : (user.schoolName ?? 'Your school'),
-                        style: t.bodyMedium,
-                      ),
-                    ],
-                  ),
+                _Header(
+                  user: user,
+                  greeting: greeting,
                 ),
-                const SizedBox(height: 16),
-                _SectionTitle('At a glance'),
-                const SizedBox(height: 8),
-                Row(
-                  children: const [
-                    Expanded(child: _StatCard(label: 'Attendance', value: '—', hint: 'Phase 9')),
-                    SizedBox(width: 12),
-                    Expanded(child: _StatCard(label: 'Homework', value: '—', hint: 'Phase 14')),
-                  ],
-                ),
-                const SizedBox(height: 12),
-                Row(
-                  children: const [
-                    Expanded(child: _StatCard(label: 'Fees due', value: '—', hint: 'Phase 11')),
-                    SizedBox(width: 12),
-                    Expanded(child: _StatCard(label: 'Bus ETA', value: '—', hint: 'Phase 18')),
-                  ],
-                ),
-                const SizedBox(height: 24),
-                _SectionTitle('Backend connectivity'),
-                const SizedBox(height: 8),
-                FutureBuilder<Map<String, dynamic>>(
-                  future: _health,
-                  builder: (context, snapshot) {
-                    final data = snapshot.data ?? <String, dynamic>{'status': 'loading'};
-                    return Container(
-                      padding: const EdgeInsets.all(16),
-                      decoration: BoxDecoration(
-                        color: JaikalkiBrand.indigoDark,
-                        borderRadius: BorderRadius.circular(16),
-                      ),
-                      child: Text(
-                        data.entries.map((e) => '${e.key}: ${e.value}').join('\n'),
-                        style: const TextStyle(
-                          color: JaikalkiBrand.marigoldPale,
-                          fontFamily: 'monospace',
-                          fontSize: 12,
-                          height: 1.6,
-                        ),
-                      ),
-                    );
-                  },
-                ),
+                if (isParent) ...[
+                  const SizedBox(height: 16),
+                  const _ChildSwitcher(),
+                  const SizedBox(height: 16),
+                  const _ChildDashboardCard(),
+                ] else ...[
+                  const SizedBox(height: 16),
+                  _StaffStats(),
+                ],
               ],
             ),
           );
@@ -136,17 +79,223 @@ class _DashboardPageState extends State<DashboardPage> {
   }
 }
 
-class _SectionTitle extends StatelessWidget {
-  const _SectionTitle(this.text);
-  final String text;
+class _Header extends StatelessWidget {
+  const _Header({required this.user, required this.greeting});
+  final AuthUser? user;
+  final String greeting;
+
   @override
   Widget build(BuildContext context) {
-    return Text(text, style: Theme.of(context).textTheme.titleLarge);
+    final t = Theme.of(context).textTheme;
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: JaikalkiBrand.warmWhite,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: JaikalkiBrand.saffronPale),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            '${user?.tenantSubdomain ?? "JAIKALKI"} · ${user?.primaryRole?.toUpperCase() ?? "MOBILE"}',
+            style: t.labelSmall?.copyWith(color: JaikalkiBrand.saffronDark),
+          ),
+          const SizedBox(height: 8),
+          Text('Namaste, $greeting', style: t.displayMedium),
+          const SizedBox(height: 6),
+          Text(user?.schoolName ?? 'Your school', style: t.bodyMedium),
+        ],
+      ),
+    );
   }
 }
 
-class _StatCard extends StatelessWidget {
-  const _StatCard({required this.label, required this.value, required this.hint});
+class _ChildSwitcher extends StatelessWidget {
+  const _ChildSwitcher();
+
+  @override
+  Widget build(BuildContext context) {
+    final t = Theme.of(context).textTheme;
+    return BlocBuilder<ChildrenCubit, ChildrenState>(
+      builder: (context, state) {
+        if (state is ChildrenLoading || state is ChildrenInitial) {
+          return const SizedBox(height: 100, child: Center(child: CircularProgressIndicator()));
+        }
+        if (state is ChildrenError) {
+          return Text(state.message, style: t.bodyMedium);
+        }
+        if (state is ChildrenLoaded) {
+          if (state.children.isEmpty) {
+            return Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: JaikalkiBrand.warmWhite,
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(color: JaikalkiBrand.saffronPale),
+              ),
+              child: Text(
+                'No children linked to this account yet. Ask your school admin to link them.',
+                style: t.bodyMedium,
+              ),
+            );
+          }
+          return SizedBox(
+            height: 96,
+            child: ListView.separated(
+              scrollDirection: Axis.horizontal,
+              itemCount: state.children.length,
+              separatorBuilder: (_, __) => const SizedBox(width: 12),
+              itemBuilder: (context, index) {
+                final c = state.children[index];
+                final selected = state.selectedId == c.studentId;
+                return GestureDetector(
+                  onTap: () => context.read<ChildrenCubit>().select(c.studentId),
+                  child: AnimatedContainer(
+                    duration: const Duration(milliseconds: 180),
+                    width: 220,
+                    padding: const EdgeInsets.all(14),
+                    decoration: BoxDecoration(
+                      color: selected ? JaikalkiBrand.saffron : JaikalkiBrand.warmWhite,
+                      borderRadius: BorderRadius.circular(18),
+                      border: Border.all(
+                        color: selected ? JaikalkiBrand.saffron : JaikalkiBrand.saffronPale,
+                      ),
+                    ),
+                    child: Row(
+                      children: [
+                        CircleAvatar(
+                          radius: 28,
+                          backgroundColor: selected ? JaikalkiBrand.warmWhite : JaikalkiBrand.saffronPale,
+                          child: Text(
+                            c.fullName.isNotEmpty ? c.fullName.characters.first : '?',
+                            style: TextStyle(
+                              color: selected ? JaikalkiBrand.saffronDark : JaikalkiBrand.indigoDark,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Text(
+                                c.fullName,
+                                style: t.titleMedium?.copyWith(
+                                  color: selected ? JaikalkiBrand.warmWhite : JaikalkiBrand.indigoDark,
+                                ),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                              const SizedBox(height: 2),
+                              Text(
+                                c.classLabel ?? c.admissionNumber,
+                                style: t.bodyMedium?.copyWith(
+                                  fontSize: 12,
+                                  color: selected
+                                      ? JaikalkiBrand.marigoldPale
+                                      : JaikalkiBrand.textSecondary,
+                                ),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                );
+              },
+            ),
+          );
+        }
+        return const SizedBox.shrink();
+      },
+    );
+  }
+}
+
+class _ChildDashboardCard extends StatelessWidget {
+  const _ChildDashboardCard();
+
+  @override
+  Widget build(BuildContext context) {
+    final t = Theme.of(context).textTheme;
+    return BlocBuilder<ChildrenCubit, ChildrenState>(
+      builder: (context, state) {
+        if (state is! ChildrenLoaded || state.children.isEmpty) return const SizedBox.shrink();
+        if (state.dashboardLoading) {
+          return const SizedBox(height: 80, child: Center(child: CircularProgressIndicator()));
+        }
+        final dash = state.dashboard;
+        if (dash == null) return const SizedBox.shrink();
+        final tiles = [
+          _Tile(label: 'Pending leaves', value: dash.pendingLeaves.toString(), hint: 'Phase 8'),
+          _Tile(label: 'Documents', value: dash.documentsCount.toString(), hint: 'Phase 6'),
+          _Tile(label: 'Upcoming events', value: dash.upcomingEventsCount.toString(), hint: 'Phase 5'),
+          _Tile(label: 'Attendance', value: '—', hint: 'Phase 9'),
+        ];
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(dash.fullName, style: t.titleLarge),
+            const SizedBox(height: 4),
+            Text(
+              '${dash.classLabel ?? "—"} · ${dash.admissionNumber}',
+              style: t.bodyMedium,
+            ),
+            const SizedBox(height: 12),
+            GridView.count(
+              shrinkWrap: true,
+              physics: const NeverScrollableScrollPhysics(),
+              crossAxisCount: 2,
+              childAspectRatio: 1.6,
+              mainAxisSpacing: 12,
+              crossAxisSpacing: 12,
+              children: tiles,
+            ),
+          ],
+        );
+      },
+    );
+  }
+}
+
+class _StaffStats extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    final t = Theme.of(context).textTheme;
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: JaikalkiBrand.warmWhite,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: JaikalkiBrand.saffronPale),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text('PHASE 8 · TODAY',
+              style: t.labelSmall?.copyWith(color: JaikalkiBrand.saffronDark)),
+          const SizedBox(height: 6),
+          Text('Welcome back', style: t.titleLarge),
+          const SizedBox(height: 6),
+          Text(
+            'Staff dashboards (attendance, classes, fee desk) light up phase by phase. '
+            'Use the school admin web for the full feature set today.',
+            style: t.bodyMedium,
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _Tile extends StatelessWidget {
+  const _Tile({required this.label, required this.value, required this.hint});
   final String label;
   final String value;
   final String hint;
@@ -155,7 +304,7 @@ class _StatCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final t = Theme.of(context).textTheme;
     return Container(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
         color: JaikalkiBrand.warmWhite,
         borderRadius: BorderRadius.circular(16),
@@ -167,9 +316,9 @@ class _StatCard extends StatelessWidget {
           Text(label.toUpperCase(),
               style: t.labelSmall?.copyWith(color: JaikalkiBrand.saffronDark)),
           const SizedBox(height: 6),
-          Text(value, style: t.displayMedium?.copyWith(fontSize: 28)),
-          const SizedBox(height: 4),
-          Text('Lands in $hint', style: t.bodyMedium?.copyWith(fontSize: 12)),
+          Text(value, style: t.displayMedium?.copyWith(fontSize: 26)),
+          const Spacer(),
+          Text(hint, style: t.bodyMedium?.copyWith(fontSize: 11)),
         ],
       ),
     );

@@ -32,6 +32,26 @@ class Relation(str, enum.Enum):
     FATHER = "father"
     MOTHER = "mother"
     GUARDIAN = "guardian"
+    OTHER = "other"
+
+
+class ParentAccessLevel(str, enum.Enum):
+    """How much a parent row can do for a particular child.
+
+    primary    - full access (everything secondary can do + fee.collect, leave apply)
+    secondary  - read everything, can NOT pay fees
+    guardian   - read attendance + fees, no notifications by default
+    """
+    PRIMARY = "primary"
+    SECONDARY = "secondary"
+    GUARDIAN = "guardian"
+
+
+class LeaveStatus(str, enum.Enum):
+    PENDING = "pending"
+    APPROVED = "approved"
+    REJECTED = "rejected"
+    CANCELLED = "cancelled"
 
 
 class Student(TenantBase):
@@ -138,6 +158,8 @@ class ParentChildMapping(TenantBase):
 
     parent_id = Column(Integer, ForeignKey("parents.id", ondelete="CASCADE"), nullable=False)
     student_id = Column(Integer, ForeignKey("students.id", ondelete="CASCADE"), nullable=False)
+    relation = Column(String(20), nullable=False, default=Relation.GUARDIAN.value)
+    access_level = Column(String(20), nullable=False, default=ParentAccessLevel.PRIMARY.value)
     is_primary = Column(Boolean, nullable=False, default=False)
     can_pay_fee = Column(Boolean, nullable=False, default=True)
     can_receive_notifications = Column(Boolean, nullable=False, default=True)
@@ -163,3 +185,25 @@ class ParentSession(TenantBase):
     last_switched_at = Column(DateTime, server_default=func.now(), nullable=False)
 
     parent = relationship("Parent", back_populates="session")
+
+
+class LeaveApplication(TenantBase):
+    """Leave applied for a child by a parent (or by school staff on behalf)."""
+
+    __tablename__ = "leave_applications"
+    __table_args__ = (
+        Index("ix_leave_tenant_student_status", "tenant_id", "student_id", "status"),
+        {"mysql_engine": "InnoDB", "mysql_charset": "utf8mb4"},
+    )
+
+    student_id = Column(Integer, ForeignKey("students.id", ondelete="CASCADE"), nullable=False, index=True)
+    parent_id = Column(Integer, ForeignKey("parents.id", ondelete="SET NULL"), nullable=True)
+    applied_by_user_id = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+
+    start_date = Column(Date, nullable=False)
+    end_date = Column(Date, nullable=False)
+    reason = Column(Text, nullable=False)
+    status = Column(String(20), nullable=False, default=LeaveStatus.PENDING.value)
+    decision_remarks = Column(Text, nullable=True)
+    decided_by_user_id = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+    decided_at = Column(DateTime, nullable=True)

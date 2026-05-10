@@ -16,6 +16,7 @@ import {
   withdrawStudent,
   type StudentStatus,
 } from "./api";
+import { ParentLinksPanel } from "./ParentLinksPanel";
 
 const TABS = ["Personal", "Academic", "Family", "Documents", "History"] as const;
 type Tab = (typeof TABS)[number];
@@ -120,7 +121,12 @@ export function StudentDetailPage() {
           sectionName={s.section_id ? sectionMap.get(s.section_id) ?? "?" : "—"}
         />
       )}
-      {tab === "Family" && <FamilyTab s={s} />}
+      {tab === "Family" && (
+        <div className="space-y-4">
+          <FamilyTab s={s} />
+          <ParentLinksPanel studentId={s.id} />
+        </div>
+      )}
       {tab === "Documents" && <DocumentsTab studentId={s.id} docs={s.documents} />}
       {tab === "History" && <HistoryTab s={s} />}
     </div>

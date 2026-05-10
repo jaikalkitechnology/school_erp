@@ -12,7 +12,7 @@ Tracker for the 23-phase build defined in `school_erp_structure/`.
 | 5 | Academic Setup | ✅ Done (core) |
 | 6 | Student Information System | ✅ Done (core) |
 | 7 | Teacher Management | ✅ Done (core) |
-| 8 | Parent Module (Multi-Child) | ⬜ |
+| 8 | Parent Module (Multi-Child) | ✅ Done (core) |
 | 9 | Attendance | ⬜ |
 | 10 | Mobile App Polish | ⬜ |
 | 11 | Fee Management | ⬜ |
@@ -27,6 +27,54 @@ Tracker for the 23-phase build defined in `school_erp_structure/`.
 | 20 | Reports & Analytics | ⬜ |
 | 21 | Subscription & Billing | ⬜ |
 | 22 | Final Testing & Deployment | ⬜ |
+
+## Phase 8 deliverables (shipped)
+
+Fee payment (8.6), bus tracking (8.8), comms / PTM / notifications / photo
+gallery (8.5, 8.10, 8.11, 8.12) deferred to their owning phases (Phase 11
+fees, Phase 18 transport, Phase 12 communications).
+
+- **Schema** — `ParentChildMapping` extended with `relation` and
+  `access_level`; new `LeaveApplication` table. Migration `00531624cc6a`.
+- **Auto-link on admit** — `admit_student` now finds-or-creates a `Parent`
+  + `ParentChildMapping` whenever the student row carries a parent phone
+  or email, attaches the `parent` role to the user, and reuses the row
+  for siblings (one parent record covers all their children).
+- **/v1/parent** (gated to `parent` role only):
+  - `GET /me`
+  - `GET /children` — every child the parent is linked to with relation +
+    access level + permissions.
+  - `POST /select-child` — flips `ParentSession.current_child_id`.
+  - `GET /dashboard/{student_id}` — pending leaves, document count,
+    sibling ids, upcoming events. Stubs for attendance/homework/fees fill
+    in as their owning phases ship.
+  - `GET /children/{id}/documents` — read-only document vault for
+    *linked* children only.
+  - `GET /leave-applications` + `POST /leave-applications` (rejects
+    `end_date < start_date`, scoped to linked children).
+- **/v1/school-admin** parent management:
+  - `POST /parents` creates a parent user + Parent row + grants the role.
+  - `GET /students/{id}/parents`, upsert via
+    `POST /students/{id}/parents`, `DELETE /students/{id}/parents/{mapping_id}`.
+  - `GET /leave-applications` queue + `POST /{id}/decide` for school
+    admin / principal / VP / class teacher to approve or reject.
+- **School Admin React** — `ParentLinksPanel` lives in the Family tab of
+  the student detail page: list current parents, create+link a new parent
+  in one form, or attach an existing user-id; relation, access level, and
+  permission checkboxes are editable on every link.
+- **Flutter** — `ParentRepository` over Dio, `ChildrenCubit` that loads
+  children + dashboard for the selected child. The dashboard page now
+  detects parent users, shows a horizontal **child switcher** with
+  selected-state styling, and renders a per-child stats grid that pulls
+  from `/v1/parent/dashboard/{id}`. Non-parent users get the existing
+  staff card.
+- **Tests** — 74 passing (7 new): admit auto-creates parent + reuses
+  for siblings, school admin can create + login parent users, the
+  parent-facing endpoints (`me`, `children`, `select-child`,
+  `dashboard`) work end-to-end, leave application full lifecycle
+  (parent applies → school admin decides), parent cannot read another
+  parent's child, school admin can link/unlink parents, super-admin
+  token blocked from `/v1/parent/*`.
 
 ## Phase 7 deliverables (shipped)
 

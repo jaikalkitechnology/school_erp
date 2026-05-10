@@ -31,7 +31,10 @@ from app.models.auth import (  # noqa: F401
     UserRole,
 )
 from app.models.parent import (  # noqa: F401
+    LeaveApplication,
+    LeaveStatus,
     Parent,
+    ParentAccessLevel,
     ParentChildMapping,
     ParentSession,
     Relation,
