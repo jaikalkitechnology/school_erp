@@ -59,6 +59,7 @@ async def _truncate_all() -> None:
     )
     from app.models.attendance import StudentAttendance
     from app.models.audit import AuditLog
+    from app.models.timetable import PeriodDef, Substitution, TimetableEntry
     from app.models.comms import (
         Announcement,
         Message,
@@ -119,6 +120,8 @@ async def _truncate_all() -> None:
             TeacherAttendance, TeacherSubject, Teacher,
             # Phase 6
             StudentDocument, Admission,
+            # Phase 13
+            Substitution, TimetableEntry, PeriodDef,
             # Phase 12
             NotificationOutbox, Notification, Message, Announcement, NotificationTemplate,
             # Phase 11
