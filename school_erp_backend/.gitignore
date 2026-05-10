@@ -1,0 +1,27 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+.env
+*.sqlite3
+dev.db
+dev.db-journal
+
+# Tooling
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+.idea/
+.vscode/
+
+# Local file storage (per-tenant content is never committed)
+uploads/tenant_*/
+!uploads/.gitkeep
+
+# Secrets
+firebase-service-account.json
+*.pem

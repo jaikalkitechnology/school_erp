@@ -79,6 +79,9 @@ logs/
 *.db
 db.sqlite3-journal
 uploads/
+!school_erp_backend/uploads/
+school_erp_backend/uploads/*
+!school_erp_backend/uploads/.gitkeep
 media/
 storage/
 minio-data/
