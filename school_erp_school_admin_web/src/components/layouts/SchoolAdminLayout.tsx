@@ -1,6 +1,7 @@
 import { NavLink, Outlet, useNavigate } from "react-router-dom";
 import {
   BookOpenCheck,
+  Building,
   Bus,
   CalendarDays,
   ClipboardList,
@@ -36,6 +37,7 @@ const nav = [
   { to: "/communication", label: "Communication", icon: MessageCircle },
   { to: "/library", label: "Library", icon: Library },
   { to: "/transport", label: "Transport", icon: Bus },
+  { to: "/hostel", label: "Hostel", icon: Building },
   { to: "/settings", label: "Settings", icon: Settings },
 ];
 
