@@ -158,6 +158,44 @@ async def set_status(session: AsyncSession, tenant_id: int, new_status: TenantSt
     return tenant
 
 
+async def extend_trial(session: AsyncSession, tenant_id: int, days: int) -> Tenant:
+    tenant = await get_tenant(session, tenant_id)
+    base = tenant.subscription_end or datetime.now(timezone.utc).replace(tzinfo=None)
+    tenant.subscription_end = base + timedelta(days=days)
+    if tenant.status == TenantStatus.SUSPENDED:
+        tenant.status = TenantStatus.TRIAL
+    await session.commit()
+    await session.refresh(tenant)
+    return tenant
+
+
+async def change_plan(session: AsyncSession, tenant_id: int, plan_code: str) -> Tenant:
+    tenant = await get_tenant(session, tenant_id)
+    plan = await get_plan_by_code(session, plan_code)
+    tenant.plan_id = plan.id
+    tenant.student_limit = plan.student_limit or settings.DEFAULT_TENANT_LIMIT_STUDENTS
+    tenant.teacher_limit = plan.teacher_limit or 50
+    tenant.storage_limit_mb = (plan.storage_gb or 5) * 1024
+    tenant.modules_enabled = list(plan.modules_included or [])
+    if tenant.status == TenantStatus.TRIAL:
+        tenant.status = TenantStatus.ACTIVE
+    await session.commit()
+    await session.refresh(tenant)
+    return tenant
+
+
+async def count_users(session: AsyncSession, tenant_id: int) -> int:
+    from app.models.auth import User
+
+    return int(
+        (
+            await session.execute(
+                select(func.count(User.id)).where(User.tenant_id == tenant_id)
+            )
+        ).scalar_one()
+    )
+
+
 async def collect_health(session: AsyncSession, tenant_id: int) -> dict:
     tenant = await get_tenant(session, tenant_id)
     used_mb = get_tenant_storage_used_mb(tenant_id)

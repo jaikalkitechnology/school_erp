@@ -3,7 +3,11 @@ import { SuperAdminLayout } from "@/components/layouts/SuperAdminLayout";
 import { LoginPage } from "@/features/auth/LoginPage";
 import { DashboardPage } from "@/features/dashboard/DashboardPage";
 import { Placeholder } from "@/features/placeholder/Placeholder";
+import { AuditPage } from "@/features/audit/AuditPage";
+import { PlansPage } from "@/features/plans/PlansPage";
+import { OnboardingWizard } from "@/features/schools/OnboardingWizard";
 import { SchoolsPage } from "@/features/schools/SchoolsPage";
+import { TenantDetailPage } from "@/features/schools/TenantDetailPage";
 import { useAuth } from "@/stores/auth";
 
 function RequireAuth({ children }: { children: React.ReactNode }) {
@@ -25,10 +29,12 @@ export const routes: RouteObject[] = [
       { index: true, element: <Navigate to="/dashboard" replace /> },
       { path: "dashboard", element: <DashboardPage /> },
       { path: "schools", element: <SchoolsPage /> },
-      { path: "plans", element: <Placeholder title="Plans & Billing" phase="Phase 21 (Subscription & Billing)" /> },
-      { path: "staff", element: <Placeholder title="Platform Staff" phase="Phase 2 (Auth & RBAC)" /> },
-      { path: "audit", element: <Placeholder title="Audit & Security" phase="Phase 22 (Final hardening)" /> },
-      { path: "settings", element: <Placeholder title="Platform Settings" phase="Phase 1 (Multi-tenant)" /> },
+      { path: "schools/new", element: <OnboardingWizard /> },
+      { path: "schools/:id", element: <TenantDetailPage /> },
+      { path: "plans", element: <PlansPage /> },
+      { path: "staff", element: <Placeholder title="Platform Staff" phase="Phase 4 (school admin foundation)" /> },
+      { path: "audit", element: <AuditPage /> },
+      { path: "settings", element: <Placeholder title="Platform Settings" phase="Phase 3.8 (system config)" /> },
     ],
   },
   { path: "*", element: <Navigate to="/dashboard" replace /> },

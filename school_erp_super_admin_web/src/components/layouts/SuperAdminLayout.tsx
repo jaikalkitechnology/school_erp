@@ -8,9 +8,9 @@ import { useAuth } from "@/stores/auth";
 const nav = [
   { to: "/dashboard", label: "Overview", icon: Gauge },
   { to: "/schools", label: "Schools", icon: Building2 },
-  { to: "/plans", label: "Plans & Billing", icon: Receipt },
+  { to: "/plans", label: "Plans", icon: Receipt },
+  { to: "/audit", label: "Audit log", icon: ShieldCheck },
   { to: "/staff", label: "Platform Staff", icon: Users2 },
-  { to: "/audit", label: "Audit & Security", icon: ShieldCheck },
   { to: "/settings", label: "Settings", icon: Settings },
 ];
 

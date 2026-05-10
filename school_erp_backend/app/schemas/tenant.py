@@ -29,6 +29,69 @@ class SubscriptionPlanRead(BaseModel):
     is_active: bool
 
 
+class SubscriptionPlanWrite(BaseModel):
+    code: str = Field(min_length=2, max_length=40, pattern=r"^[a-z0-9_-]+$")
+    name: str = Field(min_length=2, max_length=80)
+    monthly_price: float = Field(ge=0)
+    annual_price: float = Field(ge=0)
+    student_limit: int = Field(ge=0, default=0)
+    teacher_limit: int = Field(ge=0, default=0)
+    storage_gb: int = Field(ge=0, default=5)
+    sms_quota: int = Field(ge=0, default=0)
+    modules_included: List[str] = Field(default_factory=list)
+    is_active: bool = True
+
+
+class SubscriptionPlanUpdate(BaseModel):
+    name: Optional[str] = None
+    monthly_price: Optional[float] = Field(default=None, ge=0)
+    annual_price: Optional[float] = Field(default=None, ge=0)
+    student_limit: Optional[int] = Field(default=None, ge=0)
+    teacher_limit: Optional[int] = Field(default=None, ge=0)
+    storage_gb: Optional[int] = Field(default=None, ge=0)
+    sms_quota: Optional[int] = Field(default=None, ge=0)
+    modules_included: Optional[List[str]] = None
+    is_active: Optional[bool] = None
+
+
+class TrialExtension(BaseModel):
+    days: int = Field(ge=1, le=180)
+    reason: Optional[str] = None
+
+
+class PlanChange(BaseModel):
+    plan_code: str
+    billing_cycle: Optional[str] = "monthly"
+
+
+class AnalyticsOverview(BaseModel):
+    total_tenants: int
+    active_tenants: int
+    trial_tenants: int
+    suspended_tenants: int
+    total_students: int
+    total_teachers: int
+    total_storage_used_mb: float
+    mrr: float
+    by_state: dict[str, int]
+    by_plan: dict[str, int]
+
+
+class AuditLogRead(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    tenant_id: int
+    actor_email: Optional[str]
+    actor_role: Optional[str]
+    action: str
+    target_type: Optional[str]
+    target_id: Optional[int]
+    summary: Optional[str]
+    ip_address: Optional[str]
+    created_at: datetime
+
+
 class TenantCreate(BaseModel):
     school_name: str = Field(min_length=2, max_length=180)
     school_code: str = Field(min_length=2, max_length=40)

@@ -7,7 +7,7 @@ Tracker for the 23-phase build defined in `school_erp_structure/`.
 | 0 | Foundation (3 projects) | ✅ Done |
 | 1 | Multi-Tenant Architecture | ✅ Done |
 | 2 | Auth & RBAC (13 roles) | ✅ Done |
-| 3 | Super Admin (Onboarding) | ⬜ |
+| 3 | Super Admin (Onboarding) | ✅ Done (core) |
 | 4 | School Admin Foundation | ⬜ |
 | 5 | Academic Setup | ⬜ |
 | 6 | Student Information System | ⬜ |
@@ -27,6 +27,43 @@ Tracker for the 23-phase build defined in `school_erp_structure/`.
 | 20 | Reports & Analytics | ⬜ |
 | 21 | Subscription & Billing | ⬜ |
 | 22 | Final Testing & Deployment | ⬜ |
+
+## Phase 3 deliverables (shipped)
+
+Core Super Admin slice. Razorpay billing + ticket system + master templates
+deferred to their own dedicated phases (21, future, 5).
+
+- **Audit log** — `audit_logs` table + `app/services/audit.py`. Every super
+  admin action (`tenant.create / update / suspend / activate / trial_extend /
+  plan_change / impersonate`, `plan.create / update`) writes a row with
+  actor, ip, user-agent, summary, and a JSON metadata bag.
+- **Plan CRUD** — `POST /admin/plans`, `PATCH /admin/plans/{id}`. Catalogue
+  is now editable by the super admin without a code deploy.
+- **Tenant lifecycle** — new endpoints: `POST /admin/tenants/{id}/extend-trial`
+  (bumps `subscription_end`, lifts the tenant out of suspension if needed) and
+  `POST /admin/tenants/{id}/change-plan` (resets limits + module set, lifts
+  trials to active).
+- **Tenant detail bundle** — `GET /admin/tenants/{id}/usage` rolls up storage
+  + user count + plan limits in one round-trip.
+- **Cross-school analytics** — `GET /admin/analytics/overview`: total/active
+  /trial/suspended schools, total students + teachers, MRR (monthly-equivalent
+  across active subscriptions), storage used, breakdowns by plan code and
+  state.
+- **Audit feeds** — `GET /admin/tenants/{id}/audit` and `GET /admin/audit`
+  (with `action_prefix` filter).
+- **Super Admin React** —
+  - **Dashboard** rebuilt with live KPI tiles (schools / MRR / students /
+    teachers), bar charts for plan + state mix, and a recent-schools list
+    with deep links.
+  - **7-step Onboarding Wizard** at `/schools/new` (info → plan → branding →
+    academic → admin → modules → review).
+  - **Tenant Detail** at `/schools/:id` with Info / Usage / Audit tabs, plan
+    swap, trial extension, suspend / activate, info edit.
+  - **Plans page** with toggle + create form.
+  - **Audit page** with action-prefix filter.
+- **Tests** — 38 passing (9 new): plan CRUD, duplicate plan code 409, plan
+  update, trial extension, plan change limits, analytics overview shape,
+  audit log records, tenant audit feed, tenant usage endpoint.
 
 ## Phase 2 deliverables (shipped)
 
