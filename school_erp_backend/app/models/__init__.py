@@ -36,6 +36,11 @@ from app.models.fees import (  # noqa: F401
     PaymentMethod,
     PaymentStatus,
 )
+from app.models.homework import (  # noqa: F401
+    Homework,
+    HomeworkSubmission,
+    SubmissionStatus,
+)
 from app.models.curriculum import (  # noqa: F401
     CalendarEvent,
     CalendarEventKind,

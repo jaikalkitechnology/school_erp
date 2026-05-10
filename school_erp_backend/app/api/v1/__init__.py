@@ -9,6 +9,7 @@ from app.api.v1 import (
     curriculum,
     fees,
     health,
+    homework,
     parent,
     school_admin,
     sis,
@@ -37,3 +38,5 @@ router.include_router(comms.router)
 router.include_router(comms.messages_router)
 router.include_router(comms.notif_router)
 router.include_router(timetable.router)
+router.include_router(homework.router)
+router.include_router(homework.parent_router)
