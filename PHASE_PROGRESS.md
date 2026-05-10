@@ -24,9 +24,53 @@ Tracker for the 23-phase build defined in `school_erp_structure/`.
 | 17 | Library | ✅ Done (core) |
 | 18 | Transport (GPS) | ✅ Done (core) |
 | 19 | Hostel | ✅ Done (core) |
-| 20 | Reports & Analytics | ⬜ |
+| 20 | Reports & Analytics | ✅ Done (core) |
 | 21 | Subscription & Billing | ⬜ |
 | 22 | Final Testing & Deployment | ⬜ |
+
+## Phase 20 deliverables (shipped)
+
+Drag-drop custom report builder, scheduled report email delivery, and
+mobile UI deferred. The standard reports pipeline is wired (8 endpoints
++ a CSV exporter); a custom builder can layer on top by accepting a
+JSON descriptor and dispatching to the same aggregator helpers.
+
+Backend
+- New `app/services/school_analytics.py` with cross-module
+  aggregations: overview (students, teachers, classes, sections,
+  attendance % today, fee collected this month, fee pending, overdue
+  loans, by-class strength), N-day attendance trend with
+  half-day-weighted %, fees overview (billed / collected / pending /
+  overdue + by-method + by-category), exam analytics (per-section
+  average + pass % + grade distribution from the default scale),
+  library usage (issued today + overdue + most-loaned), transport
+  summary (routes / buses / drivers / allocated / active trips), hostel
+  summary (occupied / available / pending leaves), student directory
+  with class + section filters.
+- `/v1/school-admin/analytics`:
+  - GET `/overview`, `/attendance-trend?days=`, `/fees`,
+    `/exams[?exam_id=]`, `/library`, `/transport`, `/hostel`.
+  - GET `/reports/students` (JSON) and `/reports/students.csv`
+    (streaming CSV download with a `Content-Disposition: attachment`
+    filename).
+
+School Admin React
+- New `/reports` page with **Overview / Attendance / Fees / Exams /
+  Modules / Students** tabs. Recharts renders: bar chart for class
+  strength, line chart for attendance trend with day-window selector,
+  pie chart for fee methods + bar chart for fee categories, per-section
+  exam table + grade distribution bar chart, library most-loaned
+  horizontal bar, KPI tiles for transport + hostel. Students tab has
+  class + section filters and a one-tap CSV download button that hits
+  the streaming endpoint.
+- New sidebar entry "Reports" between Hostel and Settings.
+
+Tests: 6 new (148 total). Overview returns class strength rows,
+attendance trend has 7 points + non-zero values once a roll is taken,
+fees overview reflects newly generated invoices, library/transport/
+hostel summaries return zeros on empty state, student JSON + CSV
+report return the 3-row class with the expected columns and headers,
+super_admin token blocked.
 
 ## Phase 19 deliverables (shipped)
 
