@@ -7,6 +7,7 @@ from app.api.v1 import (
     auth,
     comms,
     curriculum,
+    exams,
     fees,
     health,
     homework,
@@ -40,3 +41,6 @@ router.include_router(comms.notif_router)
 router.include_router(timetable.router)
 router.include_router(homework.router)
 router.include_router(homework.parent_router)
+router.include_router(exams.router)
+router.include_router(exams.grade_router)
+router.include_router(exams.parent_router)

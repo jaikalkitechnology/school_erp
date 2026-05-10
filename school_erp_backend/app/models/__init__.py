@@ -49,6 +49,15 @@ from app.models.curriculum import (  # noqa: F401
     SectionSubject,
     Syllabus,
 )
+from app.models.exams import (  # noqa: F401
+    Exam,
+    ExamMarks,
+    ExamStatus,
+    ExamSubject,
+    ExamType,
+    GradeScale,
+    MarkStatus,
+)
 from app.models.auth import (  # noqa: F401
     AuthProvider,
     Permission,

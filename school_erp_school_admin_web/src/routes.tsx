@@ -6,6 +6,7 @@ import { Placeholder } from "@/features/placeholder/Placeholder";
 import { AttendancePage } from "@/features/attendance/AttendancePage";
 import { CommunicationPage } from "@/features/communication/CommunicationPage";
 import { CurriculumPage } from "@/features/curriculum/CurriculumPage";
+import { ExamsPage } from "@/features/exams/ExamsPage";
 import { FeesPage } from "@/features/fees/FeesPage";
 import { HomeworkPage } from "@/features/homework/HomeworkPage";
 import { TimetablePage } from "@/features/timetable/TimetablePage";
@@ -51,7 +52,7 @@ export const routes: RouteObject[] = [
       { path: "attendance", element: <AttendancePage /> },
       { path: "timetable", element: <TimetablePage /> },
       { path: "homework", element: <HomeworkPage /> },
-      { path: "exams", element: <Placeholder title="Exams" phase="Phase 15 (Examination System)" /> },
+      { path: "exams", element: <ExamsPage /> },
       { path: "fees", element: <FeesPage /> },
       { path: "communication", element: <CommunicationPage /> },
       { path: "library", element: <Placeholder title="Library" phase="Phase 17 (Library)" /> },
