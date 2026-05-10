@@ -9,7 +9,7 @@ Tracker for the 23-phase build defined in `school_erp_structure/`.
 | 2 | Auth & RBAC (13 roles) | ✅ Done |
 | 3 | Super Admin (Onboarding) | ✅ Done (core) |
 | 4 | School Admin Foundation | ✅ Done (core) |
-| 5 | Academic Setup | ⬜ |
+| 5 | Academic Setup | ✅ Done (core) |
 | 6 | Student Information System | ⬜ |
 | 7 | Teacher Management | ⬜ |
 | 8 | Parent Module (Multi-Child) | ⬜ |
@@ -27,6 +27,40 @@ Tracker for the 23-phase build defined in `school_erp_structure/`.
 | 20 | Reports & Analytics | ⬜ |
 | 21 | Subscription & Billing | ⬜ |
 | 22 | Final Testing & Deployment | ⬜ |
+
+## Phase 5 deliverables (shipped)
+
+Student-class assignment (5.3) and teacher-subject mapping (5.4) ship with
+their owning entities — Phase 6 (SIS) and Phase 7 (Teachers) — to avoid
+forward-references.
+
+- **Schema** — `House`, `SectionSubject`, `CalendarEvent`, `Syllabus`,
+  `Chapter`. All TenantBase. Migration `156ae1cc14ed`.
+- **/v1/school-admin/curriculum** endpoints (gated to school staff /
+  teachers; mutations restricted to school admin / principal / VP /
+  coordinator):
+  - Houses CRUD.
+  - Section-subject CRUD plus an idempotent
+    `POST /section-subjects/bulk` that links many subjects to a section in
+    one round-trip.
+  - Calendar event CRUD with a `kind` enum (general / exam / sports /
+    cultural / parent_teacher / holiday).
+  - Syllabus CRUD per (year × class × subject) with chapter children.
+    `GET /syllabi` returns each syllabus with a server-computed
+    `overall_completion_pct` weighted by `expected_periods`.
+  - `POST /syllabi/{id}/chapters` to add chapters.
+  - `PATCH /chapters/{id}/progress` updates `completion_pct` and stamps
+    `completed_on` automatically when it hits 100%.
+- **School Admin React** — new `/curriculum` page with **Houses**,
+  **Section subjects**, **Calendar**, **Syllabus** tabs. The section-
+  subject panel is a one-tap toggle grid; the syllabus panel inlines
+  chapter rows with progress sliders + an add-chapter row. New sidebar
+  entry "Curriculum".
+- **Tests** — 49 passing (5 new): house CRUD, idempotent bulk section-
+  subject link, calendar event CRUD, weighted overall completion math
+  (6×100 + 4×50 → 80%), super-admin token blocked from `/v1/school-admin/
+  curriculum`. Conftest `_truncate_all` extended to cover Phase 4 + 5
+  tables so tests don't bleed.
 
 ## Phase 4 deliverables (shipped)
 
