@@ -7,6 +7,7 @@ from app.api.v1 import (
     auth,
     curriculum,
     health,
+    notifications,
     parent,
     school_admin,
     sis,
@@ -26,3 +27,4 @@ router.include_router(teachers.router)
 router.include_router(parent.router)
 router.include_router(parent.sa_router)
 router.include_router(attendance.router)
+router.include_router(notifications.router)

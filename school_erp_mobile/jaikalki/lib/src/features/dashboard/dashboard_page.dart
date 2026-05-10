@@ -1,11 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:go_router/go_router.dart';
 
 import '../../api/parent_repository.dart';
 import '../../core/auth_cubit.dart';
 import '../../core/children_cubit.dart';
 import '../../core/service_locator.dart';
+import '../../core/settings_cubit.dart';
 import '../../theme/brand.dart';
 
 class DashboardPage extends StatefulWidget {
@@ -28,39 +28,21 @@ class _DashboardPageState extends State<DashboardPage> {
 
   @override
   Widget build(BuildContext context) {
-    return MultiBlocProvider(
-      providers: [
-        BlocProvider.value(value: locator<AuthCubit>()),
-        BlocProvider.value(value: locator<ChildrenCubit>()),
-      ],
-      child: BlocConsumer<AuthCubit, AuthState>(
-        listenWhen: (prev, curr) => curr is AuthInitial && prev is AuthAuthenticated,
-        listener: (context, state) {
-          if (state is AuthInitial) context.go('/login');
-        },
+    return BlocProvider.value(
+      value: locator<ChildrenCubit>(),
+      child: BlocBuilder<AuthCubit, AuthState>(
         builder: (context, authState) {
           final user = authState is AuthAuthenticated ? authState.user : null;
           final isParent = (user?.roles ?? const []).contains('parent');
           final greeting = user?.fullName.split(' ').first ?? 'there';
+          final s = context.watch<SettingsCubit>().state.strings;
 
           return Scaffold(
-            appBar: AppBar(
-              title: const Text('Today'),
-              actions: [
-                IconButton(
-                  onPressed: () => context.read<AuthCubit>().logout(),
-                  icon: const Icon(Icons.logout),
-                  tooltip: 'Sign out',
-                ),
-              ],
-            ),
+            appBar: AppBar(title: Text(s.today)),
             body: ListView(
               padding: const EdgeInsets.all(20),
               children: [
-                _Header(
-                  user: user,
-                  greeting: greeting,
-                ),
+                _Header(user: user, greeting: greeting),
                 if (isParent) ...[
                   const SizedBox(height: 16),
                   const _ChildSwitcher(),
@@ -89,12 +71,13 @@ class _Header extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final t = Theme.of(context).textTheme;
+    final s = context.watch<SettingsCubit>().state.strings;
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        color: JaikalkiBrand.warmWhite,
+        color: Theme.of(context).colorScheme.surface,
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: JaikalkiBrand.saffronPale),
+        border: Border.all(color: Theme.of(context).colorScheme.outline),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -104,9 +87,9 @@ class _Header extends StatelessWidget {
             style: t.labelSmall?.copyWith(color: JaikalkiBrand.saffronDark),
           ),
           const SizedBox(height: 8),
-          Text('Namaste, $greeting', style: t.displayMedium),
+          Text('${s.namaste}, $greeting', style: t.displayMedium),
           const SizedBox(height: 6),
-          Text(user?.schoolName ?? 'Your school', style: t.bodyMedium),
+          Text(user?.schoolName ?? s.yourSchool, style: t.bodyMedium),
         ],
       ),
     );

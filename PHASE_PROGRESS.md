@@ -14,7 +14,7 @@ Tracker for the 23-phase build defined in `school_erp_structure/`.
 | 7 | Teacher Management | ✅ Done (core) |
 | 8 | Parent Module (Multi-Child) | ✅ Done (core) |
 | 9 | Attendance | ✅ Done (core) |
-| 10 | Mobile App Polish | ⬜ |
+| 10 | Mobile App Polish | ✅ Done (core) |
 | 11 | Fee Management | ⬜ |
 | 12 | Communication | ⬜ |
 | 13 | Time Table & Substitution | ⬜ |
@@ -27,6 +27,47 @@ Tracker for the 23-phase build defined in `school_erp_structure/`.
 | 20 | Reports & Analytics | ⬜ |
 | 21 | Subscription & Billing | ⬜ |
 | 22 | Final Testing & Deployment | ⬜ |
+
+## Phase 10 deliverables (shipped)
+
+Push notifications via Firebase + bio-auth + on-device performance work
+deferred — they need native config that's better handled when an Android
+project is set up for shipping. The data path the FCM client will hit
+already exists (`/v1/notifications`).
+
+Backend
+- New `/v1/notifications` endpoint that returns a real, role-aware list
+  (parents see decisions on leaves they applied for; school staff see
+  pending leaves in the queue). The Phase 12 SMS/push delivery will
+  reuse the same payload shape.
+
+Flutter (school_erp_mobile/jaikalki)
+- **Multi-language** scaffolding (`AppLanguage` + `AppStrings` for
+  English / Hindi / Marathi). Every user-facing string in login,
+  dashboard, settings, onboarding, notifications goes through it.
+- **SettingsCubit** persists language + theme + onboarded flag in a
+  Hive box.
+- **Dark mode** — `JaikalkiBrand.darkTheme()` (indigo surfaces, saffron
+  accent retained). MaterialApp respects `themeMode` from SettingsCubit.
+- **Splash** at `/` routes to `/onboarding` on first launch, otherwise
+  `/login` or `/home` based on auth state.
+- **Onboarding** carousel (3 slides) seals the Hive `onboarded` flag
+  before navigating away.
+- **HomeShell** with `NavigationBar` (Home / Notifications / Settings)
+  using `IndexedStack` for state preservation.
+- **Notifications page** hits `/v1/notifications`, with empty state and
+  pull-to-refresh.
+- **Settings page** with language chips, theme chips, sign-out, about.
+- **Offline cache** — `OfflineCache` over Hive; `ChildrenCubit` now
+  warm-boots from cache before the network refresh, so the parent
+  dashboard renders instantly even on a flaky connection.
+- **Global error bus** — Dio `ErrorInterceptor` pipes failures into
+  `ErrorBus`, surfaced as snackbars by `GlobalErrorListener` wrapping
+  the entire MaterialApp tree.
+- Login redirects to the new `/home` path; dashboard drops its own
+  Scaffold/AppBar (HomeShell handles them).
+- Widget test boots Hive in a temp dir, settings cubit, and confirms
+  the splash → onboarding routing happens on first launch.
 
 ## Phase 9 deliverables (shipped)
 

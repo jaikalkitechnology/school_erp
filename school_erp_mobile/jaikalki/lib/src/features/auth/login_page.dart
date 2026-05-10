@@ -45,7 +45,7 @@ class _LoginPageState extends State<LoginPage> {
       child: BlocConsumer<AuthCubit, AuthState>(
         listener: (context, state) {
           if (state is AuthAuthenticated) {
-            context.go('/dashboard');
+            context.go('/home');
           }
         },
         builder: (context, state) {

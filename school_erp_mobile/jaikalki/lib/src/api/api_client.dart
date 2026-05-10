@@ -1,6 +1,8 @@
 import 'package:dio/dio.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 
+import '../core/error_bus.dart';
+
 const _kAccessKey = 'jaikalki.access_token';
 const _kSubdomainKey = 'jaikalki.subdomain';
 
@@ -25,6 +27,7 @@ class ApiClient {
         handler.next(options);
       }),
     );
+    dio.interceptors.add(ErrorInterceptor(fallback: 'Could not reach the school server.'));
   }
 
   final Dio dio;
