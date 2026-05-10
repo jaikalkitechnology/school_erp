@@ -8,9 +8,10 @@ void main() {
   testWidgets('Boots into login page', (tester) async {
     registerDependencies();
     await tester.pumpWidget(const JaikalkiApp());
-    await tester.pumpAndSettle();
+    await tester.pump();
 
     expect(find.text('Sign in'), findsOneWidget);
-    expect(find.byType(TextField), findsNWidgets(2));
+    // Subdomain + identifier + password = 3 fields.
+    expect(find.byType(TextFormField), findsNWidgets(3));
   });
 }

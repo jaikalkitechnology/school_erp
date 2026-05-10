@@ -42,12 +42,20 @@ async def db_session():
         await session.rollback()
 
 
-@pytest_asyncio.fixture
-async def seeded_plans():
-    """Truncate tenant tables and seed plans fresh for the test."""
+async def _truncate_all() -> None:
+    """Wipe everything for tests that need a clean slate."""
     from sqlalchemy import delete
 
     from app.database import AsyncSessionLocal
+    from app.models.auth import (
+        Permission,
+        RefreshToken,
+        Role,
+        RolePermission,
+        User,
+        UserRole,
+    )
+    from app.models.parent import Parent, ParentChildMapping, ParentSession, Student
     from app.models.tenant import (
         Subscription,
         SubscriptionPlan,
@@ -55,11 +63,66 @@ async def seeded_plans():
         TenantSettings,
         TenantUsageSnapshot,
     )
-    from app.services.seed import seed_plans
 
     async with AsyncSessionLocal() as session:
-        for model in (TenantUsageSnapshot, TenantSettings, Subscription, Tenant, SubscriptionPlan):
+        for model in (
+            ParentSession, ParentChildMapping, Parent, Student,
+            RefreshToken, UserRole, RolePermission, Permission, Role, User,
+            TenantUsageSnapshot, TenantSettings, Subscription, Tenant, SubscriptionPlan,
+        ):
             await session.execute(delete(model))
         await session.commit()
+
+
+@pytest_asyncio.fixture
+async def seeded_plans():
+    """Truncate everything and seed plans fresh."""
+    from app.database import AsyncSessionLocal
+    from app.services.seed import seed_plans
+
+    await _truncate_all()
+    async with AsyncSessionLocal() as session:
         await seed_plans(session)
     yield
+
+
+@pytest_asyncio.fixture
+async def super_admin_token():
+    """Run the full seed, then issue a real super-admin access token."""
+    from httpx import ASGITransport, AsyncClient
+
+    from app.main import app
+    from app.services.seed import (
+        DEFAULT_SUPER_ADMIN_EMAIL,
+        DEFAULT_SUPER_ADMIN_PASSWORD,
+        run_all,
+    )
+
+    await _truncate_all()
+    await run_all()
+
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://localhost") as ac:
+        r = await ac.post(
+            "/v1/auth/login",
+            json={
+                "identifier": DEFAULT_SUPER_ADMIN_EMAIL,
+                "password": DEFAULT_SUPER_ADMIN_PASSWORD,
+                "subdomain": "platform",
+            },
+        )
+        assert r.status_code == 200, r.text
+        return r.json()["tokens"]["access_token"]
+
+
+@pytest_asyncio.fixture
+async def auth_client(super_admin_token):
+    from httpx import ASGITransport, AsyncClient
+
+    from app.main import app
+
+    async with AsyncClient(
+        transport=ASGITransport(app=app),
+        base_url="http://localhost",
+        headers={"Authorization": f"Bearer {super_admin_token}"},
+    ) as ac:
+        yield ac

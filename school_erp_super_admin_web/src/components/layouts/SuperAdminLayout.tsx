@@ -1,6 +1,9 @@
-import { NavLink, Outlet } from "react-router-dom";
-import { Building2, Gauge, Receipt, Settings, ShieldCheck, Users2 } from "lucide-react";
+import { NavLink, Outlet, useNavigate } from "react-router-dom";
+import { Building2, Gauge, LogOut, Receipt, Settings, ShieldCheck, Users2 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { Button } from "@/components/ui/button";
+import { logout as logoutApi } from "@/lib/auth-api";
+import { useAuth } from "@/stores/auth";
 
 const nav = [
   { to: "/dashboard", label: "Overview", icon: Gauge },
@@ -12,6 +15,21 @@ const nav = [
 ];
 
 export function SuperAdminLayout() {
+  const user = useAuth((s) => s.user);
+  const tokens = useAuth((s) => s.tokens);
+  const clear = useAuth((s) => s.clear);
+  const navigate = useNavigate();
+
+  const onLogout = async () => {
+    try {
+      await logoutApi(tokens?.refresh_token);
+    } catch {
+      // best-effort - we still clear local state
+    }
+    clear();
+    navigate("/login", { replace: true });
+  };
+
   return (
     <div className="grid h-full grid-cols-[260px_1fr] bg-ivory">
       <aside className="flex h-full flex-col border-r border-saffron-pale bg-warm-white px-5 py-7">
@@ -45,9 +63,19 @@ export function SuperAdminLayout() {
           ))}
         </nav>
 
-        <p className="mt-6 text-[11px] uppercase tracking-[0.18em] text-muted-foreground">
-          v0.1.0 · Phase 0 foundation
-        </p>
+        <div className="mt-6 space-y-3 border-t border-saffron-pale pt-4">
+          {user && (
+            <div className="text-xs text-muted-foreground">
+              <p className="font-medium text-indigo-dark">{user.full_name}</p>
+              <p className="truncate">{user.email}</p>
+            </div>
+          )}
+          <Button variant="ghost" size="sm" className="w-full justify-start" onClick={onLogout}>
+            <LogOut className="h-4 w-4" />
+            Sign out
+          </Button>
+          <p className="text-[11px] uppercase tracking-[0.18em] text-muted-foreground">v0.1.0 · Phase 2</p>
+        </div>
       </aside>
 
       <main className="overflow-y-auto px-10 py-8">

@@ -1,4 +1,4 @@
-import { NavLink, Outlet } from "react-router-dom";
+import { NavLink, Outlet, useNavigate } from "react-router-dom";
 import {
   BookOpenCheck,
   Bus,
@@ -7,12 +7,15 @@ import {
   GraduationCap,
   Home,
   Library,
+  LogOut,
   MessageCircle,
   Receipt,
   Settings,
   Users,
 } from "lucide-react";
+import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+import { logout as logoutApi } from "@/lib/auth-api";
 import { useAuth } from "@/stores/auth";
 
 const nav = [
@@ -31,6 +34,19 @@ const nav = [
 
 export function SchoolAdminLayout() {
   const user = useAuth((s) => s.user);
+  const tokens = useAuth((s) => s.tokens);
+  const clear = useAuth((s) => s.clear);
+  const navigate = useNavigate();
+
+  const onLogout = async () => {
+    try {
+      await logoutApi(tokens?.refresh_token);
+    } catch {
+      // best-effort
+    }
+    clear();
+    navigate("/login", { replace: true });
+  };
 
   return (
     <div className="grid h-full grid-cols-[260px_1fr] bg-ivory">
@@ -64,9 +80,21 @@ export function SchoolAdminLayout() {
           ))}
         </nav>
 
-        <p className="mt-6 text-[11px] uppercase tracking-[0.18em] text-muted-foreground">
-          Powered by Jaikalki · v0.1.0
-        </p>
+        <div className="mt-6 space-y-3 border-t border-saffron-pale pt-4">
+          {user && (
+            <div className="text-xs text-muted-foreground">
+              <p className="font-medium text-indigo-dark">{user.full_name}</p>
+              <p className="truncate">{user.primary_role?.replace(/_/g, " ") ?? "Staff"}</p>
+            </div>
+          )}
+          <Button variant="ghost" size="sm" className="w-full justify-start" onClick={onLogout}>
+            <LogOut className="h-4 w-4" />
+            Sign out
+          </Button>
+          <p className="text-[11px] uppercase tracking-[0.18em] text-muted-foreground">
+            Powered by Jaikalki · v0.1.0
+          </p>
+        </div>
       </aside>
 
       <main className="overflow-y-auto px-10 py-8">

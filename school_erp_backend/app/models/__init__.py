@@ -1,5 +1,21 @@
 """SQLAlchemy ORM models. Importing this package registers every table."""
 
+from app.models.auth import (  # noqa: F401
+    AuthProvider,
+    Permission,
+    RefreshToken,
+    Role,
+    RolePermission,
+    User,
+    UserRole,
+)
+from app.models.parent import (  # noqa: F401
+    Parent,
+    ParentChildMapping,
+    ParentSession,
+    Relation,
+    Student,
+)
 from app.models.tenant import (  # noqa: F401
     BillingCycle,
     SchoolType,
@@ -11,15 +27,3 @@ from app.models.tenant import (  # noqa: F401
     TenantStatus,
     TenantUsageSnapshot,
 )
-
-__all__ = [
-    "BillingCycle",
-    "SchoolType",
-    "Subscription",
-    "SubscriptionPlan",
-    "SubscriptionStatus",
-    "Tenant",
-    "TenantSettings",
-    "TenantStatus",
-    "TenantUsageSnapshot",
-]
