@@ -1,0 +1,56 @@
+# MySQL + Redis + phpMyAdmin only. NO MinIO/S3 — all files are stored locally
+# under ./uploads/ and served by an authenticated FastAPI endpoint.
+
+services:
+  mysql:
+    image: mysql:8.0
+    container_name: jaikalki_school_mysql
+    restart: always
+    environment:
+      MYSQL_ROOT_PASSWORD: Love1718
+      MYSQL_DATABASE: db_school_jaikalki
+    ports:
+      - "3306:3306"
+    volumes:
+      - mysql_data:/var/lib/mysql
+    command:
+      - --character-set-server=utf8mb4
+      - --collation-server=utf8mb4_unicode_ci
+      - --max_connections=500
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-pLove1718"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    container_name: jaikalki_school_redis
+    restart: always
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  phpmyadmin:
+    image: phpmyadmin/phpmyadmin
+    container_name: jaikalki_school_phpmyadmin
+    restart: always
+    environment:
+      PMA_HOST: mysql
+      MYSQL_ROOT_PASSWORD: Love1718
+      UPLOAD_LIMIT: 64M
+    ports:
+      - "8080:80"
+    depends_on:
+      mysql:
+        condition: service_healthy
+
+volumes:
+  mysql_data:
+  redis_data:
