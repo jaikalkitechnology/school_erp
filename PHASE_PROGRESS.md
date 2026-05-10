@@ -20,13 +20,67 @@ Tracker for the 23-phase build defined in `school_erp_structure/`.
 | 13 | Time Table & Substitution | ✅ Done (core) |
 | 14 | Homework | ✅ Done (core) |
 | 15 | Examination System | ✅ Done (core) |
-| 16 | Report Cards | ⬜ |
+| 16 | Report Cards | ✅ Done (core) |
 | 17 | Library | ⬜ |
 | 18 | Transport (GPS) | ⬜ |
 | 19 | Hostel | ⬜ |
 | 20 | Reports & Analytics | ⬜ |
 | 21 | Subscription & Billing | ⬜ |
 | 22 | Final Testing & Deployment | ⬜ |
+
+## Phase 16 deliverables (shipped)
+
+Drag-drop visual template designer + email-on-publish deferred. Templates
+today are JSON-layout records (board + flags) the renderer reads; a
+WYSIWYG can land later without changing the data path. Email distribution
+will reuse Phase 12's notification pipeline once the trigger is wired.
+
+Backend
+- New tables: `report_card_templates`, `co_curricular_grades`,
+  `report_card_remarks`, `report_cards`. Migration `9b7c15b881e3`.
+  Templates carry `board` (cbse/icse/state/custom) + JSON layout +
+  single-default invariant. Cards persist a JSON `snapshot` so a parent
+  always re-downloads the exact card that was generated, even if marks
+  change later.
+- `/v1/school-admin/report-cards`:
+  - Templates CRUD (PUT upsert + DELETE) with default flip.
+  - Co-curricular grades + class-teacher / principal remarks per
+    (exam, student) — both list (by section) and upsert paths.
+  - `POST /generate` materialises one card per active student in the
+    section by reusing Phase 15's `section_results` aggregator,
+    augmenting with co-curricular + remarks, rendering a reportlab PDF
+    under `tenant_X/reports/report_cards/` and saving the relative
+    path. Idempotent: re-running upserts the same row + re-renders the
+    PDF. Optional `publish=true` flips status in one shot.
+  - `POST /{exam_id}/sections/{id}/publish` to publish the whole
+    section.
+  - `GET /{exam_id}/sections/{id}` lists rendered cards.
+  - `GET /{card_id}/pdf` streams the PDF (school admin).
+- `/v1/parent/children/{id}/report-cards` lists published cards for
+  linked children only; `/v1/parent/report-cards/{id}/pdf` re-checks
+  the parent-link guard before streaming. Cross-child download 403.
+
+School Admin React
+- New `/report-cards` page with **Templates / Co-curricular & remarks /
+  Generate / Cards** tabs:
+  - Templates: list with default badge + add/update form (code, name,
+    board, default toggle).
+  - Co-curricular & remarks: pick exam + section → student selector
+    backed by `examResults`, save area-grade-remarks rows (idempotent
+    by area), separate textarea editor for class teacher + principal
+    remarks.
+  - Generate: pick exam + section + template + publish toggle, runs
+    bulk and shows `generated / skipped` count.
+  - Cards: lists per-section cards with %, grade, rank, status pill,
+    one-tap PDF download (opens in a new tab) + Publish-all action.
+- New sidebar entry "Report cards" between Exams and Fees.
+
+Tests: 6 new (124 total). Template upsert with default-flip,
+co-curricular + remarks upsert (idempotent by area), bulk generate
+creates two cards with snapshots + PDFs (verified by `%PDF` magic
+bytes), idempotent re-generate updates status to published, publish
+section + parent-link-guarded download (cross-child 403), unknown
+exam 404, super_admin token blocked.
 
 ## Phase 15 deliverables (shipped)
 

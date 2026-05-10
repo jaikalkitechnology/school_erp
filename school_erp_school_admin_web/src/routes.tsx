@@ -8,6 +8,7 @@ import { CommunicationPage } from "@/features/communication/CommunicationPage";
 import { CurriculumPage } from "@/features/curriculum/CurriculumPage";
 import { ExamsPage } from "@/features/exams/ExamsPage";
 import { FeesPage } from "@/features/fees/FeesPage";
+import { ReportCardsPage } from "@/features/report_cards/ReportCardsPage";
 import { HomeworkPage } from "@/features/homework/HomeworkPage";
 import { TimetablePage } from "@/features/timetable/TimetablePage";
 import { AcademicPage } from "@/features/setup/AcademicPage";
@@ -53,6 +54,7 @@ export const routes: RouteObject[] = [
       { path: "timetable", element: <TimetablePage /> },
       { path: "homework", element: <HomeworkPage /> },
       { path: "exams", element: <ExamsPage /> },
+      { path: "report-cards", element: <ReportCardsPage /> },
       { path: "fees", element: <FeesPage /> },
       { path: "communication", element: <CommunicationPage /> },
       { path: "library", element: <Placeholder title="Library" phase="Phase 17 (Library)" /> },

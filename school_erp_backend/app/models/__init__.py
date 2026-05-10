@@ -58,6 +58,14 @@ from app.models.exams import (  # noqa: F401
     GradeScale,
     MarkStatus,
 )
+from app.models.report_cards import (  # noqa: F401
+    CoCurricularGrade,
+    ReportCard,
+    ReportCardRemark,
+    ReportCardStatus,
+    ReportCardTemplate,
+    TemplateBoard,
+)
 from app.models.auth import (  # noqa: F401
     AuthProvider,
     Permission,
