@@ -37,6 +37,14 @@ from app.models.parent import (  # noqa: F401
     Relation,
     Student,
 )
+from app.models.sis import (  # noqa: F401
+    Admission,
+    AdmissionStage,
+    Category,
+    Gender,
+    StudentDocument,
+    StudentStatus,
+)
 from app.models.tenant import (  # noqa: F401
     BillingCycle,
     SchoolType,

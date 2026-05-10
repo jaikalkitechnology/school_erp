@@ -10,7 +10,7 @@ Tracker for the 23-phase build defined in `school_erp_structure/`.
 | 3 | Super Admin (Onboarding) | ✅ Done (core) |
 | 4 | School Admin Foundation | ✅ Done (core) |
 | 5 | Academic Setup | ✅ Done (core) |
-| 6 | Student Information System | ⬜ |
+| 6 | Student Information System | ✅ Done (core) |
 | 7 | Teacher Management | ⬜ |
 | 8 | Parent Module (Multi-Child) | ⬜ |
 | 9 | Attendance | ⬜ |
@@ -27,6 +27,50 @@ Tracker for the 23-phase build defined in `school_erp_structure/`.
 | 20 | Reports & Analytics | ⬜ |
 | 21 | Subscription & Billing | ⬜ |
 | 22 | Final Testing & Deployment | ⬜ |
+
+## Phase 6 deliverables (shipped)
+
+Bulk Excel import (6.5) and PDF rendering of TC / Bonafide (6.8) deferred —
+the data path and JSON payload are ready for both, the renderer lands when
+report cards (Phase 16) needs the same plumbing.
+
+- **Schema** — Phase 2's `students` stub promoted to a full SIS row with
+  identity + academic + personal + family + medical + status + sibling
+  group columns. New tables: `admissions` (funnel), `student_documents`.
+  Migration `712d09e4f2d4`.
+- **Admission service** — auto admission number (`ADM-YY-NNNN`),
+  validates section⇄class match, auto-links siblings on shared
+  `parent_phone` / `parent_email` into a stable `sibling_group_id`.
+- **Search + filters** — `/v1/school-admin/students` accepts `q`,
+  `class_def_id`, `section_id`, `status`, `limit`, `offset` and returns a
+  paged result.
+- **Detail bundle** — `GET /v1/school-admin/students/{id}` returns the full
+  record + documents + sibling ids.
+- **Promotion** — `POST /students/promote` skips inactive students and
+  reports them in the `skipped` payload; updates `current_class_label`.
+- **Withdrawal + TC** — `POST /students/{id}/withdraw` flips status +
+  `is_active` + `exit_date`; `GET .../transfer-certificate` returns the
+  JSON payload Phase 16 will render to PDF.
+- **Documents** — add / verify / delete student-document slots (paths point
+  at the per-tenant `uploads/` tree from Phase 0).
+- **Manual sibling link** — `POST /students/link-siblings` with 2+ ids.
+- **Admission funnel** — `/v1/school-admin/admissions` CRUD + stage
+  transitions + one-click `POST /admissions/{id}/admit` to promote into a
+  Student row.
+- **School Admin React** —
+  - **Students list** at `/students` with debounced search + class /
+    section / status filters + pagination + status pills + sibling-group
+    badges.
+  - **Admit form** at `/students/admit` with auto-generated admission
+    number when blank; class/section selectors are linked.
+  - **Student detail** at `/students/:id` with **Personal / Academic /
+    Family / Documents / History** tabs. Documents tab adds, verifies, and
+    deletes document slots; Family tab links to siblings.
+- **Tests** — 58 passing (9 new): admit + auto-number, section/class
+  validation, sibling auto-link by phone, search + class filter, promotion
+  skipping inactive, withdraw + TC payload, admission funnel → student,
+  document attach + verify, cross-tenant isolation. Conftest extended to
+  truncate `admissions` + `student_documents`.
 
 ## Phase 5 deliverables (shipped)
 
