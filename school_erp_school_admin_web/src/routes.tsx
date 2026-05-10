@@ -7,6 +7,7 @@ import { AttendancePage } from "@/features/attendance/AttendancePage";
 import { CommunicationPage } from "@/features/communication/CommunicationPage";
 import { CurriculumPage } from "@/features/curriculum/CurriculumPage";
 import { FeesPage } from "@/features/fees/FeesPage";
+import { HomeworkPage } from "@/features/homework/HomeworkPage";
 import { TimetablePage } from "@/features/timetable/TimetablePage";
 import { AcademicPage } from "@/features/setup/AcademicPage";
 import { OrgPage } from "@/features/setup/OrgPage";
@@ -49,6 +50,7 @@ export const routes: RouteObject[] = [
       { path: "teachers/:id", element: <TeacherDetailPage /> },
       { path: "attendance", element: <AttendancePage /> },
       { path: "timetable", element: <TimetablePage /> },
+      { path: "homework", element: <HomeworkPage /> },
       { path: "exams", element: <Placeholder title="Exams" phase="Phase 15 (Examination System)" /> },
       { path: "fees", element: <FeesPage /> },
       { path: "communication", element: <CommunicationPage /> },

@@ -353,6 +353,11 @@ async def dashboard_for_child(
 
     fee_due = await fee_due_for_student(session, student.id)
 
+    # Phase 14: homework pending count.
+    from app.services.homework import pending_homework_count
+
+    pending_hw = await pending_homework_count(session, student.id)
+
     return ChildDashboard(
         student_id=student.id,
         full_name=student.full_name,
@@ -365,6 +370,7 @@ async def dashboard_for_child(
         upcoming_events_count=upcoming_events,
         today_attendance=today_status,
         fee_due_amount=float(fee_due),
+        pending_homework=pending_hw,
     )
 
 

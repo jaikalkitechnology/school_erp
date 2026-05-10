@@ -18,7 +18,7 @@ Tracker for the 23-phase build defined in `school_erp_structure/`.
 | 11 | Fee Management | ✅ Done (core) |
 | 12 | Communication | ✅ Done (core) |
 | 13 | Time Table & Substitution | ✅ Done (core) |
-| 14 | Homework | ⬜ |
+| 14 | Homework | ✅ Done (core) |
 | 15 | Examination System | ⬜ |
 | 16 | Report Cards | ⬜ |
 | 17 | Library | ⬜ |
@@ -27,6 +27,43 @@ Tracker for the 23-phase build defined in `school_erp_structure/`.
 | 20 | Reports & Analytics | ⬜ |
 | 21 | Subscription & Billing | ⬜ |
 | 22 | Final Testing & Deployment | ⬜ |
+
+## Phase 14 deliverables (shipped)
+
+Plagiarism detection + file-attachment upload UI deferred. Attachments
+ride as JSON path arrays today; Phase 0's `/v1/uploads` already accepts
+files - the React UI just needs to call it.
+
+Backend
+- New tables: `homework_assignments`, `homework_submissions` (unique on
+  tenant + homework + student). Migration `2744bfd82acc`.
+- `/v1/school-admin/homework` (gated to teachers + admins):
+  - List by `section_id` or `teacher_user_id`.
+  - POST creates with `assigned_on` defaulting to today; rejects past
+    `due_date`.
+  - PATCH updates title / description / due_date / max_marks /
+    attachments. DELETE is admin-only.
+  - `GET /{id}/submissions` and `GET /{id}/report` show per-student
+    submission status (submitted / late / missing) + counts.
+  - `POST /submissions/{id}/grade` writes marks + feedback, rejects
+    over-mark.
+- `/v1/parent/children/{id}/homework` and
+  `POST .../homework/submit` for parent-led submissions on behalf of
+  the child. Late submits get flagged automatically. Re-submit after a
+  grade returns 409.
+- Phase 8 `ChildDashboard.pending_homework` now actually counts open
+  homework for the child's section.
+
+School Admin React
+- New `/homework` page: section picker, create-form, list of homework
+  with click-to-drill-down detail. Detail panel shows the per-student
+  status table with inline grading (marks + feedback inputs); already
+  graded rows are read-only.
+
+Tests: 7 new (112 total). Past-due-date rejection on create, parent
+submit + teacher grade round-trip with overmark 400, late-submission
+flag, status report counts, dashboard pending_homework, parent cross-
+child block, re-submit-after-grade 409.
 
 ## Phase 13 deliverables (shipped)
 

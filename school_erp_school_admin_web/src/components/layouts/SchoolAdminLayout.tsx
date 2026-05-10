@@ -28,6 +28,7 @@ const nav = [
   { to: "/teachers", label: "Teachers", icon: Users },
   { to: "/attendance", label: "Attendance", icon: ClipboardList },
   { to: "/timetable", label: "Timetable", icon: CalendarDays },
+  { to: "/homework", label: "Homework", icon: ClipboardList },
   { to: "/exams", label: "Exams", icon: BookOpenCheck },
   { to: "/fees", label: "Fees", icon: Receipt },
   { to: "/communication", label: "Communication", icon: MessageCircle },
