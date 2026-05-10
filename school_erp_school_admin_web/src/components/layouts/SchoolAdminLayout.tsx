@@ -6,6 +6,7 @@ import {
   ClipboardList,
   GraduationCap,
   Home,
+  Layers,
   Library,
   LogOut,
   MessageCircle,
@@ -20,6 +21,8 @@ import { useAuth } from "@/stores/auth";
 
 const nav = [
   { to: "/dashboard", label: "Overview", icon: Home },
+  { to: "/org", label: "Departments / Classes", icon: Layers },
+  { to: "/academic", label: "Academic year", icon: CalendarDays },
   { to: "/students", label: "Students", icon: GraduationCap },
   { to: "/teachers", label: "Teachers", icon: Users },
   { to: "/attendance", label: "Attendance", icon: ClipboardList },

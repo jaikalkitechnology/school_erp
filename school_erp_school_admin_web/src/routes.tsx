@@ -3,6 +3,9 @@ import { SchoolAdminLayout } from "@/components/layouts/SchoolAdminLayout";
 import { LoginPage } from "@/features/auth/LoginPage";
 import { DashboardPage } from "@/features/dashboard/DashboardPage";
 import { Placeholder } from "@/features/placeholder/Placeholder";
+import { AcademicPage } from "@/features/setup/AcademicPage";
+import { OrgPage } from "@/features/setup/OrgPage";
+import { SettingsPage } from "@/features/setup/SettingsPage";
 import { useAuth } from "@/stores/auth";
 
 function RequireAuth({ children }: { children: React.ReactNode }) {
@@ -23,6 +26,9 @@ export const routes: RouteObject[] = [
     children: [
       { index: true, element: <Navigate to="/dashboard" replace /> },
       { path: "dashboard", element: <DashboardPage /> },
+      { path: "org", element: <OrgPage /> },
+      { path: "academic", element: <AcademicPage /> },
+      { path: "settings", element: <SettingsPage /> },
       { path: "students", element: <Placeholder title="Students" phase="Phase 6 (SIS)" /> },
       { path: "teachers", element: <Placeholder title="Teachers" phase="Phase 7 (Teacher Management)" /> },
       { path: "attendance", element: <Placeholder title="Attendance" phase="Phase 9 (Attendance)" /> },
@@ -32,7 +38,6 @@ export const routes: RouteObject[] = [
       { path: "communication", element: <Placeholder title="Communication" phase="Phase 12 (Communication)" /> },
       { path: "library", element: <Placeholder title="Library" phase="Phase 17 (Library)" /> },
       { path: "transport", element: <Placeholder title="Transport" phase="Phase 18 (Transport + GPS)" /> },
-      { path: "settings", element: <Placeholder title="Settings" phase="Phase 4 (School Admin Foundation)" /> },
     ],
   },
   { path: "*", element: <Navigate to="/dashboard" replace /> },

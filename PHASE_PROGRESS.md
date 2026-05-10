@@ -8,7 +8,7 @@ Tracker for the 23-phase build defined in `school_erp_structure/`.
 | 1 | Multi-Tenant Architecture | ✅ Done |
 | 2 | Auth & RBAC (13 roles) | ✅ Done |
 | 3 | Super Admin (Onboarding) | ✅ Done (core) |
-| 4 | School Admin Foundation | ⬜ |
+| 4 | School Admin Foundation | ✅ Done (core) |
 | 5 | Academic Setup | ⬜ |
 | 6 | Student Information System | ⬜ |
 | 7 | Teacher Management | ⬜ |
@@ -27,6 +27,40 @@ Tracker for the 23-phase build defined in `school_erp_structure/`.
 | 20 | Reports & Analytics | ⬜ |
 | 21 | Subscription & Billing | ⬜ |
 | 22 | Final Testing & Deployment | ⬜ |
+
+## Phase 4 deliverables (shipped)
+
+Bulk import + ID-card templates deferred (Phase 4.8 / 4.9 — UI-heavy, will
+revisit when SIS lands in Phase 6).
+
+- **Academic schema** — `Department`, `AcademicYear`, `AcademicTerm`,
+  `ClassDef`, `Section`, `Subject`, `ClassSubject`, `Holiday`. All
+  TenantBase, all auto-filtered. Migration `0febbee8d0cb`.
+- **/v1/school-admin** endpoints (gated to school_admin / principal /
+  vice_principal / coordinator):
+  - `GET /dashboard` — students, teachers, classes, sections, subjects,
+    departments, active year (with terms), storage usage.
+  - `GET/PATCH /settings` — branding + school identity (writes to the
+    Tenant row via the platform session, since Tenant isn't TenantBase).
+  - Departments / Classes / Sections / Subjects / Holidays CRUD.
+  - Academic years CRUD + `POST /academic-years/{id}/activate` (enforces
+    one-active-at-a-time invariant).
+  - `POST /academic-years/{id}/terms` — add a term to a year.
+- **School Admin React** —
+  - **Dashboard** rebuilt with live KPI tiles, active-year card, quick
+    links to Org / Academic / Students / Teachers.
+  - **Settings page** at `/settings` — every Tenant identity field
+    editable, live colour swatches.
+  - **Org page** at `/org` with tabbed Departments / Classes / Sections /
+    Subjects panels.
+  - **Academic page** at `/academic` for year + term + holiday management,
+    one-click year activation.
+  - Sidebar gets two new top-level entries (Org, Academic).
+- **Tests** — 44 passing (6 new): dashboard endpoint, settings get/patch,
+  full CRUD round-trip across departments/classes/sections/subjects/years/
+  terms/holidays, single-active-year invariant, cross-tenant isolation
+  (Other tenant cannot see Demo's department), super_admin token blocked
+  from `/v1/school-admin/*` (lacks the staff roles).
 
 ## Phase 3 deliverables (shipped)
 
