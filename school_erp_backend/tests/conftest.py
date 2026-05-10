@@ -59,6 +59,13 @@ async def _truncate_all() -> None:
     )
     from app.models.attendance import StudentAttendance
     from app.models.audit import AuditLog
+    from app.models.comms import (
+        Announcement,
+        Message,
+        Notification,
+        NotificationOutbox,
+        NotificationTemplate,
+    )
     from app.models.fees import (
         FeeCategory,
         FeeDiscount,
@@ -112,6 +119,8 @@ async def _truncate_all() -> None:
             TeacherAttendance, TeacherSubject, Teacher,
             # Phase 6
             StudentDocument, Admission,
+            # Phase 12
+            NotificationOutbox, Notification, Message, Announcement, NotificationTemplate,
             # Phase 11
             FeePayment, FeeInvoice, FeeStructure, FeeCategory, FeeDiscount,
             # Phase 9

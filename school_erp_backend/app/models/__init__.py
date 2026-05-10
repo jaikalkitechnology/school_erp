@@ -14,6 +14,16 @@ from app.models.academic import (  # noqa: F401
 )
 from app.models.attendance import StudentAttendance, StudentAttendanceStatus  # noqa: F401
 from app.models.audit import AuditLog  # noqa: F401
+from app.models.comms import (  # noqa: F401
+    Announcement,
+    AnnouncementAudience,
+    Channel,
+    DeliveryStatus,
+    Message,
+    Notification,
+    NotificationOutbox,
+    NotificationTemplate,
+)
 from app.models.fees import (  # noqa: F401
     DiscountKind,
     FeeCategory,

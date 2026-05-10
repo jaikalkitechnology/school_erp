@@ -257,8 +257,11 @@ async def run_all() -> None:
     async with AsyncSessionLocal() as session:
         await seed_plans(session)
 
+        from app.services.comms import seed_default_templates as _seed_templates
+
         platform_id = await seed_platform_tenant(session)
         await seed_rbac_for_tenant(session, platform_id)
+        await _seed_templates(session, platform_id)
         await _ensure_user(
             session,
             tenant_id=platform_id,
@@ -270,6 +273,7 @@ async def run_all() -> None:
 
         demo_id = await seed_demo_tenant(session)
         await seed_rbac_for_tenant(session, demo_id)
+        await _seed_templates(session, demo_id)
         await _ensure_user(
             session,
             tenant_id=demo_id,

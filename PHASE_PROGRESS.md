@@ -16,7 +16,7 @@ Tracker for the 23-phase build defined in `school_erp_structure/`.
 | 9 | Attendance | ✅ Done (core) |
 | 10 | Mobile App Polish | ✅ Done (core) |
 | 11 | Fee Management | ✅ Done (core) |
-| 12 | Communication | ⬜ |
+| 12 | Communication | ✅ Done (core) |
 | 13 | Time Table & Substitution | ⬜ |
 | 14 | Homework | ⬜ |
 | 15 | Examination System | ⬜ |
@@ -27,6 +27,62 @@ Tracker for the 23-phase build defined in `school_erp_structure/`.
 | 20 | Reports & Analytics | ⬜ |
 | 21 | Subscription & Billing | ⬜ |
 | 22 | Final Testing & Deployment | ⬜ |
+
+## Phase 12 deliverables (shipped)
+
+Live SMS / WhatsApp / FCM push delivery deferred — they need real
+provider credentials (MSG91 / Twilio / SendGrid / Firebase). The data
+path is fully wired: every external channel writes a queued row to
+`notification_outbox` that real adapters can consume.
+
+Backend
+- New tables: `NotificationTemplate`, `Announcement`, `Notification`,
+  `NotificationOutbox`, `Message` (direct 1-1). Migration `f2b86b5c2688`.
+- Channel abstraction in `app/services/comms.py`:
+  - `Channel.IN_APP` writes a `Notification` row directly.
+  - `SMS / EMAIL / WHATSAPP / PUSH` write a `NotificationOutbox` row
+    with `status=queued` (or `skipped` if the user has no address).
+- `notify(template_code, recipients, context)` formats `{{key}}`
+  substitutions against the picked template, fans out across the
+  template's channels.
+- Audience resolver: `all`, `staff`, `parents`, `students`, `class:N`,
+  `section:N`. Class/section paths walk through SIS students → linked
+  parents (with `can_receive_notifications=True`).
+- Endpoints:
+  - `/v1/school-admin/communication/templates` GET + PUT (per-tenant).
+  - `/v1/school-admin/communication/announcements` GET / POST (publish
+    fans out instantly).
+  - `/v1/school-admin/communication/outbox` for the delivery debug view.
+  - `/v1/announcements` (any auth user) — own school's notice board.
+  - `/v1/messages` (POST/GET inbox/sent) + `POST /{id}/read`.
+  - `/v1/notifications` now reads the persisted `Notification` table
+    (replacing Phase 10's stub) + `POST /{id}/read` + `POST /read-all`.
+- Default templates seeded per tenant (`leave.decided`,
+  `announcement.posted`, `fee.collected`).
+- Hook: `decide_leave` (Phase 8) now fires `notify("leave.decided", ...)`
+  to the parent that applied — best-effort so a comms hiccup never
+  blocks the school admin's decision.
+
+School Admin React
+- New `/communication` page with **Announcements / Templates / Outbox**
+  tabs. Announcements: pick audience (incl. class/section), publish
+  with a flash showing "Notified N users". Templates: per-language
+  subject + body editing with a channel chip-row. Outbox: per-status
+  filter table with channel + address + status pill.
+
+Flutter
+- `NotificationsRepository` upgraded: int ids, real `read_at` field,
+  `markRead(id)` + `markAllRead()` plumbing; new `AnnouncementsRepository`.
+- Notifications page now shows pinned/recent announcements at the top,
+  per-row tap to mark read, "Mark all read" button, read state styling
+  via the dark/light theme outline.
+
+Tests: 97 passing (7 new). Default templates seeded, announcement to
+parents fans out + parent sees in their notifications, section-scoped
+announcement targets only linked parents, leave decision triggers a
+parent notification with the right title, direct messages round-trip
+between two users, outbox correctly queues SMS rows when the template
+includes the channel, mark-all-read clears the unread count.
 
 ## Phase 11 deliverables (shipped)
 

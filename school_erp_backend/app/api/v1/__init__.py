@@ -5,10 +5,10 @@ from fastapi import APIRouter
 from app.api.v1 import (
     attendance,
     auth,
+    comms,
     curriculum,
     fees,
     health,
-    notifications,
     parent,
     school_admin,
     sis,
@@ -28,6 +28,10 @@ router.include_router(teachers.router)
 router.include_router(parent.router)
 router.include_router(parent.sa_router)
 router.include_router(attendance.router)
-router.include_router(notifications.router)
 router.include_router(fees.router)
 router.include_router(fees.parent_router)
+# Phase 12: real notifications + announcements + messages.
+router.include_router(comms.sa_router)
+router.include_router(comms.router)
+router.include_router(comms.messages_router)
+router.include_router(comms.notif_router)
