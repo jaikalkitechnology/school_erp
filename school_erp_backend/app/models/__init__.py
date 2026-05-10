@@ -13,6 +13,14 @@ from app.models.academic import (  # noqa: F401
     Subject,
 )
 from app.models.audit import AuditLog  # noqa: F401
+from app.models.curriculum import (  # noqa: F401
+    CalendarEvent,
+    CalendarEventKind,
+    Chapter,
+    House,
+    SectionSubject,
+    Syllabus,
+)
 from app.models.auth import (  # noqa: F401
     AuthProvider,
     Permission,

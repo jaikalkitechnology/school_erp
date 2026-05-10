@@ -47,6 +47,17 @@ async def _truncate_all() -> None:
     from sqlalchemy import delete
 
     from app.database import AsyncSessionLocal
+    from app.models.academic import (
+        AcademicTerm,
+        AcademicYear,
+        ClassDef,
+        ClassSubject,
+        Department,
+        Holiday,
+        Section,
+        Subject,
+    )
+    from app.models.audit import AuditLog
     from app.models.auth import (
         Permission,
         RefreshToken,
@@ -54,6 +65,13 @@ async def _truncate_all() -> None:
         RolePermission,
         User,
         UserRole,
+    )
+    from app.models.curriculum import (
+        CalendarEvent,
+        Chapter,
+        House,
+        SectionSubject,
+        Syllabus,
     )
     from app.models.parent import Parent, ParentChildMapping, ParentSession, Student
     from app.models.tenant import (
@@ -65,9 +83,19 @@ async def _truncate_all() -> None:
     )
 
     async with AsyncSessionLocal() as session:
+        # Order matters - children before parents.
         for model in (
+            # Phase 5
+            Chapter, Syllabus, CalendarEvent, SectionSubject, House,
+            # Phase 4
+            Holiday, ClassSubject, Section, ClassDef, Subject,
+            AcademicTerm, AcademicYear, Department,
+            # Phase 3
+            AuditLog,
+            # Phase 2
             ParentSession, ParentChildMapping, Parent, Student,
             RefreshToken, UserRole, RolePermission, Permission, Role, User,
+            # Phase 1
             TenantUsageSnapshot, TenantSettings, Subscription, Tenant, SubscriptionPlan,
         ):
             await session.execute(delete(model))

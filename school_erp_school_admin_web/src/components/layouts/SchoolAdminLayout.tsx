@@ -23,6 +23,7 @@ const nav = [
   { to: "/dashboard", label: "Overview", icon: Home },
   { to: "/org", label: "Departments / Classes", icon: Layers },
   { to: "/academic", label: "Academic year", icon: CalendarDays },
+  { to: "/curriculum", label: "Curriculum", icon: BookOpenCheck },
   { to: "/students", label: "Students", icon: GraduationCap },
   { to: "/teachers", label: "Teachers", icon: Users },
   { to: "/attendance", label: "Attendance", icon: ClipboardList },
