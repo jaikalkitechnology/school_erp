@@ -14,8 +14,8 @@ from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import settings
+from app.core.auth_deps import AuthPrincipal, require_super_admin
 from app.core.security import create_access_token
-from app.core.tenant import require_platform
 from app.core.tenant_session import platform_session
 from app.models.tenant import TenantStatus
 from app.schemas.tenant import (
@@ -36,7 +36,11 @@ from app.services.tenants import (
     update_tenant,
 )
 
-router = APIRouter(prefix="/tenants", tags=["super-admin"], dependencies=[Depends(require_platform)])
+router = APIRouter(
+    prefix="/tenants",
+    tags=["super-admin"],
+    dependencies=[Depends(require_super_admin())],
+)
 
 
 @router.get("", response_model=list[TenantRead])
@@ -116,7 +120,11 @@ async def impersonate(tenant_id: int, session: AsyncSession = Depends(platform_s
 
 # ----- Plans (read-only here; admin UI in Phase 21 manages these) ------------
 
-plans_router = APIRouter(prefix="/plans", tags=["super-admin"], dependencies=[Depends(require_platform)])
+plans_router = APIRouter(
+    prefix="/plans",
+    tags=["super-admin"],
+    dependencies=[Depends(require_super_admin())],
+)
 
 
 @plans_router.get("", response_model=list[SubscriptionPlanRead])
