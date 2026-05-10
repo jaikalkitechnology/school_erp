@@ -58,6 +58,7 @@ async def _truncate_all() -> None:
         Subject,
     )
     from app.models.attendance import StudentAttendance
+    from app.models.billing import BillingInvoice, BillingPayment, BillingRefund
     from app.models.audit import AuditLog
     from app.models.exams import Exam, ExamMarks, ExamSubject, GradeScale
     from app.models.report_cards import (
@@ -176,6 +177,8 @@ async def _truncate_all() -> None:
             # Phase 2
             ParentSession, ParentChildMapping, Parent, Student,
             RefreshToken, UserRole, RolePermission, Permission, Role, User,
+            # Phase 21
+            BillingRefund, BillingPayment, BillingInvoice,
             # Phase 1
             TenantUsageSnapshot, TenantSettings, Subscription, Tenant, SubscriptionPlan,
         ):

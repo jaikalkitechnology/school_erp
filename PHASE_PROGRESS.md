@@ -25,8 +25,63 @@ Tracker for the 23-phase build defined in `school_erp_structure/`.
 | 18 | Transport (GPS) | ✅ Done (core) |
 | 19 | Hostel | ✅ Done (core) |
 | 20 | Reports & Analytics | ✅ Done (core) |
-| 21 | Subscription & Billing | ⬜ |
+| 21 | Subscription & Billing | ✅ Done (core) |
 | 22 | Final Testing & Deployment | ⬜ |
+
+## Phase 21 deliverables (shipped)
+
+Live B2B Razorpay capture (subscription auto-charge), GSTR-1 export,
+and email/SMS dunning deferred. The data path is wired end-to-end:
+invoices generate with full GST split, payments + refunds record
+against them, plan changes pro-rate the diff, and auto-renew sweeps
+expiring tenants idempotently.
+
+Backend
+- New tables (non-tenant; super-admin scope): `billing_invoices`,
+  `billing_payments`, `billing_refunds`. Migration `f6567bd9b857`.
+  Invoices unique on `invoice_number`, indexed on `(tenant_id)` and
+  `(status)` for the dashboard.
+- `app/services/billing.py`:
+  - Invoice generation prorates `monthly_price × period_days / 30`
+    and splits GST: intra-state → CGST+SGST (each 9% of net at 18%);
+    inter-state → IGST (full 18%); exempt → none.
+  - `auto-renew` picks every active tenant with `subscription_end`
+    inside the window, generates a fresh invoice for the next period,
+    and skips if a non-void invoice already covers the start date.
+  - Payments cap at outstanding balance; second-payment-after-paid
+    returns 400. Status auto-progresses pending → partial → paid.
+  - Refunds cap at net paid; full refund flips status to refunded.
+  - Plan change with `pro_rate=true` charges the daily diff for
+    remaining days and writes a tagged proration invoice.
+  - Reports return billed / collected / pending / refunded /
+    overdue + MRR (sum of monthly_price across active tenants) +
+    ARR (× 12).
+- `/admin/billing` (super admin only): full CRUD for invoices +
+  payments + refunds + plan-change + auto-renew + reports.
+- `/v1/school-admin/subscription` (school admin only): own plan +
+  status + invoice history.
+
+React
+- New super-admin `/billing` page with **Reports / Invoices /
+  Plan changes / Auto-renew** tabs. Reports tab shows 7 KPI tiles
+  (billed / collected / pending / refunded / overdue / MRR / ARR).
+  Invoices tab generates with tenant + period + GST treatment +
+  rate, supports per-row pay / refund / void with status pills.
+  Plan-changes tab applies upgrade/downgrade with a pro-rate toggle
+  and surfaces the resulting invoice. Auto-renew tab takes months +
+  due-in-days + GST and triggers the bulk job.
+- New super-admin sidebar entry "Billing" between Plans and Audit.
+- New school-admin `/subscription` page renders 3 tiles (plan +
+  status + renewal date) and the invoice history table; sidebar
+  gets a "Subscription" entry between Reports and Settings.
+
+Tests: 10 new (158 total). Intra-state CGST+SGST split, inter-state
+IGST split, partial-pay → paid status progression + overpayment 400,
+refund cap (over-refund 400, full refund flips status), void blocked
+on paid invoice, plan change with proration writes invoice when
+upgrading, auto-renew skips already-renewed tenants, reports endpoint
+totals, school-admin can read own subscription, super-admin token
+required for /admin/billing.
 
 ## Phase 20 deliverables (shipped)
 

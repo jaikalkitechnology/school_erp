@@ -6,6 +6,7 @@ import {
   Bus,
   CalendarDays,
   ClipboardList,
+  CreditCard,
   GraduationCap,
   Home,
   Layers,
@@ -40,6 +41,7 @@ const nav = [
   { to: "/transport", label: "Transport", icon: Bus },
   { to: "/hostel", label: "Hostel", icon: Building },
   { to: "/reports", label: "Reports", icon: BarChart3 },
+  { to: "/subscription", label: "Subscription", icon: CreditCard },
   { to: "/settings", label: "Settings", icon: Settings },
 ];
 

@@ -1,5 +1,5 @@
 import { NavLink, Outlet, useNavigate } from "react-router-dom";
-import { Building2, Gauge, LogOut, Receipt, Settings, ShieldCheck, Users2 } from "lucide-react";
+import { Building2, CreditCard, Gauge, LogOut, Receipt, Settings, ShieldCheck, Users2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { logout as logoutApi } from "@/lib/auth-api";
@@ -9,6 +9,7 @@ const nav = [
   { to: "/dashboard", label: "Overview", icon: Gauge },
   { to: "/schools", label: "Schools", icon: Building2 },
   { to: "/plans", label: "Plans", icon: Receipt },
+  { to: "/billing", label: "Billing", icon: CreditCard },
   { to: "/audit", label: "Audit log", icon: ShieldCheck },
   { to: "/staff", label: "Platform Staff", icon: Users2 },
   { to: "/settings", label: "Settings", icon: Settings },

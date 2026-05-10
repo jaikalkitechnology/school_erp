@@ -4,6 +4,7 @@ import { LoginPage } from "@/features/auth/LoginPage";
 import { DashboardPage } from "@/features/dashboard/DashboardPage";
 import { Placeholder } from "@/features/placeholder/Placeholder";
 import { AuditPage } from "@/features/audit/AuditPage";
+import { BillingPage } from "@/features/billing/BillingPage";
 import { PlansPage } from "@/features/plans/PlansPage";
 import { OnboardingWizard } from "@/features/schools/OnboardingWizard";
 import { SchoolsPage } from "@/features/schools/SchoolsPage";
@@ -32,6 +33,7 @@ export const routes: RouteObject[] = [
       { path: "schools/new", element: <OnboardingWizard /> },
       { path: "schools/:id", element: <TenantDetailPage /> },
       { path: "plans", element: <PlansPage /> },
+      { path: "billing", element: <BillingPage /> },
       { path: "staff", element: <Placeholder title="Platform Staff" phase="Phase 4 (school admin foundation)" /> },
       { path: "audit", element: <AuditPage /> },
       { path: "settings", element: <Placeholder title="Platform Settings" phase="Phase 3.8 (system config)" /> },

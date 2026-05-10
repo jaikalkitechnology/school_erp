@@ -15,6 +15,7 @@ import { TimetablePage } from "@/features/timetable/TimetablePage";
 import { TransportPage } from "@/features/transport/TransportPage";
 import { HostelPage } from "@/features/hostel/HostelPage";
 import { ReportsPage } from "@/features/reports/ReportsPage";
+import { SubscriptionPage } from "@/features/subscription/SubscriptionPage";
 import { AcademicPage } from "@/features/setup/AcademicPage";
 import { OrgPage } from "@/features/setup/OrgPage";
 import { SettingsPage } from "@/features/setup/SettingsPage";
@@ -65,6 +66,7 @@ export const routes: RouteObject[] = [
       { path: "transport", element: <TransportPage /> },
       { path: "hostel", element: <HostelPage /> },
       { path: "reports", element: <ReportsPage /> },
+      { path: "subscription", element: <SubscriptionPage /> },
     ],
   },
   { path: "*", element: <Navigate to="/dashboard" replace /> },
