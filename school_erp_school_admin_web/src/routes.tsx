@@ -5,6 +5,7 @@ import { DashboardPage } from "@/features/dashboard/DashboardPage";
 import { Placeholder } from "@/features/placeholder/Placeholder";
 import { AttendancePage } from "@/features/attendance/AttendancePage";
 import { CurriculumPage } from "@/features/curriculum/CurriculumPage";
+import { FeesPage } from "@/features/fees/FeesPage";
 import { AcademicPage } from "@/features/setup/AcademicPage";
 import { OrgPage } from "@/features/setup/OrgPage";
 import { SettingsPage } from "@/features/setup/SettingsPage";
@@ -47,7 +48,7 @@ export const routes: RouteObject[] = [
       { path: "attendance", element: <AttendancePage /> },
       { path: "timetable", element: <Placeholder title="Timetable" phase="Phase 13 (Timetable & Substitution)" /> },
       { path: "exams", element: <Placeholder title="Exams" phase="Phase 15 (Examination System)" /> },
-      { path: "fees", element: <Placeholder title="Fees" phase="Phase 11 (Fee Management)" /> },
+      { path: "fees", element: <FeesPage /> },
       { path: "communication", element: <Placeholder title="Communication" phase="Phase 12 (Communication)" /> },
       { path: "library", element: <Placeholder title="Library" phase="Phase 17 (Library)" /> },
       { path: "transport", element: <Placeholder title="Transport" phase="Phase 18 (Transport + GPS)" /> },

@@ -15,7 +15,7 @@ Tracker for the 23-phase build defined in `school_erp_structure/`.
 | 8 | Parent Module (Multi-Child) | ✅ Done (core) |
 | 9 | Attendance | ✅ Done (core) |
 | 10 | Mobile App Polish | ✅ Done (core) |
-| 11 | Fee Management | ⬜ |
+| 11 | Fee Management | ✅ Done (core) |
 | 12 | Communication | ⬜ |
 | 13 | Time Table & Substitution | ⬜ |
 | 14 | Homework | ⬜ |
@@ -27,6 +27,71 @@ Tracker for the 23-phase build defined in `school_erp_structure/`.
 | 20 | Reports & Analytics | ⬜ |
 | 21 | Subscription & Billing | ⬜ |
 | 22 | Final Testing & Deployment | ⬜ |
+
+## Phase 11 deliverables (shipped)
+
+Live Razorpay integration, UPI QR generation, PDF receipt rendering, and
+SMS/email reminders deferred — they need real keys + Phase 12's
+communication pipes. The data path is fully wired: the online payment
+flow is signature-verified end-to-end against a stub gateway, receipts
+return JSON ready for Phase 16's PDF renderer, and reminder triggers
+will reuse the Phase 10 notifications endpoint.
+
+Backend
+- Schema: `FeeCategory`, `FeeStructure`, `FeeInvoice`, `FeePayment`,
+  `FeeDiscount` with the right indexes and uniques. Migration
+  `99ff6b1ec51b`.
+- `/v1/school-admin/fees` (gated to school staff for reads, admins +
+  accountant for mutations):
+  - Categories CRUD.
+  - Structures CRUD with a `(class, category, period)` unique guard.
+  - `POST /structures/{id}/generate` materialises invoices for every
+    active student in the class. Auto-applies a sibling discount
+    (configurable %) when the student belongs to a sibling group, plus
+    any active explicit discount. Idempotent: re-running for the same
+    period returns `created=0` and skips duplicates.
+  - Discounts CRUD (`sibling / scholarship / staff_ward / manual`).
+  - `GET /students/{id}` rolls up invoices + total due / paid / overdue
+    counts and self-heals invoice status (paid > partial > overdue >
+    pending precedence).
+  - `POST /collect` records cash / UPI / card / bank transfer / cheque
+    payments by accountants; rejects overpayment.
+  - `GET /payments/{id}/receipt` returns the receipt JSON Phase 16's
+    PDF renderer will consume.
+  - `GET /reports/collection` (date-windowed totals + daily / by-method
+    / by-category breakdowns) and `GET /reports/defaulters` (current
+    overdue ranked by amount).
+- Online payment stub (Razorpay-style):
+  - `POST /v1/parent/payments/initiate` validates the parent-link, mints
+    an `order_id`, persists a pending payment row.
+  - `POST /v1/parent/payments/confirm` verifies an HMAC-SHA256 signature
+    against the stored secret, marks payment SUCCESS, and credits the
+    invoice.
+  - `GET /v1/parent/children/{id}/fees` returns the same `StudentFeeView`
+    parent-link guarded.
+- Phase 8 `ChildDashboard.fee_due_amount` now actually computes from open
+  invoices, so the parent dashboard tile is real.
+
+School Admin React
+- `/fees` page with **Categories / Structures / Collection / Reports**
+  tabs. Structures tab can generate invoices for a date range with a
+  configurable sibling discount %. Collection tab picks a student,
+  shows their invoices with status pills, lets the accountant collect
+  any amount with a method. Reports tab shows total collected /
+  pending / overdue tiles plus a defaulter table.
+
+Flutter
+- The parent dashboard's stats grid now uses the real `feeDueAmount` and
+  `todayAttendance` fields from the backend dashboard payload, with the
+  fee tile coloured saffron when there's a balance and teal when clear.
+
+Tests: 90 passing (8 new). Category + structure CRUD with duplicate
+rejection, invoice generation with sibling discount math (10% of 1000
+= 100, total 900), idempotent re-generation, full payment + partial +
+overpay rejection paths, online HMAC signature flow with the right
+secret, collection summary totals, defaulter list correctness, parent
+dashboard fee_due_amount math (10% sibling on 750 = 675), parent
+cannot view another kid's fees.
 
 ## Phase 10 deliverables (shipped)
 

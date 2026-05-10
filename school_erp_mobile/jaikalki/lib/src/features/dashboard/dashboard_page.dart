@@ -218,10 +218,21 @@ class _ChildDashboardCard extends StatelessWidget {
         final dash = state.dashboard;
         if (dash == null) return const SizedBox.shrink();
         final tiles = [
-          _Tile(label: 'Pending leaves', value: dash.pendingLeaves.toString(), hint: 'Phase 8'),
-          _Tile(label: 'Documents', value: dash.documentsCount.toString(), hint: 'Phase 6'),
-          _Tile(label: 'Upcoming events', value: dash.upcomingEventsCount.toString(), hint: 'Phase 5'),
-          _Tile(label: 'Attendance', value: '—', hint: 'Phase 9'),
+          _Tile(
+            label: 'Fees due',
+            value: '₹${dash.feeDueAmount.toStringAsFixed(0)}',
+            hint: dash.feeDueAmount > 0 ? 'Tap fees to pay' : 'All clear',
+            tone: dash.feeDueAmount > 0
+                ? JaikalkiBrand.saffron
+                : JaikalkiBrand.tealDark,
+          ),
+          _Tile(
+            label: 'Today',
+            value: (dash.todayAttendance ?? '—').replaceAll('_', ' '),
+            hint: 'Attendance',
+          ),
+          _Tile(label: 'Pending leaves', value: dash.pendingLeaves.toString(), hint: 'Approvals'),
+          _Tile(label: 'Documents', value: dash.documentsCount.toString(), hint: 'On record'),
         ];
         return Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -391,10 +402,16 @@ _StatusTone _toneFor(String status) {
 
 
 class _Tile extends StatelessWidget {
-  const _Tile({required this.label, required this.value, required this.hint});
+  const _Tile({
+    required this.label,
+    required this.value,
+    required this.hint,
+    this.tone,
+  });
   final String label;
   final String value;
   final String hint;
+  final Color? tone;
 
   @override
   Widget build(BuildContext context) {
@@ -402,9 +419,9 @@ class _Tile extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: JaikalkiBrand.warmWhite,
+        color: Theme.of(context).colorScheme.surface,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: JaikalkiBrand.saffronPale),
+        border: Border.all(color: Theme.of(context).colorScheme.outline),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -412,7 +429,13 @@ class _Tile extends StatelessWidget {
           Text(label.toUpperCase(),
               style: t.labelSmall?.copyWith(color: JaikalkiBrand.saffronDark)),
           const SizedBox(height: 6),
-          Text(value, style: t.displayMedium?.copyWith(fontSize: 26)),
+          Text(
+            value,
+            style: t.displayMedium?.copyWith(
+              fontSize: 26,
+              color: tone,
+            ),
+          ),
           const Spacer(),
           Text(hint, style: t.bodyMedium?.copyWith(fontSize: 11)),
         ],
