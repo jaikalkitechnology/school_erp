@@ -16,6 +16,7 @@ from app.api.v1 import (
     parent,
     report_cards,
     school_admin,
+    school_analytics,
     sis,
     teachers,
     timetable,
@@ -56,3 +57,4 @@ router.include_router(transport.router)
 router.include_router(transport.parent_router)
 router.include_router(hostel.router)
 router.include_router(hostel.parent_router)
+router.include_router(school_analytics.router)
