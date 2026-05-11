@@ -376,7 +376,7 @@ function StudentsReportPanel() {
     queryKey: ["analytics-student-report", params],
     queryFn: () => studentReport(params),
   });
-  const apiBase = import.meta.env.VITE_API_BASE_URL ?? "http://localhost:8000";
+  const apiBase = import.meta.env.VITE_API_BASE_URL ?? "https://api.campus.jaikalki.in";
   const csvHref = `${apiBase}${studentReportCsvUrl(params)}`;
 
   return (

@@ -6,9 +6,17 @@ import '../core/error_bus.dart';
 const _kAccessKey = 'jaikalki.access_token';
 const _kSubdomainKey = 'jaikalki.subdomain';
 
+/// Default points at the production API. Override per build with
+/// `--dart-define=API_BASE_URL=http://10.0.2.2:8000` for the Android emulator,
+/// `http://localhost:8000` for an iOS simulator, or any other host.
+const _defaultApiBaseUrl = String.fromEnvironment(
+  'API_BASE_URL',
+  defaultValue: 'https://api.campus.jaikalki.in',
+);
+
 /// Single Dio instance for the entire app, with auth + tenant interceptor.
 class ApiClient {
-  ApiClient({String baseUrl = 'http://10.0.2.2:8000', FlutterSecureStorage? storage})
+  ApiClient({String baseUrl = _defaultApiBaseUrl, FlutterSecureStorage? storage})
       : storage = storage ?? const FlutterSecureStorage(),
         dio = Dio(
           BaseOptions(

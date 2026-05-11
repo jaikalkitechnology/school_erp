@@ -532,7 +532,7 @@ function CardsPanel() {
     onSuccess: () => qc.invalidateQueries({ queryKey: ["section-cards", examId, sectionId] }),
   });
 
-  const apiBase = import.meta.env.VITE_API_BASE_URL ?? "http://localhost:8000";
+  const apiBase = import.meta.env.VITE_API_BASE_URL ?? "https://api.campus.jaikalki.in";
 
   return (
     <div className="space-y-4">
