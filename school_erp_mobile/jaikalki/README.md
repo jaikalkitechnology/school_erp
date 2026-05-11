@@ -17,6 +17,26 @@ The default `ApiClient` uses `10.0.2.2:8000` so the Android emulator can reach
 the host machine — adjust `lib/src/api/api_client.dart` if you're on iOS or
 the web target.
 
+## App icon
+
+The launcher icon is generated from `assets/icons/` (kept in version
+control). After editing any of the source PNGs — or pulling a new
+saffron-themed mark — regenerate every Android density, the iOS
+AppIcon.appiconset, the web favicon, and the Windows .ico in one shot:
+
+```bash
+dart run flutter_launcher_icons
+```
+
+Sources (all 432×432 for adaptive, 1024×1024 for the iOS master):
+
+- `assets/icons/ic_launcher_foreground.png` — logo mark on transparent
+- `assets/icons/ic_launcher_background.png` — saffron gradient layer
+- `assets/icons/ic_launcher_monochrome.png` — Android 13+ themed icon
+- `assets/icons/app_icon.png` — full-bleed 1024 master (iOS / web / Windows)
+
+Config lives under `flutter_launcher_icons:` in `pubspec.yaml`.
+
 ## Structure
 
 ```
