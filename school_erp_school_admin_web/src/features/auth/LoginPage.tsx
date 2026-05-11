@@ -21,19 +21,31 @@ const SCHOOL_ROLES = new Set([
   "office_staff",
 ]);
 
-function detectSubdomain(): string {
+// Hosts that serve the school admin web itself rather than a per-tenant
+// subdomain. When the user lands on one of these, we don't try to read a
+// subdomain from the URL — they pick / type one on the form.
+const APP_HOST_LABELS = new Set(["www", "admin", "api", "school", "campus", "app"]);
+
+function detectSubdomain(): string | null {
+  // Explicit override always wins.
   const fromQuery = new URLSearchParams(window.location.search).get("school");
   if (fromQuery) return fromQuery.toLowerCase();
+  // Last-used subdomain (sticky between sessions).
+  const stored = localStorage.getItem("jaikalki.subdomain");
+  if (stored) return stored;
+  // Hostname-derived: requires at least 3 labels (e.g. demo.school.jaikalki.in)
+  // and the first label must not be an app-host marker.
   const host = window.location.host.split(":")[0];
   const parts = host.split(".");
-  if (parts.length >= 3 && !["www", "admin", "api"].includes(parts[0])) return parts[0];
-  return "demo";
+  if (parts.length < 3) return null;
+  if (APP_HOST_LABELS.has(parts[0])) return null;
+  return parts[0];
 }
 
 export function LoginPage() {
   const navigate = useNavigate();
   const setSession = useAuth((s) => s.setSession);
-  const subdomain = detectSubdomain();
+  const [subdomain, setSubdomain] = useState<string>(detectSubdomain() ?? "demo");
   const [identifier, setIdentifier] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -42,9 +54,16 @@ export function LoginPage() {
   const onSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
+    if (!subdomain.trim()) {
+      setError("Pick the school's subdomain (e.g. demo).");
+      return;
+    }
     setSubmitting(true);
     try {
-      const res = await loginApi({ identifier, password, subdomain });
+      const cleanSubdomain = subdomain.trim().toLowerCase();
+      // Persist before the API call so the axios interceptor picks it up.
+      localStorage.setItem("jaikalki.subdomain", cleanSubdomain);
+      const res = await loginApi({ identifier, password, subdomain: cleanSubdomain });
       const allowed = res.user.roles.some((r) => SCHOOL_ROLES.has(r));
       if (!allowed) {
         setError("This console is for school staff. Use the mobile app to sign in as parent/student.");
@@ -60,12 +79,21 @@ export function LoginPage() {
     }
   };
 
+  // Pretty FQDN for the wallpaper text — falls back to current hostname.
+  const baseDomain = (() => {
+    const host = window.location.host.split(":")[0];
+    const parts = host.split(".");
+    if (parts.length >= 2) return parts.slice(-2).join(".");
+    return host;
+  })();
+  const fqdn = `${subdomain || "<school>"}.${baseDomain}`;
+
   return (
     <div className="grid min-h-full grid-cols-1 lg:grid-cols-[1fr_minmax(420px,440px)]">
       <aside className="relative hidden flex-col justify-between overflow-hidden bg-saffron p-12 text-warm-white lg:flex">
         <div>
           <p className="font-mono text-xs uppercase tracking-[0.4em] text-marigold-pale">
-            {subdomain}.jaikalki.com
+            {fqdn}
           </p>
           <h1 className="mt-6 font-display text-4xl leading-tight text-warm-white">
             Run your school <em className="italic text-marigold">like a Monday morning assembly.</em>
@@ -87,12 +115,22 @@ export function LoginPage() {
           <CardHeader>
             <CardTitle>Welcome back</CardTitle>
             <CardDescription>
-              Signing in to <span className="font-mono text-saffron-dark">{subdomain}.jaikalki.com</span>.
+              Signing in to <span className="font-mono text-saffron-dark">{fqdn}</span>.
               Demo seed: <span className="font-mono text-saffron-dark">admin@demo.school / School@123</span>.
             </CardDescription>
           </CardHeader>
           <CardContent>
             <form className="space-y-4" onSubmit={onSubmit}>
+              <div className="space-y-2">
+                <Label htmlFor="subdomain">School</Label>
+                <Input
+                  id="subdomain"
+                  required
+                  placeholder="demo"
+                  value={subdomain}
+                  onChange={(e) => setSubdomain(e.target.value)}
+                />
+              </div>
               <div className="space-y-2">
                 <Label htmlFor="identifier">Email or mobile</Label>
                 <Input
@@ -119,12 +157,6 @@ export function LoginPage() {
               <Button type="submit" className="w-full" disabled={submitting}>
                 {submitting ? "Signing in…" : "Sign in"}
               </Button>
-              <p className="text-center text-xs text-muted-foreground">
-                Wrong school?{" "}
-                <a href={`?school=${subdomain}`} className="font-medium text-saffron-dark">
-                  switch with ?school=…
-                </a>
-              </p>
             </form>
           </CardContent>
         </Card>
