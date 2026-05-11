@@ -14,7 +14,6 @@ import {
   homeworkReport,
   listHomework,
   submissionsFor,
-  type Homework,
   type SubmissionStatus,
 } from "./api";
 
@@ -301,10 +300,16 @@ function GradeInline({ max, onSubmit }: { max: number; onSubmit: (marks: number,
     <span className="inline-flex items-center gap-2">
       <Input
         type="number"
+        min={0}
+        max={max}
         value={marks}
-        onChange={(e) => setMarks(Number(e.target.value) || 0)}
+        onChange={(e) => {
+          const n = Number(e.target.value) || 0;
+          setMarks(Math.max(0, Math.min(max, n)));
+        }}
         className="h-8 w-20"
       />
+      <span className="text-xs text-muted-foreground">/{max}</span>
       <Input
         placeholder="feedback"
         value={feedback}

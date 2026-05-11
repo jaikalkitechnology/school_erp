@@ -2,7 +2,6 @@ import { Navigate, type RouteObject } from "react-router-dom";
 import { SchoolAdminLayout } from "@/components/layouts/SchoolAdminLayout";
 import { LoginPage } from "@/features/auth/LoginPage";
 import { DashboardPage } from "@/features/dashboard/DashboardPage";
-import { Placeholder } from "@/features/placeholder/Placeholder";
 import { AttendancePage } from "@/features/attendance/AttendancePage";
 import { CommunicationPage } from "@/features/communication/CommunicationPage";
 import { CurriculumPage } from "@/features/curriculum/CurriculumPage";

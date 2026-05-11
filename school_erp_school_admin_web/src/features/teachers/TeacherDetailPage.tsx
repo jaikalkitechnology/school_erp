@@ -220,10 +220,6 @@ function ClassesTab({ teacherId }: { teacherId: number }) {
     () => new Map((subjects.data ?? []).map((s) => [s.id, s])),
     [subjects.data],
   );
-  const sectionMap = useMemo(
-    () => new Map((sections.data ?? []).map((s) => [s.id, s])),
-    [sections.data],
-  );
 
   return (
     <div className="space-y-4">

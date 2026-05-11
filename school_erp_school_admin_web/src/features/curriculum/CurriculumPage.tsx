@@ -191,11 +191,6 @@ function SectionSubjectsPanel() {
     return `${cls?.name ?? "?"} · ${s.name}`;
   };
 
-  const subjectMap = useMemo(
-    () => new Map((subjects.data ?? []).map((s) => [s.id, s])),
-    [subjects.data],
-  );
-
   const linkedIds = new Set((links.data ?? []).map((ss) => ss.subject_id));
 
   return (
