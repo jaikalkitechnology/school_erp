@@ -10,6 +10,12 @@ edge CDN / nginx.
 - A managed MySQL 8.0 cluster (or self-hosted; the compose file bundles one
   for single-node deployments).
 - A managed Redis instance.
+- **Node.js 20.19+** (or 22.12+) on whatever box builds the React apps —
+  Vite 8 refuses to run on Node 18, which is past end-of-life anyway.
+  Install via NodeSource (`curl -fsSL https://deb.nodesource.com/setup_20.x
+  | sudo -E bash - && sudo apt-get install -y nodejs`) or nvm.
+- **Python 3.11** for the backend (Dockerfile pins it; only matters if
+  you build outside Docker).
 - Two DNS names you control: one for the super-admin web (e.g.
   `admin.example.com`) and a wildcard for the school admin
   (`*.school.example.com`). The wildcard is what `TenantMiddleware` reads.
