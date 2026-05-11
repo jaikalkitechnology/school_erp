@@ -16,11 +16,14 @@ api.interceptors.request.use((config) => {
   }
   // School admin web is tenant-scoped: forward the subdomain so the FastAPI
   // tenant middleware can resolve the right school during local dev where
-  // the request hits localhost:8000 without a real subdomain.
-  const subdomain = localStorage.getItem("jaikalki.subdomain");
-  if (subdomain) {
-    config.headers = config.headers ?? {};
-    config.headers["X-Tenant-Subdomain"] = subdomain;
+  // the request hits localhost:8000 without a real subdomain. An explicit
+  // per-call override (e.g. login) takes precedence over the stored value.
+  config.headers = config.headers ?? {};
+  if (!config.headers["X-Tenant-Subdomain"]) {
+    const subdomain = localStorage.getItem("jaikalki.subdomain");
+    if (subdomain) {
+      config.headers["X-Tenant-Subdomain"] = subdomain;
+    }
   }
   return config;
 });

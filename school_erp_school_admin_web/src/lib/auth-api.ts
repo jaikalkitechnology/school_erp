@@ -20,7 +20,13 @@ export interface LoginResponse {
 }
 
 export async function login(payload: LoginPayload): Promise<LoginResponse> {
-  const { data } = await api.post<LoginResponse>("/v1/auth/login", payload);
+  // Override X-Tenant-Subdomain for *this* call so login isn't dependent on
+  // whatever was previously persisted in localStorage. The middleware reads
+  // the header before the body; without this override a stale subdomain
+  // from a prior failed attempt would 404 at the tenant lookup.
+  const headers: Record<string, string> = {};
+  if (payload.subdomain) headers["X-Tenant-Subdomain"] = payload.subdomain;
+  const { data } = await api.post<LoginResponse>("/v1/auth/login", payload, { headers });
   return data;
 }
 

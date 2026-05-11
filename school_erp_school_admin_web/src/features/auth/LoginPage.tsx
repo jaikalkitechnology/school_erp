@@ -61,8 +61,10 @@ export function LoginPage() {
     setSubmitting(true);
     try {
       const cleanSubdomain = subdomain.trim().toLowerCase();
-      // Persist before the API call so the axios interceptor picks it up.
-      localStorage.setItem("jaikalki.subdomain", cleanSubdomain);
+      // Don't persist subdomain until the login actually succeeds, otherwise
+      // a typo poisons localStorage and we keep submitting the wrong tenant
+      // on every reload. loginApi sends the subdomain as an explicit header
+      // for this call; the auth store writes it to localStorage on success.
       const res = await loginApi({ identifier, password, subdomain: cleanSubdomain });
       const allowed = res.user.roles.some((r) => SCHOOL_ROLES.has(r));
       if (!allowed) {
@@ -70,6 +72,7 @@ export function LoginPage() {
         setSubmitting(false);
         return;
       }
+      localStorage.setItem("jaikalki.subdomain", cleanSubdomain);
       setSession(res.user, res.tokens);
       navigate("/dashboard");
     } catch (err: any) {
