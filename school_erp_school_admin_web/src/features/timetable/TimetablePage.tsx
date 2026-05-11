@@ -86,14 +86,6 @@ function SectionGridPanel() {
     setConflicts([]);
   }, [grid.data]);
 
-  const teacherMap = useMemo(
-    () => new Map((teachers.data?.items ?? []).map((t) => [t.user_id, t])),
-    [teachers.data],
-  );
-  const subjectMap = useMemo(
-    () => new Map((subjects.data ?? []).map((s) => [s.id, s])),
-    [subjects.data],
-  );
   const classMap = useMemo(
     () => new Map((classes.data ?? []).map((c) => [c.id, c.name])),
     [classes.data],
@@ -270,10 +262,6 @@ function SubstitutionsPanel() {
   const teacherMap = useMemo(
     () => new Map((teachers.data?.items ?? []).map((t) => [t.user_id, t])),
     [teachers.data],
-  );
-  const sectionMap = useMemo(
-    () => new Map((sections.data ?? []).map((s) => [s.id, s])),
-    [sections.data],
   );
   const subjectMap = useMemo(
     () => new Map((subjects.data ?? []).map((s) => [s.id, s])),

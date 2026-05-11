@@ -41,10 +41,6 @@ export function StudentsPage() {
     () => new Map((classes.data ?? []).map((c) => [c.id, c.name])),
     [classes.data],
   );
-  const sectionMap = useMemo(
-    () => new Map((sections.data ?? []).map((s) => [s.id, s.name])),
-    [sections.data],
-  );
 
   const total = list.data?.total ?? 0;
   const showingTo = Math.min(offset + limit, total);
