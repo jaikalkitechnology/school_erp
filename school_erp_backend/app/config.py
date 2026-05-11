@@ -35,7 +35,11 @@ class Settings(BaseSettings):
     # JWT
     JWT_SECRET_KEY: str = "change-this-in-production"
     JWT_ALGORITHM: str = "HS256"
-    JWT_ACCESS_TOKEN_EXPIRE_MINUTES: int = 15
+    # 2 hours: short enough that compromised tokens have a small blast
+    # radius, long enough that a school admin's session survives a coffee
+    # break. The refresh-token rotation flow gives indefinite freshness
+    # while the user keeps using the app.
+    JWT_ACCESS_TOKEN_EXPIRE_MINUTES: int = 120
     JWT_REFRESH_TOKEN_EXPIRE_DAYS: int = 30
 
     # CORS - Annotated[..., NoDecode] tells pydantic-settings to skip JSON parsing
