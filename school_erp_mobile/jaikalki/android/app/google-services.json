@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "77926921930",
+    "project_id": "school-jaikalki",
+    "storage_bucket": "school-jaikalki.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:77926921930:android:25700da6fded9abaffa633",
+        "android_client_info": {
+          "package_name": "com.erp_school.jaikalki"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCGOvud-xzbUMzFGWuR158ybB_T6ke4Ad8"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

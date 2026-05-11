@@ -1,0 +1,2 @@
+super-admin: tenant_id=1 email=admin@jaikalki.com pwd=Admin@123
+  school-admin (demo subdomain): tenant_id=2 email=admin@demo.school pwd=School@123
