@@ -194,6 +194,11 @@ function InvoicesPanel() {
             <option value="inter">Inter-state (IGST)</option>
             <option value="exempt">Exempt</option>
           </select>
+          <Input
+            placeholder="Place of supply"
+            value={place}
+            onChange={(e) => setPlace(e.target.value)}
+          />
           <Button onClick={() => create.mutate()} disabled={!formTenant || create.isPending}>
             <Plus className="mr-1 h-4 w-4" />
             Invoice
