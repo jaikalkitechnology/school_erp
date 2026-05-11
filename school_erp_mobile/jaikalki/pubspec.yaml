@@ -29,7 +29,7 @@ dependencies:
 
   # UX bits the docs call for
   cached_network_image: ^3.4.1
-  intl: ^0.19.0
+  intl: ^0.20.2  # Pinned by flutter_localizations in current Flutter SDK.
   fl_chart: ^0.69.0
   pdf: ^3.11.1
   permission_handler: ^11.3.1
