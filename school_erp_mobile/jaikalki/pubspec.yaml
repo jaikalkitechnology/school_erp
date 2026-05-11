@@ -53,6 +53,32 @@ dev_dependencies:
   flutter_test:
     sdk: flutter
   flutter_lints: ^6.0.0
+  flutter_launcher_icons: ^0.14.1
 
 flutter:
   uses-material-design: true
+  assets:
+    - assets/icons/
+
+# Run with: dart run flutter_launcher_icons
+# Generates the full Android mipmap set + iOS AppIcon.appiconset from the
+# adaptive-icon bundle in Logoes/. The monochrome layer is the Android 13+
+# themed icon. The 1024 master (app_icon.png) is the iOS source.
+flutter_launcher_icons:
+  android: "ic_launcher"
+  ios: true
+  remove_alpha_ios: true
+  image_path: "assets/icons/app_icon.png"
+  min_sdk_android: 21
+  adaptive_icon_background: "assets/icons/ic_launcher_background.png"
+  adaptive_icon_foreground: "assets/icons/ic_launcher_foreground.png"
+  adaptive_icon_monochrome: "assets/icons/ic_launcher_monochrome.png"
+  web:
+    generate: true
+    image_path: "assets/icons/app_icon.png"
+    background_color: "#FFFCF7"
+    theme_color: "#E85D2E"
+  windows:
+    generate: true
+    image_path: "assets/icons/app_icon.png"
+    icon_size: 256
