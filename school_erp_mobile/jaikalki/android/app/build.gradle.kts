@@ -3,6 +3,10 @@ plugins {
     id("kotlin-android")
     // The Flutter Gradle Plugin must be applied after the Android and Kotlin Gradle plugins.
     id("dev.flutter.flutter-gradle-plugin")
+    // Wire the google-services.json the user dropped in app/. Without this
+    // plugin the JSON is ignored at build time and Firebase init fails on
+    // the device with "Default FirebaseApp is not initialized".
+    id("com.google.gms.google-services")
 }
 
 android {

@@ -71,8 +71,10 @@ class Settings(BaseSettings):
     SENDGRID_API_KEY: str = ""
     SENDGRID_FROM_EMAIL: str = "noreply@jaikalki.com"
 
-    # Firebase (push)
-    FIREBASE_CREDENTIALS_PATH: str = "./firebase-service-account.json"
+    # Firebase (push). Path is relative to the backend root by default;
+    # override with FIREBASE_CREDENTIALS_PATH in the .env to point at the
+    # actual service-account JSON Google Cloud gave you.
+    FIREBASE_CREDENTIALS_PATH: str = "./school-jaikalki-firebase-adminsdk-fbsvc-5b1fcf0080.json"
 
     # Multi-tenant defaults
     DEFAULT_TENANT_LIMIT_STUDENTS: int = 500
