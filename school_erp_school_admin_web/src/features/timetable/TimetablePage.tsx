@@ -256,7 +256,6 @@ function SubstitutionsPanel() {
   const [date, setDate] = useState(today);
   const [absentTeacherUserId, setAbsentTeacherUserId] = useState<number | "">("");
   const teachers = useQuery({ queryKey: ["teachers", "for-tt"], queryFn: () => listTeachers({ limit: 200 }) });
-  const sections = useQuery({ queryKey: ["sections"], queryFn: () => listSections() });
   const subjects = useQuery({ queryKey: ["subjects"], queryFn: listSubjects });
 
   const teacherMap = useMemo(
