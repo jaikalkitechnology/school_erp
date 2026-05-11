@@ -9,6 +9,10 @@ export interface SubscriptionPlan {
   student_limit: number;
   teacher_limit: number;
   storage_gb: number;
+  sms_quota: number;
+  modules_included: string[];
+  features_json?: Record<string, unknown>;
+  is_active: boolean;
 }
 
 export interface Tenant {
@@ -27,6 +31,7 @@ export interface Tenant {
   subscription_start: string | null;
   subscription_end: string | null;
   created_at: string;
+  plan_id: number | null;
   plan?: SubscriptionPlan | null;
 }
 
