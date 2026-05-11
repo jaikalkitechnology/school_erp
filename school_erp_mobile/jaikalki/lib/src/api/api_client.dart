@@ -1,4 +1,5 @@
 import 'package:dio/dio.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 
 import '../core/error_bus.dart';
@@ -18,6 +19,7 @@ const _defaultApiBaseUrl = String.fromEnvironment(
 class ApiClient {
   ApiClient({String baseUrl = _defaultApiBaseUrl, FlutterSecureStorage? storage})
       : storage = storage ?? const FlutterSecureStorage(),
+        _baseUrl = baseUrl,
         dio = Dio(
           BaseOptions(
             baseUrl: baseUrl,
@@ -26,17 +28,34 @@ class ApiClient {
             contentType: 'application/json',
           ),
         ) {
+    debugPrint('[ApiClient] baseUrl=$baseUrl');
     dio.interceptors.add(
       InterceptorsWrapper(onRequest: (options, handler) async {
         final token = await this.storage.read(key: _kAccessKey);
         final subdomain = await this.storage.read(key: _kSubdomainKey);
         if (token != null) options.headers['Authorization'] = 'Bearer $token';
         if (subdomain != null) options.headers['X-Tenant-Subdomain'] = subdomain;
+        debugPrint(
+          '[ApiClient] -> ${options.method} ${options.uri} '
+          'subdomain=$subdomain',
+        );
         handler.next(options);
+      }, onError: (err, handler) {
+        // Surface the URL + error type so timeouts aren't a black box.
+        debugPrint(
+          '[ApiClient] !! ${err.requestOptions.method} ${err.requestOptions.uri} '
+          '-> ${err.type} ${err.response?.statusCode ?? ""} ${err.message}',
+        );
+        handler.next(err);
       }),
     );
     dio.interceptors.add(ErrorInterceptor(fallback: 'Could not reach the school server.'));
   }
+
+  /// The base URL this client is talking to. Surfaced so debug UIs can show
+  /// the user what host their requests are hitting.
+  final String _baseUrl;
+  String get baseUrl => _baseUrl;
 
   final Dio dio;
   final FlutterSecureStorage storage;
