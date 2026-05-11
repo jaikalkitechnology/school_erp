@@ -25,6 +25,31 @@ async def test_health_returns_status():
 
 
 @pytest.mark.asyncio
+async def test_livez_is_dependency_free():
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://localhost") as ac:
+        r = await ac.get("/v1/livez")
+        assert r.status_code == 200
+        assert r.json()["status"] == "ok"
+
+
+@pytest.mark.asyncio
+async def test_readyz_returns_ready_when_db_up():
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://localhost") as ac:
+        r = await ac.get("/v1/readyz")
+        # Redis is unreachable in CI; the contract is only about DB+Redis being
+        # both ok. We just assert the contract: 200 ⇒ ready, 503 ⇒ details
+        # carry per-dependency status strings.
+        if r.status_code == 200:
+            body = r.json()
+            assert body["status"] == "ready"
+            assert body["database"] == "ok"
+        else:
+            assert r.status_code == 503
+            detail = r.json()["detail"]
+            assert "database" in detail and "redis" in detail
+
+
+@pytest.mark.asyncio
 async def test_request_id_header_attached():
     async with AsyncClient(transport=ASGITransport(app=app), base_url="http://localhost") as ac:
         r = await ac.get("/")
