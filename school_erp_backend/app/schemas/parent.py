@@ -133,3 +133,16 @@ class ParentCreate(BaseModel):
     password: str = Field(min_length=6, max_length=128)
     relation: Relation = Relation.GUARDIAN
     occupation: Optional[str] = None
+
+
+class ParentPasswordReset(BaseModel):
+    """Body for the school-admin "Set password" UI on the Family panel."""
+    new_password: str = Field(min_length=6, max_length=128)
+
+
+class ParentPasswordResetResult(BaseModel):
+    user_id: int
+    full_name: str
+    email: Optional[str]
+    phone: Optional[str]
+    is_active: bool
