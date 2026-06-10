@@ -35,8 +35,8 @@ class _HomeworkPageState extends State<HomeworkPage>
 
   void _loadForSelected() {
     final children = context.read<ChildrenCubit>().state;
-    if (children is ChildrenLoaded && children.selectedChildId != null) {
-      context.read<HomeworkCubit>().load(children.selectedChildId!);
+    if (children is ChildrenLoaded && children.selectedId != null) {
+      context.read<HomeworkCubit>().load(children.selectedId!);
     }
   }
 
@@ -51,7 +51,7 @@ class _HomeworkPageState extends State<HomeworkPage>
         listenWhen: (a, b) =>
             a is ChildrenLoaded &&
             b is ChildrenLoaded &&
-            a.selectedChildId != b.selectedChildId,
+            a.selectedId != b.selectedId,
         listener: (context, state) => _loadForSelected(),
         child: Scaffold(
           appBar: AppBar(
@@ -121,10 +121,10 @@ class _HomeworkList extends StatelessWidget {
     return RefreshIndicator(
       onRefresh: () async {
         final children = context.read<ChildrenCubit>().state;
-        if (children is ChildrenLoaded && children.selectedChildId != null) {
+        if (children is ChildrenLoaded && children.selectedId != null) {
           await context
               .read<HomeworkCubit>()
-              .refresh(children.selectedChildId!);
+              .refresh(children.selectedId!);
         }
       },
       child: ListView.separated(
@@ -441,10 +441,10 @@ class _HomeworkDetailPageState extends State<_HomeworkDetailPage> {
     final content = _ctrl.text.trim();
     if (content.isEmpty) return;
     final children = context.read<ChildrenCubit>().state;
-    if (children is! ChildrenLoaded || children.selectedChildId == null) return;
+    if (children is! ChildrenLoaded || children.selectedId == null) return;
     final ok = await context.read<HomeworkCubit>().submit(
           homeworkId: widget.item.id,
-          studentId: children.selectedChildId!,
+          studentId: children.selectedId!,
           content: content,
         );
     if (!mounted) return;

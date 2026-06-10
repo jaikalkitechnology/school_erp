@@ -19,8 +19,8 @@ class FeesPage extends StatefulWidget {
 class _FeesPageState extends State<FeesPage> {
   void _loadForSelected() {
     final children = context.read<ChildrenCubit>().state;
-    if (children is ChildrenLoaded && children.selectedChildId != null) {
-      context.read<FeesCubit>().load(children.selectedChildId!);
+    if (children is ChildrenLoaded && children.selectedId != null) {
+      context.read<FeesCubit>().load(children.selectedId!);
     }
   }
 
@@ -41,7 +41,7 @@ class _FeesPageState extends State<FeesPage> {
         listenWhen: (a, b) =>
             a is ChildrenLoaded &&
             b is ChildrenLoaded &&
-            a.selectedChildId != b.selectedChildId,
+            a.selectedId != b.selectedId,
         listener: (context, state) => _loadForSelected(),
         child: Scaffold(
           appBar: AppBar(title: Text(s.tabFees)),
@@ -51,10 +51,10 @@ class _FeesPageState extends State<FeesPage> {
                 onRefresh: () async {
                   final children = context.read<ChildrenCubit>().state;
                   if (children is ChildrenLoaded &&
-                      children.selectedChildId != null) {
+                      children.selectedId != null) {
                     await context
                         .read<FeesCubit>()
-                        .refresh(children.selectedChildId!);
+                        .refresh(children.selectedId!);
                   }
                 },
                 child: state is FeesLoading
@@ -310,13 +310,13 @@ class _InvoiceCard extends StatelessWidget {
   Future<void> _pay(BuildContext context, FeeInvoice invoice) async {
     final s = context.read<SettingsCubit>().state.strings;
     final children = context.read<ChildrenCubit>().state;
-    if (children is! ChildrenLoaded || children.selectedChildId == null) return;
+    if (children is! ChildrenLoaded || children.selectedId == null) return;
     // Backend creates an order_id. Razorpay SDK launch lands when a merchant
     // account is provisioned (Phase 11 deferred — see PHASE_PROGRESS.md).
     try {
       await context.read<FeesCubit>().initiatePayment(
             invoiceId: invoice.id,
-            studentId: children.selectedChildId!,
+            studentId: children.selectedId!,
           );
     } catch (_) {
       // Even if the order request itself succeeds, until the gateway is
