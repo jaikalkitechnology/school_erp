@@ -21,8 +21,8 @@ class _AttendancePageState extends State<AttendancePage> {
 
   void _loadForSelected() {
     final children = context.read<ChildrenCubit>().state;
-    if (children is ChildrenLoaded && children.selectedChildId != null) {
-      context.read<AttendanceCubit>().load(children.selectedChildId!);
+    if (children is ChildrenLoaded && children.selectedId != null) {
+      context.read<AttendanceCubit>().load(children.selectedId!);
     }
   }
 
@@ -44,7 +44,7 @@ class _AttendancePageState extends State<AttendancePage> {
         listenWhen: (a, b) =>
             a is ChildrenLoaded &&
             b is ChildrenLoaded &&
-            a.selectedChildId != b.selectedChildId,
+            a.selectedId != b.selectedId,
         listener: (context, state) => _loadForSelected(),
         child: Scaffold(
           appBar: AppBar(title: Text(s.tabAttendance)),
@@ -54,10 +54,10 @@ class _AttendancePageState extends State<AttendancePage> {
                 onRefresh: () async {
                   final children = context.read<ChildrenCubit>().state;
                   if (children is ChildrenLoaded &&
-                      children.selectedChildId != null) {
+                      children.selectedId != null) {
                     await context
                         .read<AttendanceCubit>()
-                        .refresh(children.selectedChildId!);
+                        .refresh(children.selectedId!);
                   }
                 },
                 child: ListView(

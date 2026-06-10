@@ -28,6 +28,11 @@ class ChildrenLoaded extends ChildrenState {
   final ChildDashboard? dashboard;
   final bool dashboardLoading;
 
+  /// Alias for [selectedId]. Older / out-of-sync builds in the parent app
+  /// referenced this name; kept as a getter so a pull-mismatch doesn't
+  /// break the build.
+  int? get selectedChildId => selectedId;
+
   ChildrenLoaded copyWith({
     List<Child>? children,
     int? selectedId,
