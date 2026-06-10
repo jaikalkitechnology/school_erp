@@ -763,3 +763,67 @@ async def unlink_parent_from_student(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Mapping not found")
     await session.delete(mapping)
     await session.commit()
+
+
+async def set_parent_password(
+    session: AsyncSession,
+    *,
+    tenant_id: int,
+    parent_user_id: int,
+    new_password: str,
+) -> User:
+    """Force-set the password for a parent user. Used by the school admin
+    UI when a parent was auto-created during admit (password_hash=NULL) and
+    needs login credentials, or when the parent forgot their password.
+
+    Validates that:
+    * the user exists in this tenant (defense-in-depth on top of the
+      tenant_scoped_session filter),
+    * the user has the 'parent' role (we don't expose this endpoint as a
+      generic "reset any user's password" by accident).
+    """
+    if len(new_password) < 6:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Password must be at least 6 characters",
+        )
+
+    user = (
+        await session.execute(
+            select(User).where(
+                User.id == parent_user_id, User.tenant_id == tenant_id
+            )
+        )
+    ).scalar_one_or_none()
+    if user is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="User not found"
+        )
+
+    # Make sure this is actually a parent — we don't want this endpoint
+    # being weaponised to reset a teacher's or admin's password.
+    has_parent_role = (
+        await session.execute(
+            select(UserRole.id)
+            .join(Role, Role.id == UserRole.role_id)
+            .where(
+                UserRole.user_id == user.id,
+                UserRole.tenant_id == tenant_id,
+                Role.code == "parent",
+            )
+        )
+    ).scalar_one_or_none()
+    if has_parent_role is None:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Target user is not a parent",
+        )
+
+    user.password_hash = hash_password(new_password)
+    user.is_active = True
+    # If the email/phone wasn't verified yet, flip it — the school admin
+    # vouching for the credentials counts as verification.
+    user.is_email_verified = True
+    await session.commit()
+    await session.refresh(user)
+    return user

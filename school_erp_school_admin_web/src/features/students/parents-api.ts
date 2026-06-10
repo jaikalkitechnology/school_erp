@@ -60,3 +60,22 @@ export const unlinkStudentParent = async (studentId: number, mappingId: number):
 
 export const createParent = async (payload: ParentCreatePayload): Promise<ParentSelf> =>
   (await api.post<ParentSelf>("/v1/school-admin/parents", payload)).data;
+
+export interface ParentPasswordResetResult {
+  user_id: number;
+  full_name: string;
+  email: string | null;
+  phone: string | null;
+  is_active: boolean;
+}
+
+export const setParentPassword = async (
+  parentUserId: number,
+  newPassword: string,
+): Promise<ParentPasswordResetResult> =>
+  (
+    await api.post<ParentPasswordResetResult>(
+      `/v1/school-admin/parents/${parentUserId}/set-password`,
+      { new_password: newPassword },
+    )
+  ).data;

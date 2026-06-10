@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Plus, Trash2 } from "lucide-react";
+import { KeyRound, Plus, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -9,10 +9,22 @@ import {
   createParent,
   linkStudentParent,
   listStudentParents,
+  setParentPassword,
   unlinkStudentParent,
   type AccessLevel,
   type Relation,
 } from "./parents-api";
+
+function randomPassword(): string {
+  // 10-char temp password: 8 url-safe + a digit + a symbol so it satisfies any
+  // strength heuristic and is still easy to dictate over the phone.
+  const alphabet = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789";
+  let out = "";
+  for (let i = 0; i < 8; i++) {
+    out += alphabet[Math.floor(Math.random() * alphabet.length)];
+  }
+  return `${out}@${Math.floor(10 + Math.random() * 90)}`;
+}
 
 const RELATIONS: { value: Relation; label: string }[] = [
   { value: "father", label: "Father" },
@@ -72,9 +84,15 @@ export function ParentLinksPanel({ studentId }: { studentId: number }) {
                       {[link.parent_phone, link.parent_email].filter(Boolean).join(" · ")}
                     </p>
                   </div>
-                  <Button variant="ghost" size="icon" onClick={() => remove.mutate(link.mapping_id)}>
-                    <Trash2 className="h-4 w-4 text-destructive" />
-                  </Button>
+                  <div className="flex items-center gap-1">
+                    <SetPasswordButton
+                      parentUserId={link.parent_user_id}
+                      parentName={link.parent_name}
+                    />
+                    <Button variant="ghost" size="icon" onClick={() => remove.mutate(link.mapping_id)}>
+                      <Trash2 className="h-4 w-4 text-destructive" />
+                    </Button>
+                  </div>
                 </li>
               ))}
             </ul>
@@ -272,5 +290,124 @@ function CheckboxRow({ label, checked, onChange }: { label: string; checked: boo
       />
       {label}
     </label>
+  );
+}
+
+function SetPasswordButton({ parentUserId, parentName }: { parentUserId: number; parentName: string }) {
+  const [open, setOpen] = useState(false);
+  const [password, setPassword] = useState("");
+  const [result, setResult] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  const submit = useMutation({
+    mutationFn: () => setParentPassword(parentUserId, password),
+    onSuccess: () => {
+      setResult(password);
+      setError(null);
+    },
+    onError: (e: any) => {
+      setError(e?.response?.data?.detail ?? "Could not set password.");
+    },
+  });
+
+  const reset = () => {
+    setOpen(false);
+    setPassword("");
+    setResult(null);
+    setError(null);
+    submit.reset();
+  };
+
+  return (
+    <>
+      <Button
+        variant="ghost"
+        size="icon"
+        title={`Set password for ${parentName}`}
+        onClick={() => {
+          setPassword(randomPassword());
+          setOpen(true);
+        }}
+      >
+        <KeyRound className="h-4 w-4 text-saffron-darker" />
+      </Button>
+
+      {open && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-indigo-dark/40 p-4"
+          onClick={reset}
+        >
+          <div
+            className="w-full max-w-md rounded-2xl border border-saffron-pale bg-warm-white p-6 shadow-xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h3 className="font-display text-xl text-indigo-dark">
+              Set password for {parentName}
+            </h3>
+            <p className="mt-1 text-xs text-muted-foreground">
+              Replaces the existing password (or sets one if this parent was auto-created during admission).
+              Share it with the parent over WhatsApp / SMS — they can change it later from Settings.
+            </p>
+
+            {result === null ? (
+              <>
+                <Label htmlFor="new-password" className="mt-4 block text-sm">
+                  New password
+                </Label>
+                <div className="mt-1 flex items-center gap-2">
+                  <Input
+                    id="new-password"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    autoFocus
+                    className="font-mono"
+                  />
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setPassword(randomPassword())}
+                    type="button"
+                  >
+                    Regenerate
+                  </Button>
+                </div>
+                <p className="mt-1 text-xs text-muted-foreground">Min 6 characters.</p>
+                {error && <p className="mt-3 text-sm text-destructive">{error}</p>}
+                <div className="mt-5 flex justify-end gap-2">
+                  <Button variant="ghost" onClick={reset}>
+                    Cancel
+                  </Button>
+                  <Button
+                    onClick={() => submit.mutate()}
+                    disabled={submit.isPending || password.length < 6}
+                  >
+                    {submit.isPending ? "Saving…" : "Save"}
+                  </Button>
+                </div>
+              </>
+            ) : (
+              <>
+                <div className="mt-4 rounded-xl border border-teal-pale bg-teal-pale/50 p-4">
+                  <p className="text-xs font-medium uppercase tracking-wider text-teal-dark">
+                    Password updated
+                  </p>
+                  <p className="mt-2 font-mono text-lg text-indigo-dark">{result}</p>
+                  <button
+                    type="button"
+                    className="mt-2 text-xs font-medium text-teal-dark hover:underline"
+                    onClick={() => navigator.clipboard?.writeText(result)}
+                  >
+                    Copy to clipboard
+                  </button>
+                </div>
+                <div className="mt-4 flex justify-end">
+                  <Button onClick={reset}>Done</Button>
+                </div>
+              </>
+            )}
+          </div>
+        </div>
+      )}
+    </>
   );
 }

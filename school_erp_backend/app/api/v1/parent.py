@@ -20,6 +20,8 @@ from app.schemas.parent import (
     ParentCreate,
     ParentLink,
     ParentLinkRead,
+    ParentPasswordReset,
+    ParentPasswordResetResult,
     ParentSelfRead,
     StudentDocSummary,
 )
@@ -39,6 +41,7 @@ from app.services.parents import (
     list_school_leaves,
     parent_self,
     select_child,
+    set_parent_password,
     unlink_parent_from_student,
 )
 
@@ -232,6 +235,40 @@ async def unlink_parent_route(
     session: AsyncSession = Depends(tenant_scoped_session),
 ):
     await unlink_parent_from_student(session, mapping_id)
+
+
+@sa_router.post(
+    "/parents/{parent_user_id}/set-password",
+    response_model=ParentPasswordResetResult,
+)
+async def set_parent_password_route(
+    parent_user_id: int,
+    payload: ParentPasswordReset,
+    principal: AuthPrincipal = Depends(_school_admin),
+    session: AsyncSession = Depends(tenant_scoped_session),
+):
+    """Force-set a parent's login password from the school admin UI.
+
+    Useful for parents auto-created during student admission (their
+    password_hash is NULL until either Phase 12 OTP login lands or an
+    admin sets one here). Restricted to school admin / principal /
+    vice principal / office staff via the router-level dep; further
+    locked to users that actually hold the 'parent' role inside
+    set_parent_password() itself.
+    """
+    user = await set_parent_password(
+        session,
+        tenant_id=principal.tenant_id,
+        parent_user_id=parent_user_id,
+        new_password=payload.new_password,
+    )
+    return ParentPasswordResetResult(
+        user_id=user.id,
+        full_name=user.full_name,
+        email=user.email,
+        phone=user.phone,
+        is_active=user.is_active,
+    )
 
 
 # ---- School-admin leave queue ---------------------------------------------
