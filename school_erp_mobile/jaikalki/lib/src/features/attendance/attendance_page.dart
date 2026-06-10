@@ -49,8 +49,11 @@ class _AttendancePageState extends State<AttendancePage> {
     final settings = context.watch<SettingsCubit>().state;
     final s = settings.strings;
 
-    return BlocProvider.value(
-      value: locator<AttendanceCubit>(),
+    return MultiBlocProvider(
+      providers: [
+        BlocProvider.value(value: locator<ChildrenCubit>()),
+        BlocProvider.value(value: locator<AttendanceCubit>()),
+      ],
       child: BlocListener<ChildrenCubit, ChildrenState>(
         listenWhen: (a, b) =>
             a is ChildrenLoaded &&

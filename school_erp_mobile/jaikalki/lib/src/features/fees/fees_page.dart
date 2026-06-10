@@ -35,8 +35,11 @@ class _FeesPageState extends State<FeesPage> {
     final settings = context.watch<SettingsCubit>().state;
     final s = settings.strings;
 
-    return BlocProvider.value(
-      value: locator<FeesCubit>(),
+    return MultiBlocProvider(
+      providers: [
+        BlocProvider.value(value: locator<ChildrenCubit>()),
+        BlocProvider.value(value: locator<FeesCubit>()),
+      ],
       child: BlocListener<ChildrenCubit, ChildrenState>(
         listenWhen: (a, b) =>
             a is ChildrenLoaded &&
