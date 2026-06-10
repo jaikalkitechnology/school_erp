@@ -342,12 +342,30 @@ async def student_history(
         stmt = stmt.where(StudentAttendance.date <= end)
     stmt = stmt.order_by(StudentAttendance.date.desc()).limit(limit)
     rows = list((await session.execute(stmt)).scalars().all())
+
+    # Resolve teacher names in one round-trip so the parent UI can say
+    # "Marked by Mrs. Sharma at 8:42 AM" without an extra request per row.
+    user_ids = {r.marked_by_user_id for r in rows if r.marked_by_user_id is not None}
+    names: dict[int, str] = {}
+    if user_ids:
+        from app.models.auth import User  # local import keeps the service decoupled
+        names = dict(
+            (
+                await session.execute(
+                    select(User.id, User.full_name).where(User.id.in_(user_ids))
+                )
+            ).all()
+        )
+
     return [
         StudentHistoryRow(
             date=r.date,
             period=r.period,
             status=StudentAttendanceStatus(r.status),
             remarks=r.remarks,
+            marked_by_user_id=r.marked_by_user_id,
+            marked_by_name=names.get(r.marked_by_user_id) if r.marked_by_user_id else None,
+            marked_at=r.updated_at,
         )
         for r in rows
     ]
