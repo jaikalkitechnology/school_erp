@@ -197,18 +197,24 @@ class AttendanceRow {
     required this.period,
     required this.status,
     required this.remarks,
+    required this.markedByName,
+    required this.markedAt,
   });
 
   final String date;
   final String period;
   final String status;
   final String? remarks;
+  final String? markedByName;
+  final String? markedAt;
 
   factory AttendanceRow.fromJson(Map<String, dynamic> j) => AttendanceRow(
         date: j['date'] as String,
         period: j['period'] as String,
         status: j['status'] as String,
         remarks: j['remarks'] as String?,
+        markedByName: j['marked_by_name'] as String?,
+        markedAt: j['marked_at'] as String?,
       );
 }
 

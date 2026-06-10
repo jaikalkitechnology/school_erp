@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import date
+from datetime import date, datetime
 from typing import List, Optional
 
 from pydantic import BaseModel, ConfigDict, Field
@@ -91,3 +91,6 @@ class StudentHistoryRow(BaseModel):
     period: str
     status: StudentAttendanceStatus
     remarks: Optional[str]
+    marked_by_user_id: Optional[int] = None
+    marked_by_name: Optional[str] = None
+    marked_at: Optional[datetime] = None
