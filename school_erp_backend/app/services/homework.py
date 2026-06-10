@@ -335,6 +335,20 @@ async def list_for_student(
         ).scalars().all()
     }
     today = _today()
+
+    # Resolve subject names in one round-trip so the parent UI can render
+    # "Mathematics" instead of an opaque ID.
+    subject_ids = {h.subject_id for h in homeworks if h.subject_id is not None}
+    subject_names: dict[int, str] = {}
+    if subject_ids:
+        from app.models.academic import Subject  # local import: avoids cycles
+        rows = (
+            await session.execute(
+                select(Subject.id, Subject.name).where(Subject.id.in_(subject_ids))
+            )
+        ).all()
+        subject_names = {sid: name for sid, name in rows}
+
     out: list[StudentHomeworkRow] = []
     for h in homeworks:
         sub = sub_by_hw.get(h.id)
@@ -348,11 +362,17 @@ async def list_for_student(
             StudentHomeworkRow(
                 homework_id=h.id,
                 title=h.title,
+                description=h.description,
+                assigned_on=h.assigned_on,
                 due_date=h.due_date,
                 subject_id=h.subject_id,
+                subject_name=subject_names.get(h.subject_id) if h.subject_id else None,
+                max_marks=h.max_marks,
                 submission_status=stat,
                 submitted=sub is not None,
+                submitted_at=sub.submitted_at.date() if (sub and sub.submitted_at) else None,
                 marks=sub.marks if sub else None,
+                feedback=sub.feedback if sub else None,
             )
         )
     return out

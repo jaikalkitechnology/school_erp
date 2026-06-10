@@ -3,8 +3,11 @@ import 'package:get_it/get_it.dart';
 import '../api/api_client.dart';
 import '../api/auth_repository.dart';
 import '../api/parent_repository.dart';
+import 'attendance_cubit.dart';
 import 'auth_cubit.dart';
 import 'children_cubit.dart';
+import 'fees_cubit.dart';
+import 'homework_cubit.dart';
 import 'offline_cache.dart';
 import 'settings_cubit.dart';
 
@@ -33,5 +36,21 @@ void registerDependencies() {
   }
   if (!locator.isRegistered<SettingsCubit>()) {
     locator.registerLazySingleton<SettingsCubit>(() => SettingsCubit());
+  }
+  // ----- P0 parent screens (Phases 9 / 11 / 14) ---------------------------
+  if (!locator.isRegistered<AttendanceCubit>()) {
+    locator.registerLazySingleton<AttendanceCubit>(
+      () => AttendanceCubit(locator<ParentRepository>()),
+    );
+  }
+  if (!locator.isRegistered<FeesCubit>()) {
+    locator.registerLazySingleton<FeesCubit>(
+      () => FeesCubit(locator<ParentRepository>()),
+    );
+  }
+  if (!locator.isRegistered<HomeworkCubit>()) {
+    locator.registerLazySingleton<HomeworkCubit>(
+      () => HomeworkCubit(locator<ParentRepository>()),
+    );
   }
 }

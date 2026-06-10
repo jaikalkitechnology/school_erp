@@ -101,8 +101,14 @@ class HomeworkStatusReport(BaseModel):
 class StudentHomeworkRow(BaseModel):
     homework_id: int
     title: str
+    description: Optional[str] = None
+    assigned_on: Optional[date] = None
     due_date: date
     subject_id: Optional[int]
+    subject_name: Optional[str] = None
+    max_marks: Optional[Decimal] = None
     submission_status: Optional[SubmissionStatus]
     submitted: bool
+    submitted_at: Optional[date] = None
     marks: Optional[Decimal]
+    feedback: Optional[str] = None

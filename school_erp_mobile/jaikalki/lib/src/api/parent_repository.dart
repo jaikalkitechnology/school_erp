@@ -136,6 +136,59 @@ class ParentRepository {
       return const [];
     }
   }
+
+  // ----- Phase 11: Fees -----------------------------------------------------
+
+  Future<ChildFeeView> fees(int studentId) async {
+    final res = await _api.dio.get<Map<String, dynamic>>(
+      '/v1/parent/children/$studentId/fees',
+    );
+    return ChildFeeView.fromJson(res.data ?? const {});
+  }
+
+  Future<Map<String, dynamic>> initiatePayment({
+    required int invoiceId,
+    required int studentId,
+  }) async {
+    final res = await _api.dio.post<Map<String, dynamic>>(
+      '/v1/parent/payments/initiate',
+      data: {'invoice_id': invoiceId, 'student_id': studentId},
+    );
+    return res.data ?? const {};
+  }
+
+  // ----- Phase 14: Homework -----------------------------------------------
+
+  Future<List<HomeworkItem>> homework(int studentId) async {
+    try {
+      final res = await _api.dio.get<List<dynamic>>(
+        '/v1/parent/children/$studentId/homework',
+      );
+      return (res.data ?? const [])
+          .map((e) => HomeworkItem.fromJson(e as Map<String, dynamic>))
+          .toList();
+    } on DioException {
+      return const [];
+    }
+  }
+
+  Future<void> submitHomework({
+    required int homeworkId,
+    required int studentId,
+    required String content,
+    List<String>? attachmentPaths,
+  }) async {
+    await _api.dio.post<dynamic>(
+      '/v1/parent/homework/submit',
+      data: {
+        'homework_id': homeworkId,
+        'student_id': studentId,
+        'content': content,
+        if (attachmentPaths != null && attachmentPaths.isNotEmpty)
+          'attachments': attachmentPaths,
+      },
+    );
+  }
 }
 
 class AttendanceRow {
@@ -156,5 +209,121 @@ class AttendanceRow {
         period: j['period'] as String,
         status: j['status'] as String,
         remarks: j['remarks'] as String?,
+      );
+}
+
+// ---- Phase 11 models ------------------------------------------------------
+
+class FeeInvoice {
+  FeeInvoice({
+    required this.id,
+    required this.invoiceNumber,
+    required this.categoryName,
+    required this.periodStart,
+    required this.periodEnd,
+    required this.dueDate,
+    required this.totalAmount,
+    required this.paidAmount,
+    required this.status,
+  });
+
+  final int id;
+  final String invoiceNumber;
+  final String? categoryName;
+  final String periodStart;
+  final String periodEnd;
+  final String dueDate;
+  final double totalAmount;
+  final double paidAmount;
+  final String status; // pending / partial / paid / overdue / cancelled
+
+  double get balance => totalAmount - paidAmount;
+  bool get isPaid => status == 'paid';
+
+  factory FeeInvoice.fromJson(Map<String, dynamic> j) => FeeInvoice(
+        id: (j['id'] as num).toInt(),
+        invoiceNumber: (j['invoice_number'] as String?) ?? '',
+        categoryName: j['category_name'] as String?,
+        periodStart: (j['period_start'] as String?) ?? '',
+        periodEnd: (j['period_end'] as String?) ?? '',
+        dueDate: (j['due_date'] as String?) ?? '',
+        totalAmount: (j['total_amount'] as num?)?.toDouble() ?? 0.0,
+        paidAmount: (j['paid_amount'] as num?)?.toDouble() ?? 0.0,
+        status: (j['status'] as String?) ?? 'pending',
+      );
+}
+
+class ChildFeeView {
+  ChildFeeView({
+    required this.totalDue,
+    required this.totalPaid,
+    required this.overdueCount,
+    required this.invoices,
+  });
+
+  final double totalDue;
+  final double totalPaid;
+  final int overdueCount;
+  final List<FeeInvoice> invoices;
+
+  factory ChildFeeView.fromJson(Map<String, dynamic> j) => ChildFeeView(
+        totalDue: (j['total_due'] as num?)?.toDouble() ?? 0.0,
+        totalPaid: (j['total_paid'] as num?)?.toDouble() ?? 0.0,
+        overdueCount: (j['overdue_count'] as num?)?.toInt() ?? 0,
+        invoices: ((j['invoices'] as List<dynamic>?) ?? const [])
+            .map((e) => FeeInvoice.fromJson(e as Map<String, dynamic>))
+            .toList(),
+      );
+}
+
+// ---- Phase 14 models ------------------------------------------------------
+
+class HomeworkItem {
+  HomeworkItem({
+    required this.id,
+    required this.title,
+    required this.description,
+    required this.subjectName,
+    required this.assignedOn,
+    required this.dueDate,
+    required this.maxMarks,
+    required this.submissionStatus,
+    required this.submittedAt,
+    required this.marksObtained,
+    required this.feedback,
+  });
+
+  final int id;
+  final String title;
+  final String? description;
+  final String? subjectName;
+  final String assignedOn;
+  final String dueDate;
+  final double? maxMarks;
+  final String submissionStatus; // open / submitted / late / missing / graded
+  final String? submittedAt;
+  final double? marksObtained;
+  final String? feedback;
+
+  bool get isOpen => submissionStatus == 'open';
+  bool get isSubmitted =>
+      submissionStatus == 'submitted' || submissionStatus == 'late';
+  bool get isGraded => submissionStatus == 'graded';
+
+  factory HomeworkItem.fromJson(Map<String, dynamic> j) => HomeworkItem(
+        id: ((j['homework_id'] ?? j['id']) as num).toInt(),
+        title: (j['title'] as String?) ?? '',
+        description: j['description'] as String?,
+        subjectName: j['subject_name'] as String?,
+        assignedOn: (j['assigned_on'] as String?) ?? '',
+        dueDate: (j['due_date'] as String?) ?? '',
+        maxMarks: (j['max_marks'] as num?)?.toDouble(),
+        // Backend uses "open" implicitly when null + not overdue, else "missing".
+        submissionStatus: (j['submission_status'] as String?) ??
+            ((j['submitted'] as bool?) == true ? 'submitted' : 'open'),
+        submittedAt: j['submitted_at'] as String?,
+        // Backend field is `marks` (not `marks_obtained`).
+        marksObtained: (j['marks'] as num?)?.toDouble(),
+        feedback: j['feedback'] as String?,
       );
 }
