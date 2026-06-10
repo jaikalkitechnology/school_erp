@@ -142,6 +142,146 @@ class AppStrings {
         AppLanguage.hindi: 'सेटिंग्स',
         AppLanguage.marathi: 'सेटिंग्ज',
       });
+  String get tabAttendance => _t({
+        AppLanguage.english: 'Attendance',
+        AppLanguage.hindi: 'उपस्थिति',
+        AppLanguage.marathi: 'उपस्थिती',
+      });
+  String get tabFees => _t({
+        AppLanguage.english: 'Fees',
+        AppLanguage.hindi: 'फीस',
+        AppLanguage.marathi: 'शुल्क',
+      });
+  String get tabHomework => _t({
+        AppLanguage.english: 'Homework',
+        AppLanguage.hindi: 'गृहकार्य',
+        AppLanguage.marathi: 'गृहपाठ',
+      });
+  String get tabMore => _t({
+        AppLanguage.english: 'More',
+        AppLanguage.hindi: 'और',
+        AppLanguage.marathi: 'अधिक',
+      });
+
+  // Parent screens — P0 (Phases 9 / 11 / 14)
+  String get attendanceMonthlyPercent => _t({
+        AppLanguage.english: 'This month',
+        AppLanguage.hindi: 'इस महीने',
+        AppLanguage.marathi: 'या महिन्यात',
+      });
+  String get statusPresent => _t({
+        AppLanguage.english: 'Present',
+        AppLanguage.hindi: 'उपस्थित',
+        AppLanguage.marathi: 'उपस्थित',
+      });
+  String get statusAbsent => _t({
+        AppLanguage.english: 'Absent',
+        AppLanguage.hindi: 'अनुपस्थित',
+        AppLanguage.marathi: 'अनुपस्थित',
+      });
+  String get statusLate => _t({
+        AppLanguage.english: 'Late',
+        AppLanguage.hindi: 'देर से',
+        AppLanguage.marathi: 'उशीरा',
+      });
+  String get statusHalfDay => _t({
+        AppLanguage.english: 'Half day',
+        AppLanguage.hindi: 'आधा दिन',
+        AppLanguage.marathi: 'अर्धा दिवस',
+      });
+  String get statusLeave => _t({
+        AppLanguage.english: 'On leave',
+        AppLanguage.hindi: 'अवकाश',
+        AppLanguage.marathi: 'रजेवर',
+      });
+  String get feesOutstanding => _t({
+        AppLanguage.english: 'Outstanding',
+        AppLanguage.hindi: 'बकाया',
+        AppLanguage.marathi: 'थकीत',
+      });
+  String get feesPaid => _t({
+        AppLanguage.english: 'Paid',
+        AppLanguage.hindi: 'भुगतान किया',
+        AppLanguage.marathi: 'भरलेले',
+      });
+  String get feesPayNow => _t({
+        AppLanguage.english: 'Pay now',
+        AppLanguage.hindi: 'अभी भुगतान करें',
+        AppLanguage.marathi: 'आता भरा',
+      });
+  String get feesDueOn => _t({
+        AppLanguage.english: 'Due on',
+        AppLanguage.hindi: 'देय तिथि',
+        AppLanguage.marathi: 'अंतिम तारीख',
+      });
+  String get feesNoInvoices => _t({
+        AppLanguage.english: 'No fee invoices yet.',
+        AppLanguage.hindi: 'अभी कोई फीस बिल नहीं है।',
+        AppLanguage.marathi: 'अद्याप कोणतेही शुल्क बीजक नाही.',
+      });
+  String get hwOpen => _t({
+        AppLanguage.english: 'Open',
+        AppLanguage.hindi: 'खुला',
+        AppLanguage.marathi: 'सुरू',
+      });
+  String get hwSubmitted => _t({
+        AppLanguage.english: 'Submitted',
+        AppLanguage.hindi: 'जमा किया',
+        AppLanguage.marathi: 'सादर केले',
+      });
+  String get hwGraded => _t({
+        AppLanguage.english: 'Graded',
+        AppLanguage.hindi: 'जाँचा गया',
+        AppLanguage.marathi: 'तपासले',
+      });
+  String get hwSubmitButton => _t({
+        AppLanguage.english: 'Submit homework',
+        AppLanguage.hindi: 'गृहकार्य जमा करें',
+        AppLanguage.marathi: 'गृहपाठ सादर करा',
+      });
+  String get hwAnswerHint => _t({
+        AppLanguage.english: 'Type the answer here…',
+        AppLanguage.hindi: 'यहाँ उत्तर लिखें…',
+        AppLanguage.marathi: 'येथे उत्तर लिहा…',
+      });
+  String get hwDueOn => _t({
+        AppLanguage.english: 'Due',
+        AppLanguage.hindi: 'देय',
+        AppLanguage.marathi: 'अंतिम',
+      });
+  String get hwTeacherFeedback => _t({
+        AppLanguage.english: 'Teacher feedback',
+        AppLanguage.hindi: 'शिक्षक की प्रतिक्रिया',
+        AppLanguage.marathi: 'शिक्षक प्रतिक्रिया',
+      });
+  String get hwMarks => _t({
+        AppLanguage.english: 'Marks',
+        AppLanguage.hindi: 'अंक',
+        AppLanguage.marathi: 'गुण',
+      });
+  String get hwSubmitSuccess => _t({
+        AppLanguage.english: 'Homework submitted.',
+        AppLanguage.hindi: 'गृहकार्य जमा हो गया।',
+        AppLanguage.marathi: 'गृहपाठ सादर झाला.',
+      });
+  String get hwSubmitFailed => _t({
+        AppLanguage.english: 'Could not submit. Try again.',
+        AppLanguage.hindi: 'जमा नहीं हो सका। पुनः प्रयास करें।',
+        AppLanguage.marathi: 'सादर करता आले नाही. पुन्हा प्रयत्न करा.',
+      });
+  String get hwNoneOpen => _t({
+        AppLanguage.english: 'No open homework. Nice work!',
+        AppLanguage.hindi: 'कोई खुला गृहकार्य नहीं। बहुत अच्छे!',
+        AppLanguage.marathi: 'कोणतेही प्रलंबित गृहपाठ नाही. छान!',
+      });
+  String get paymentNotConfigured => _t({
+        AppLanguage.english:
+            'Online payment is not yet enabled for this school. Pay at the office or via bank transfer.',
+        AppLanguage.hindi:
+            'इस स्कूल के लिए ऑनलाइन भुगतान अभी सक्षम नहीं है। कार्यालय में या बैंक से भुगतान करें।',
+        AppLanguage.marathi:
+            'या शाळेसाठी ऑनलाइन भरणा अद्याप सुरू नाही. कार्यालयात किंवा बँकेद्वारे भरा.',
+      });
 
   // Settings
   String get language => _t({

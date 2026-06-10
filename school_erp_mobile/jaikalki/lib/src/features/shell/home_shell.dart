@@ -3,11 +3,12 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../core/auth_cubit.dart';
-import '../../core/service_locator.dart';
 import '../../core/settings_cubit.dart';
+import '../attendance/attendance_page.dart';
 import '../dashboard/dashboard_page.dart';
-import '../notifications/notifications_page.dart';
-import '../settings/settings_page.dart';
+import '../fees/fees_page.dart';
+import '../homework/homework_page.dart';
+import 'more_page.dart';
 
 class HomeShell extends StatefulWidget {
   const HomeShell({super.key});
@@ -24,10 +25,15 @@ class _HomeShellState extends State<HomeShell> {
     return BlocBuilder<SettingsCubit, SettingsState>(
       builder: (context, settings) {
         final s = settings.strings;
-        final pages = const [
+        // IndexedStack keeps every tab alive so child-switcher + scroll
+        // state survives jumps. Notifications + Settings live behind the
+        // "More" tab to keep the bottom nav at 5 max.
+        const pages = [
           DashboardPage(),
-          NotificationsPage(),
-          SettingsPage(),
+          AttendancePage(),
+          FeesPage(),
+          HomeworkPage(),
+          MorePage(),
         ];
         return BlocListener<AuthCubit, AuthState>(
           listenWhen: (prev, curr) => curr is AuthInitial && prev is AuthAuthenticated,
@@ -35,11 +41,6 @@ class _HomeShellState extends State<HomeShell> {
             if (state is AuthInitial) context.go('/login');
           },
           child: Scaffold(
-            appBar: _index == 0
-                ? null
-                : AppBar(
-                    title: Text(_index == 1 ? s.tabNotifications : s.tabSettings),
-                  ),
             body: IndexedStack(index: _index, children: pages),
             bottomNavigationBar: NavigationBar(
               selectedIndex: _index,
@@ -51,14 +52,24 @@ class _HomeShellState extends State<HomeShell> {
                   label: s.tabHome,
                 ),
                 NavigationDestination(
-                  icon: const Icon(Icons.notifications_outlined),
-                  selectedIcon: const Icon(Icons.notifications_rounded),
-                  label: s.tabNotifications,
+                  icon: const Icon(Icons.event_available_outlined),
+                  selectedIcon: const Icon(Icons.event_available_rounded),
+                  label: s.tabAttendance,
                 ),
                 NavigationDestination(
-                  icon: const Icon(Icons.settings_outlined),
-                  selectedIcon: const Icon(Icons.settings_rounded),
-                  label: s.tabSettings,
+                  icon: const Icon(Icons.payments_outlined),
+                  selectedIcon: const Icon(Icons.payments_rounded),
+                  label: s.tabFees,
+                ),
+                NavigationDestination(
+                  icon: const Icon(Icons.menu_book_outlined),
+                  selectedIcon: const Icon(Icons.menu_book_rounded),
+                  label: s.tabHomework,
+                ),
+                NavigationDestination(
+                  icon: const Icon(Icons.more_horiz_outlined),
+                  selectedIcon: const Icon(Icons.more_horiz_rounded),
+                  label: s.tabMore,
                 ),
               ],
             ),
