@@ -45,8 +45,11 @@ class _HomeworkPageState extends State<HomeworkPage>
     final settings = context.watch<SettingsCubit>().state;
     final s = settings.strings;
 
-    return BlocProvider.value(
-      value: locator<HomeworkCubit>(),
+    return MultiBlocProvider(
+      providers: [
+        BlocProvider.value(value: locator<ChildrenCubit>()),
+        BlocProvider.value(value: locator<HomeworkCubit>()),
+      ],
       child: BlocListener<ChildrenCubit, ChildrenState>(
         listenWhen: (a, b) =>
             a is ChildrenLoaded &&
