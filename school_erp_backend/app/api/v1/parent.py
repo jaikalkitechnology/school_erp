@@ -26,6 +26,7 @@ from app.schemas.parent import (
 from app.services.parents import (
     apply_leave,
     attendance_history_for_parent,
+    class_average_for_parent,
     create_parent_user,
     dashboard_for_child,
     decide_leave,
@@ -33,6 +34,7 @@ from app.services.parents import (
     list_children,
     list_documents_for_child,
     list_leaves_for_user,
+    subject_attendance_for_parent,
     list_parent_links,
     list_school_leaves,
     parent_self,
@@ -111,6 +113,38 @@ async def child_attendance(
         user_id=principal.user_id,
         student_id=student_id,
         limit=limit,
+    )
+
+
+@router.get("/children/{student_id}/attendance/by-subject")
+async def child_attendance_by_subject(
+    student_id: int,
+    window_days: int = Query(default=90, ge=7, le=365),
+    principal: AuthPrincipal = Depends(_parent_role),
+    session: AsyncSession = Depends(platform_session),
+):
+    return await subject_attendance_for_parent(
+        session,
+        tenant_id=principal.tenant_id,
+        user_id=principal.user_id,
+        student_id=student_id,
+        window_days=window_days,
+    )
+
+
+@router.get("/children/{student_id}/attendance/class-average")
+async def child_attendance_class_average(
+    student_id: int,
+    window_days: int = Query(default=30, ge=7, le=180),
+    principal: AuthPrincipal = Depends(_parent_role),
+    session: AsyncSession = Depends(platform_session),
+):
+    return await class_average_for_parent(
+        session,
+        tenant_id=principal.tenant_id,
+        user_id=principal.user_id,
+        student_id=student_id,
+        window_days=window_days,
     )
 
 

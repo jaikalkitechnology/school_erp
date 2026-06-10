@@ -402,6 +402,60 @@ async def attendance_history_for_parent(
     return await student_history(session, student_id=student_id, limit=limit)
 
 
+async def _require_linked_child(
+    session: AsyncSession, *, tenant_id: int, user_id: int, student_id: int,
+) -> None:
+    parent = await _find_parent_for_user(session, tenant_id, user_id)
+    if parent is None:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Not a parent account")
+    linked = (
+        await session.execute(
+            select(ParentChildMapping.id).where(
+                ParentChildMapping.parent_id == parent.id,
+                ParentChildMapping.student_id == student_id,
+            )
+        )
+    ).scalar_one_or_none()
+    if linked is None:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Child not linked")
+
+
+async def subject_attendance_for_parent(
+    session: AsyncSession,
+    *,
+    tenant_id: int,
+    user_id: int,
+    student_id: int,
+    window_days: int = 90,
+):
+    await _require_linked_child(
+        session, tenant_id=tenant_id, user_id=user_id, student_id=student_id,
+    )
+    from app.services.attendance import student_attendance_by_subject
+
+    return await student_attendance_by_subject(
+        session, student_id=student_id, window_days=window_days,
+    )
+
+
+async def class_average_for_parent(
+    session: AsyncSession,
+    *,
+    tenant_id: int,
+    user_id: int,
+    student_id: int,
+    window_days: int = 30,
+):
+    await _require_linked_child(
+        session, tenant_id=tenant_id, user_id=user_id, student_id=student_id,
+    )
+    from app.services.attendance import student_vs_class_average
+
+    return await student_vs_class_average(
+        session, student_id=student_id, window_days=window_days,
+    )
+
+
 async def list_documents_for_child(
     session: AsyncSession, tenant_id: int, user_id: int, student_id: int
 ) -> list[StudentDocSummary]:

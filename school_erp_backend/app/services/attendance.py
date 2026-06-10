@@ -15,12 +15,15 @@ from app.models.attendance import StudentAttendance, StudentAttendanceStatus
 from app.models.parent import Student
 from app.schemas.attendance import (
     AttendanceMarkRequest,
+    ClassAverageRow,
     DefaulterRow,
     SectionMonthlyReport,
     SectionRoll,
     StudentHistoryRow,
     StudentMonthlySummary,
     StudentRollEntry,
+    SubjectAttendanceReport,
+    SubjectAttendanceRow,
 )
 
 
@@ -385,3 +388,207 @@ async def today_status_for_student(
         )
     ).scalar_one_or_none()
     return row
+
+
+# ---- Subject-wise attendance (joins timetable) ----------------------------
+
+
+async def student_attendance_by_subject(
+    session: AsyncSession,
+    *,
+    student_id: int,
+    window_days: int = 90,
+) -> SubjectAttendanceReport:
+    """Bucket the student's per-period attendance rows by subject.
+
+    The join goes attendance.period (a period number stored as text) →
+    timetable_entries(section, day_of_week, period_number) → subject.
+    If the school only records day-level attendance, every row has
+    period='day' and we have nothing to bucket — return an empty list
+    with an explanatory note.
+    """
+    from app.models.academic import Subject
+    from app.models.timetable import TimetableEntry
+
+    student = (
+        await session.execute(select(Student).where(Student.id == student_id))
+    ).scalar_one_or_none()
+    if student is None or student.section_id is None:
+        return SubjectAttendanceReport(rows=[], window_days=window_days,
+                                       note="Student has no section assigned.")
+
+    end = _date.today()
+    start = end - timedelta_days(window_days - 1)
+
+    rows = list(
+        (
+            await session.execute(
+                select(StudentAttendance).where(
+                    StudentAttendance.student_id == student_id,
+                    StudentAttendance.date >= start,
+                    StudentAttendance.date <= end,
+                    StudentAttendance.period != "day",
+                )
+            )
+        ).scalars().all()
+    )
+    if not rows:
+        return SubjectAttendanceReport(
+            rows=[], window_days=window_days,
+            note=(
+                "This school records attendance once per day, not per subject. "
+                "Switch to period-wise attendance to see this breakdown."
+            ),
+        )
+
+    # Build a lookup: (day_of_week, period_number) -> subject_id
+    tt = list(
+        (
+            await session.execute(
+                select(TimetableEntry).where(
+                    TimetableEntry.section_id == student.section_id,
+                )
+            )
+        ).scalars().all()
+    )
+    by_slot: dict[tuple[int, int], int] = {}
+    for e in tt:
+        if e.subject_id is not None:
+            by_slot[(e.day_of_week, e.period_number)] = e.subject_id
+
+    subj_counts: dict[int, dict[str, int]] = {}
+    for r in rows:
+        try:
+            period_no = int(r.period)
+        except (TypeError, ValueError):
+            continue
+        # Python's weekday(): 0=Mon..6=Sun — matches our timetable convention.
+        slot = (r.date.weekday(), period_no)
+        sid = by_slot.get(slot)
+        if sid is None:
+            continue
+        bucket = subj_counts.setdefault(
+            sid, {"present": 0, "late": 0, "half_day": 0, "absent": 0}
+        )
+        if r.status in bucket:
+            bucket[r.status] += 1
+
+    if not subj_counts:
+        return SubjectAttendanceReport(
+            rows=[], window_days=window_days,
+            note=(
+                "Period attendance found but no matching timetable slots. "
+                "Ask the school to publish the timetable for this section."
+            ),
+        )
+
+    subject_ids = list(subj_counts.keys())
+    name_rows = (
+        await session.execute(
+            select(Subject.id, Subject.name).where(Subject.id.in_(subject_ids))
+        )
+    ).all()
+    names = {sid: name for sid, name in name_rows}
+
+    out: list[SubjectAttendanceRow] = []
+    for sid, b in subj_counts.items():
+        total = b["present"] + b["late"] + b["half_day"] + b["absent"]
+        pct = ((b["present"] + b["late"] + 0.5 * b["half_day"]) / total * 100) if total else 0.0
+        out.append(
+            SubjectAttendanceRow(
+                subject_id=sid,
+                subject_name=names.get(sid, f"Subject #{sid}"),
+                present=b["present"],
+                late=b["late"],
+                half_day=b["half_day"],
+                absent=b["absent"],
+                total=total,
+                percentage=round(pct, 2),
+            )
+        )
+    out.sort(key=lambda r: r.percentage)  # lowest first — most actionable
+    return SubjectAttendanceReport(rows=out, window_days=window_days)
+
+
+# ---- Class-average comparison --------------------------------------------
+
+
+async def student_vs_class_average(
+    session: AsyncSession,
+    *,
+    student_id: int,
+    window_days: int = 30,
+) -> ClassAverageRow:
+    """Average per-student attendance % across the section over the
+    window, vs the child's own number."""
+
+    student = (
+        await session.execute(select(Student).where(Student.id == student_id))
+    ).scalar_one_or_none()
+    if student is None or student.section_id is None:
+        return ClassAverageRow(
+            child_pct=0.0, class_pct=0.0, class_size=0,
+            window_days=window_days, child_attendance_days=0,
+        )
+
+    end = _date.today()
+    start = end - timedelta_days(window_days - 1)
+
+    classmates = list(
+        (
+            await session.execute(
+                select(Student.id).where(
+                    Student.section_id == student.section_id,
+                    Student.is_active.is_(True),
+                )
+            )
+        ).scalars().all()
+    )
+
+    rows = list(
+        (
+            await session.execute(
+                select(
+                    StudentAttendance.student_id,
+                    StudentAttendance.status,
+                    func.count(StudentAttendance.id),
+                ).where(
+                    StudentAttendance.student_id.in_(classmates),
+                    StudentAttendance.date >= start,
+                    StudentAttendance.date <= end,
+                ).group_by(StudentAttendance.student_id, StudentAttendance.status)
+            )
+        ).all()
+    )
+
+    by_student: dict[int, dict[str, int]] = {sid: {} for sid in classmates}
+    for sid, st, n in rows:
+        by_student.setdefault(sid, {})[st] = int(n)
+
+    def _pct(b: dict[str, int]) -> tuple[float, int]:
+        present = b.get(StudentAttendanceStatus.PRESENT.value, 0)
+        late = b.get(StudentAttendanceStatus.LATE.value, 0)
+        half = b.get(StudentAttendanceStatus.HALF_DAY.value, 0)
+        absent = b.get(StudentAttendanceStatus.ABSENT.value, 0)
+        total = present + late + half + absent
+        if total == 0:
+            return 0.0, 0
+        return (present + late + 0.5 * half) / total * 100, total
+
+    child_pct, child_days = _pct(by_student.get(student_id, {}))
+    pcts = [_pct(b)[0] for b in by_student.values() if _pct(b)[1] > 0]
+    class_pct = sum(pcts) / len(pcts) if pcts else 0.0
+
+    return ClassAverageRow(
+        child_pct=round(child_pct, 2),
+        class_pct=round(class_pct, 2),
+        class_size=len([1 for b in by_student.values() if _pct(b)[1] > 0]),
+        window_days=window_days,
+        child_attendance_days=child_days,
+    )
+
+
+def timedelta_days(days: int):
+    """Tiny helper so we don't import datetime.timedelta everywhere."""
+    from datetime import timedelta
+    return timedelta(days=days)
