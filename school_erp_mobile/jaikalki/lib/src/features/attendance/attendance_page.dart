@@ -81,6 +81,12 @@ class _AttendancePageState extends State<AttendancePage> {
                       _TodayCard(rows: state.rows, s: s),
                       const SizedBox(height: 12),
                       _ThresholdBanner(rows: state.rows, s: s),
+                      if (state.classAverage != null &&
+                          state.classAverage!.isMeaningful)
+                        _ClassAverageCard(avg: state.classAverage!),
+                      if (state.classAverage != null &&
+                          state.classAverage!.isMeaningful)
+                        const SizedBox(height: 12),
                     ],
                     _MonthHeader(
                       month: _month,
@@ -106,6 +112,11 @@ class _AttendancePageState extends State<AttendancePage> {
                     const SizedBox(height: 18),
                     if (state is AttendanceLoaded)
                       _TrendLine(rows: state.rows, s: s),
+                    if (state is AttendanceLoaded &&
+                        state.bySubject != null) ...[
+                      const SizedBox(height: 16),
+                      _SubjectBreakdown(report: state.bySubject!),
+                    ],
                     const SizedBox(height: 16),
                     _Legend(s: s),
                   ],
@@ -837,6 +848,323 @@ class _TrendLine extends StatelessWidget {
             ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+// ---- Class-average comparison --------------------------------------------
+
+class _ClassAverageCard extends StatelessWidget {
+  const _ClassAverageCard({required this.avg});
+  final ClassAverage avg;
+
+  @override
+  Widget build(BuildContext context) {
+    final above = avg.isAboveAverage;
+    final accent = above ? JaikalkiBrand.tealDark : const Color(0xFFD32F2F);
+    final gap = avg.gap.abs();
+
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: JaikalkiBrand.warmWhite,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: JaikalkiBrand.saffronPale),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Icon(Icons.groups_rounded,
+                  size: 18, color: JaikalkiBrand.indigoDark),
+              const SizedBox(width: 6),
+              const Text(
+                'Vs class average',
+                style: TextStyle(
+                  fontWeight: FontWeight.w700,
+                  color: JaikalkiBrand.indigoDark,
+                ),
+              ),
+              const Spacer(),
+              Text(
+                '${avg.windowDays}d · ${avg.classSize} students',
+                style: const TextStyle(
+                  fontSize: 11,
+                  color: JaikalkiBrand.textSecondary,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          Row(
+            children: [
+              Expanded(
+                child: _AvgColumn(
+                  label: 'Your child',
+                  pct: avg.childPct,
+                  color: accent,
+                  emphasis: true,
+                ),
+              ),
+              Container(
+                width: 1, height: 44,
+                color: JaikalkiBrand.saffronPale,
+              ),
+              Expanded(
+                child: _AvgColumn(
+                  label: 'Class avg',
+                  pct: avg.classPct,
+                  color: JaikalkiBrand.indigo,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          Row(
+            children: [
+              Icon(
+                above ? Icons.trending_up : Icons.trending_down,
+                size: 14,
+                color: accent,
+              ),
+              const SizedBox(width: 4),
+              Text(
+                above
+                    ? '+${gap.toStringAsFixed(1)}% above class'
+                    : '−${gap.toStringAsFixed(1)}% below class',
+                style: TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                  color: accent,
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _AvgColumn extends StatelessWidget {
+  const _AvgColumn({
+    required this.label,
+    required this.pct,
+    required this.color,
+    this.emphasis = false,
+  });
+
+  final String label;
+  final double pct;
+  final Color color;
+  final bool emphasis;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      children: [
+        Text(
+          label,
+          style: const TextStyle(
+            fontSize: 11,
+            color: JaikalkiBrand.textSecondary,
+            fontWeight: FontWeight.w600,
+            letterSpacing: 0.4,
+          ),
+        ),
+        const SizedBox(height: 2),
+        Text(
+          '${pct.toStringAsFixed(1)}%',
+          style: TextStyle(
+            fontSize: emphasis ? 26 : 22,
+            fontWeight: FontWeight.w700,
+            color: color,
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+// ---- Subject-wise breakdown ----------------------------------------------
+
+class _SubjectBreakdown extends StatelessWidget {
+  const _SubjectBreakdown({required this.report});
+  final SubjectAttendanceReport report;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: JaikalkiBrand.warmWhite,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: JaikalkiBrand.saffronPale),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Icon(Icons.subject_rounded,
+                  size: 18, color: JaikalkiBrand.indigoDark),
+              const SizedBox(width: 6),
+              const Text(
+                'By subject',
+                style: TextStyle(
+                  fontWeight: FontWeight.w700,
+                  color: JaikalkiBrand.indigoDark,
+                ),
+              ),
+              const Spacer(),
+              if (report.windowDays > 0)
+                Text(
+                  'last ${report.windowDays}d',
+                  style: const TextStyle(
+                    fontSize: 11,
+                    color: JaikalkiBrand.textSecondary,
+                  ),
+                ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          if (report.isEmpty)
+            Text(
+              report.note ?? 'No subject-wise data yet.',
+              style: const TextStyle(
+                fontSize: 12,
+                color: JaikalkiBrand.textSecondary,
+                height: 1.4,
+              ),
+            )
+          else ...[
+            for (final row in report.rows) _SubjectBar(row: row),
+            const SizedBox(height: 4),
+            Row(
+              children: [
+                Container(
+                  width: 8, height: 8,
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFD32F2F),
+                    borderRadius: BorderRadius.circular(1),
+                  ),
+                ),
+                const SizedBox(width: 4),
+                const Text(
+                  'dotted line = 75% exam cutoff',
+                  style: TextStyle(
+                    fontSize: 10,
+                    color: JaikalkiBrand.textSecondary,
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+class _SubjectBar extends StatelessWidget {
+  const _SubjectBar({required this.row});
+  final SubjectAttendanceRow row;
+
+  @override
+  Widget build(BuildContext context) {
+    final pct = row.percentage.clamp(0, 100).toDouble();
+    final isBelow = pct < 75;
+    final fillColor =
+        isBelow ? const Color(0xFFD32F2F) : JaikalkiBrand.tealDark;
+
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 10),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  row.subjectName,
+                  style: const TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                    color: JaikalkiBrand.indigoDark,
+                  ),
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+              Text(
+                '${pct.toStringAsFixed(0)}%',
+                style: TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w700,
+                  color: fillColor,
+                ),
+              ),
+              const SizedBox(width: 6),
+              Text(
+                '${row.present + row.late + (row.halfDay > 0 ? 1 : 0)}/${row.total}',
+                style: const TextStyle(
+                  fontSize: 10,
+                  color: JaikalkiBrand.textSecondary,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 4),
+          LayoutBuilder(
+            builder: (context, constraints) {
+              final width = constraints.maxWidth;
+              final fillWidth = (pct / 100) * width;
+              final cutoffX = 0.75 * width;
+              return Stack(
+                children: [
+                  Container(
+                    height: 8,
+                    width: width,
+                    decoration: BoxDecoration(
+                      color: JaikalkiBrand.saffronPale,
+                      borderRadius: BorderRadius.circular(4),
+                    ),
+                  ),
+                  Container(
+                    height: 8,
+                    width: fillWidth,
+                    decoration: BoxDecoration(
+                      color: fillColor,
+                      borderRadius: BorderRadius.circular(4),
+                    ),
+                  ),
+                  Positioned(
+                    left: cutoffX - 0.5,
+                    top: -2,
+                    bottom: -2,
+                    child: const _CutoffMarker(),
+                  ),
+                ],
+              );
+            },
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _CutoffMarker extends StatelessWidget {
+  const _CutoffMarker();
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: 1.5,
+      decoration: BoxDecoration(
+        color: const Color(0xFFD32F2F).withOpacity(0.7),
+        borderRadius: BorderRadius.circular(1),
       ),
     );
   }

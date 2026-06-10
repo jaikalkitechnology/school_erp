@@ -137,6 +137,36 @@ class ParentRepository {
     }
   }
 
+  Future<SubjectAttendanceReport> attendanceBySubject(
+    int studentId, {
+    int windowDays = 90,
+  }) async {
+    try {
+      final res = await _api.dio.get<Map<String, dynamic>>(
+        '/v1/parent/children/$studentId/attendance/by-subject',
+        queryParameters: {'window_days': windowDays},
+      );
+      return SubjectAttendanceReport.fromJson(res.data ?? const {});
+    } on DioException {
+      return const SubjectAttendanceReport(rows: [], windowDays: 0, note: null);
+    }
+  }
+
+  Future<ClassAverage?> attendanceClassAverage(
+    int studentId, {
+    int windowDays = 30,
+  }) async {
+    try {
+      final res = await _api.dio.get<Map<String, dynamic>>(
+        '/v1/parent/children/$studentId/attendance/class-average',
+        queryParameters: {'window_days': windowDays},
+      );
+      return ClassAverage.fromJson(res.data ?? const {});
+    } on DioException {
+      return null;
+    }
+  }
+
   // ----- Phase 11: Fees -----------------------------------------------------
 
   Future<ChildFeeView> fees(int studentId) async {
@@ -215,6 +245,91 @@ class AttendanceRow {
         remarks: j['remarks'] as String?,
         markedByName: j['marked_by_name'] as String?,
         markedAt: j['marked_at'] as String?,
+      );
+}
+
+class SubjectAttendanceRow {
+  const SubjectAttendanceRow({
+    required this.subjectId,
+    required this.subjectName,
+    required this.present,
+    required this.late,
+    required this.halfDay,
+    required this.absent,
+    required this.total,
+    required this.percentage,
+  });
+
+  final int subjectId;
+  final String subjectName;
+  final int present;
+  final int late;
+  final int halfDay;
+  final int absent;
+  final int total;
+  final double percentage;
+
+  factory SubjectAttendanceRow.fromJson(Map<String, dynamic> j) =>
+      SubjectAttendanceRow(
+        subjectId: (j['subject_id'] as num).toInt(),
+        subjectName: j['subject_name'] as String? ?? '',
+        present: (j['present'] as num?)?.toInt() ?? 0,
+        late: (j['late'] as num?)?.toInt() ?? 0,
+        halfDay: (j['half_day'] as num?)?.toInt() ?? 0,
+        absent: (j['absent'] as num?)?.toInt() ?? 0,
+        total: (j['total'] as num?)?.toInt() ?? 0,
+        percentage: (j['percentage'] as num?)?.toDouble() ?? 0.0,
+      );
+}
+
+class SubjectAttendanceReport {
+  const SubjectAttendanceReport({
+    required this.rows,
+    required this.windowDays,
+    required this.note,
+  });
+
+  final List<SubjectAttendanceRow> rows;
+  final int windowDays;
+  final String? note;
+
+  bool get isEmpty => rows.isEmpty;
+
+  factory SubjectAttendanceReport.fromJson(Map<String, dynamic> j) =>
+      SubjectAttendanceReport(
+        rows: ((j['rows'] as List<dynamic>?) ?? const [])
+            .map((e) => SubjectAttendanceRow.fromJson(e as Map<String, dynamic>))
+            .toList(),
+        windowDays: (j['window_days'] as num?)?.toInt() ?? 0,
+        note: j['note'] as String?,
+      );
+}
+
+class ClassAverage {
+  const ClassAverage({
+    required this.childPct,
+    required this.classPct,
+    required this.classSize,
+    required this.windowDays,
+    required this.childAttendanceDays,
+  });
+
+  final double childPct;
+  final double classPct;
+  final int classSize;
+  final int windowDays;
+  final int childAttendanceDays;
+
+  double get gap => childPct - classPct;
+  bool get isAboveAverage => gap >= 0;
+  bool get isMeaningful => childAttendanceDays > 0 && classSize > 1;
+
+  factory ClassAverage.fromJson(Map<String, dynamic> j) => ClassAverage(
+        childPct: (j['child_pct'] as num?)?.toDouble() ?? 0.0,
+        classPct: (j['class_pct'] as num?)?.toDouble() ?? 0.0,
+        classSize: (j['class_size'] as num?)?.toInt() ?? 0,
+        windowDays: (j['window_days'] as num?)?.toInt() ?? 0,
+        childAttendanceDays: (j['child_attendance_days'] as num?)?.toInt() ?? 0,
       );
 }
 
