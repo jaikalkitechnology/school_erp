@@ -399,13 +399,25 @@ async def student_attendance_by_subject(
     student_id: int,
     window_days: int = 90,
 ) -> SubjectAttendanceReport:
-    """Bucket the student's per-period attendance rows by subject.
+    """Bucket the student's attendance rows by subject.
 
-    The join goes attendance.period (a period number stored as text) →
-    timetable_entries(section, day_of_week, period_number) → subject.
-    If the school only records day-level attendance, every row has
-    period='day' and we have nothing to bucket — return an empty list
-    with an explanatory note.
+    Two modes:
+
+    1. **Period-level mode** — if the school records attendance per
+       period (rows with ``period != 'day'``), bucket each row via the
+       timetable lookup ``(day_of_week, period_number) -> subject``.
+
+    2. **Day-level projection** — if the school marks attendance once
+       per day, project each ``period='day'`` row across every subject
+       the timetable says runs on that weekday. A kid absent on Tuesday
+       counts as absent for every subject scheduled on Tuesday. Over
+       enough weeks, subjects that meet on days the kid skips show up
+       as the lower bars — which is exactly what a parent needs to see.
+
+    We never *fabricate* attendance; we only repeat what the school
+    actually recorded. The note in the response makes the projection
+    explicit so a parent knows the breakdown isn't subject-specific
+    measurement.
     """
     from app.models.academic import Subject
     from app.models.timetable import TimetableEntry
@@ -420,28 +432,28 @@ async def student_attendance_by_subject(
     end = _date.today()
     start = end - timedelta_days(window_days - 1)
 
-    rows = list(
+    # Pull *every* row in the window, both period and day.
+    all_rows = list(
         (
             await session.execute(
                 select(StudentAttendance).where(
                     StudentAttendance.student_id == student_id,
                     StudentAttendance.date >= start,
                     StudentAttendance.date <= end,
-                    StudentAttendance.period != "day",
                 )
             )
         ).scalars().all()
     )
-    if not rows:
+    if not all_rows:
         return SubjectAttendanceReport(
             rows=[], window_days=window_days,
-            note=(
-                "This school records attendance once per day, not per subject. "
-                "Switch to period-wise attendance to see this breakdown."
-            ),
+            note="No attendance recorded in the last window.",
         )
 
-    # Build a lookup: (day_of_week, period_number) -> subject_id
+    period_rows = [r for r in all_rows if r.period != "day"]
+    day_rows = [r for r in all_rows if r.period == "day"]
+
+    # ---- Timetable lookups (one query, two indexes) -----------------------
     tt = list(
         (
             await session.execute(
@@ -452,33 +464,56 @@ async def student_attendance_by_subject(
         ).scalars().all()
     )
     by_slot: dict[tuple[int, int], int] = {}
+    by_weekday: dict[int, set[int]] = {}  # weekday -> set of subject_ids
     for e in tt:
-        if e.subject_id is not None:
-            by_slot[(e.day_of_week, e.period_number)] = e.subject_id
+        if e.subject_id is None:
+            continue
+        by_slot[(e.day_of_week, e.period_number)] = e.subject_id
+        by_weekday.setdefault(e.day_of_week, set()).add(e.subject_id)
 
+    if not by_slot and not by_weekday:
+        return SubjectAttendanceReport(
+            rows=[], window_days=window_days,
+            note=(
+                "No timetable published for this section yet. "
+                "Ask the school to publish the timetable so attendance "
+                "can be broken down by subject."
+            ),
+        )
+
+    # ---- Bucket counters --------------------------------------------------
     subj_counts: dict[int, dict[str, int]] = {}
-    for r in rows:
+
+    def _bump(sid: int, status: str) -> None:
+        bucket = subj_counts.setdefault(
+            sid, {"present": 0, "late": 0, "half_day": 0, "absent": 0}
+        )
+        if status in bucket:
+            bucket[status] += 1
+
+    # Period-level rows: one row → one subject (the scheduled slot).
+    for r in period_rows:
         try:
             period_no = int(r.period)
         except (TypeError, ValueError):
             continue
-        # Python's weekday(): 0=Mon..6=Sun — matches our timetable convention.
-        slot = (r.date.weekday(), period_no)
-        sid = by_slot.get(slot)
+        sid = by_slot.get((r.date.weekday(), period_no))
         if sid is None:
             continue
-        bucket = subj_counts.setdefault(
-            sid, {"present": 0, "late": 0, "half_day": 0, "absent": 0}
-        )
-        if r.status in bucket:
-            bucket[r.status] += 1
+        _bump(sid, r.status)
+
+    # Day-level rows: project across every subject scheduled that weekday.
+    for r in day_rows:
+        weekday = r.date.weekday()
+        for sid in by_weekday.get(weekday, ()):
+            _bump(sid, r.status)
 
     if not subj_counts:
         return SubjectAttendanceReport(
             rows=[], window_days=window_days,
             note=(
-                "Period attendance found but no matching timetable slots. "
-                "Ask the school to publish the timetable for this section."
+                "Attendance found but no matching timetable slots. "
+                "Ask the school to map subjects to periods."
             ),
         )
 
@@ -507,7 +542,16 @@ async def student_attendance_by_subject(
             )
         )
     out.sort(key=lambda r: r.percentage)  # lowest first — most actionable
-    return SubjectAttendanceReport(rows=out, window_days=window_days)
+
+    # If we *only* used day-level rows, tell the parent the breakdown is
+    # projected so they don't mistake it for true per-subject measurement.
+    note: Optional[str] = None
+    if not period_rows and day_rows:
+        note = (
+            "Day-level attendance projected onto the section's timetable. "
+            "Lower subjects are scheduled on days the student missed."
+        )
+    return SubjectAttendanceReport(rows=out, window_days=window_days, note=note)
 
 
 # ---- Class-average comparison --------------------------------------------
