@@ -368,6 +368,7 @@ async def list_for_student(
                 subject_id=h.subject_id,
                 subject_name=subject_names.get(h.subject_id) if h.subject_id else None,
                 max_marks=h.max_marks,
+                teacher_attachments=list(h.attachments or []),
                 submission_status=stat,
                 submitted=sub is not None,
                 submitted_at=sub.submitted_at.date() if (sub and sub.submitted_at) else None,

@@ -1,3 +1,5 @@
+import 'dart:io' show Platform;
+
 import 'package:dio/dio.dart';
 
 import 'api_client.dart';
@@ -229,6 +231,30 @@ class ParentRepository {
           'attachments': attachmentPaths,
       },
     );
+  }
+
+  /// Uploads a single local file via /v1/uploads and returns the server-
+  /// side relative path (tenant_X/homework/submissions/<filename>). The
+  /// upload endpoint is gated by require_tenant only — parents have a
+  /// resolved TenantContext on every request via their bearer token, so
+  /// they can call this without a school-admin role.
+  Future<String> uploadFile({
+    required String localPath,
+    String category = 'homework',
+    String subcategory = 'submissions',
+  }) async {
+    final filename = localPath.split(Platform.pathSeparator).last;
+    final form = FormData.fromMap({
+      'category': category,
+      'subcategory': subcategory,
+      'file': await MultipartFile.fromFile(localPath, filename: filename),
+    });
+    final res = await _api.dio.post<Map<String, dynamic>>(
+      '/v1/uploads',
+      data: form,
+      options: Options(contentType: 'multipart/form-data'),
+    );
+    return (res.data?['path'] as String?) ?? '';
   }
 }
 
@@ -484,6 +510,7 @@ class HomeworkItem {
     required this.assignedOn,
     required this.dueDate,
     required this.maxMarks,
+    required this.teacherAttachments,
     required this.submissionStatus,
     required this.submittedAt,
     required this.marksObtained,
@@ -497,6 +524,10 @@ class HomeworkItem {
   final String assignedOn;
   final String dueDate;
   final double? maxMarks;
+  /// Files attached by the teacher when posting the homework (worksheet
+  /// PDFs, reference notes). Server-side relative paths under
+  /// uploads/tenant_X/...
+  final List<String> teacherAttachments;
   final String submissionStatus; // open / submitted / late / missing / graded
   final String? submittedAt;
   final double? marksObtained;
@@ -515,6 +546,9 @@ class HomeworkItem {
         assignedOn: (j['assigned_on'] as String?) ?? '',
         dueDate: (j['due_date'] as String?) ?? '',
         maxMarks: (j['max_marks'] as num?)?.toDouble(),
+        teacherAttachments: ((j['teacher_attachments'] as List<dynamic>?) ?? const [])
+            .map((e) => e.toString())
+            .toList(),
         // Backend uses "open" implicitly when null + not overdue, else "missing".
         submissionStatus: (j['submission_status'] as String?) ??
             ((j['submitted'] as bool?) == true ? 'submitted' : 'open'),
