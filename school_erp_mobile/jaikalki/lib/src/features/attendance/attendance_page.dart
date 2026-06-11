@@ -1042,6 +1042,39 @@ class _SubjectBreakdown extends StatelessWidget {
           else ...[
             for (final row in report.rows) _SubjectBar(row: row),
             const SizedBox(height: 4),
+            // When the backend reports a note alongside actual rows, it's
+            // telling us *how* the breakdown was computed (e.g. "day-level
+            // projected onto timetable"). Show it as a quiet hint so the
+            // parent doesn't mistake projection for per-subject measurement.
+            if (report.note != null) ...[
+              const SizedBox(height: 6),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                decoration: BoxDecoration(
+                  color: JaikalkiBrand.marigoldPale,
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Icon(Icons.info_outline,
+                        size: 14, color: JaikalkiBrand.indigo),
+                    const SizedBox(width: 6),
+                    Expanded(
+                      child: Text(
+                        report.note!,
+                        style: const TextStyle(
+                          fontSize: 11,
+                          color: JaikalkiBrand.indigoDark,
+                          height: 1.35,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 6),
+            ],
             Row(
               children: [
                 Container(
