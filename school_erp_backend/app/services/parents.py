@@ -895,6 +895,110 @@ async def list_events_for_parent(
     return list(rows)
 
 
+async def profile_for_parent(
+    session: AsyncSession, *, user_id: int, student_id: int, tenant_id: int
+):
+    """Build a self-contained profile blob with everything the mobile
+    side needs to render the profile page *and* the in-app ID card —
+    no follow-up calls required."""
+    from app.models.academic import ClassDef, Section
+    from app.models.curriculum import House
+    from app.models.tenant import Tenant
+    from app.schemas.parent import ParentContact, StudentProfileView
+
+    await _require_linked_child(session, user_id=user_id, student_id=student_id)
+
+    student = (
+        await session.execute(select(Student).where(Student.id == student_id))
+    ).scalar_one_or_none()
+    if student is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Student not found"
+        )
+
+    section_name = None
+    if student.section_id is not None:
+        sec = (
+            await session.execute(
+                select(Section).where(Section.id == student.section_id)
+            )
+        ).scalar_one_or_none()
+        section_name = sec.name if sec else None
+
+    class_label = student.current_class_label
+    if not class_label and student.class_def_id is not None:
+        cls = (
+            await session.execute(
+                select(ClassDef).where(ClassDef.id == student.class_def_id)
+            )
+        ).scalar_one_or_none()
+        class_label = cls.name if cls else None
+
+    house_name = None
+    if student.house_id is not None:
+        hs = (
+            await session.execute(select(House).where(House.id == student.house_id))
+        ).scalar_one_or_none()
+        house_name = hs.name if hs else None
+
+    parent_rows = list(
+        (
+            await session.execute(
+                select(ParentChildMapping, Parent)
+                .join(Parent, Parent.id == ParentChildMapping.parent_id)
+                .where(ParentChildMapping.student_id == student_id)
+            )
+        ).all()
+    )
+    parents = [
+        ParentContact(
+            relation=mapping.relation,
+            full_name=parent.full_name,
+            phone=parent.phone,
+            email=parent.email,
+            access_level=mapping.access_level,
+            is_primary=mapping.is_primary,
+        )
+        for mapping, parent in parent_rows
+    ]
+
+    tenant = (
+        await session.execute(select(Tenant).where(Tenant.id == tenant_id))
+    ).scalar_one_or_none()
+
+    return StudentProfileView(
+        student_id=student.id,
+        full_name=student.full_name,
+        admission_number=student.admission_number,
+        roll_no=student.roll_no,
+        photo_url=student.photo_url,
+        date_of_birth=student.date_of_birth,
+        gender=student.gender,
+        blood_group=student.blood_group,
+        class_label=class_label,
+        section_name=section_name,
+        admission_date=student.admission_date,
+        house_name=house_name,
+        address=student.address,
+        phone=student.phone,
+        email=student.email,
+        emergency_contact_name=student.emergency_contact_name,
+        emergency_phone=student.emergency_phone,
+        allergies=student.allergies,
+        medical_conditions=student.medical_conditions,
+        father_name=student.father_name,
+        mother_name=student.mother_name,
+        guardian_name=student.guardian_name,
+        parent_phone=student.parent_phone,
+        parent_email=student.parent_email,
+        parents=parents,
+        school_name=tenant.school_name if tenant else "School",
+        school_address=tenant.address if tenant else None,
+        school_phone=tenant.phone if tenant else None,
+        school_logo_url=tenant.logo_url if tenant else None,
+    )
+
+
 async def directory_for_parent(
     session: AsyncSession, *, user_id: int, student_id: int
 ) -> list[dict]:

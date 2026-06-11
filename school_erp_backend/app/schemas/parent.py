@@ -146,3 +146,61 @@ class ParentPasswordResetResult(BaseModel):
     email: Optional[str]
     phone: Optional[str]
     is_active: bool
+
+
+# ---- Phase 22: student profile + ID card ----------------------------------
+
+
+class ParentContact(BaseModel):
+    """One linked parent/guardian for a child. Surfaced on the profile
+    page so the parent can verify what the school has on file (and ask
+    the school admin to update if wrong)."""
+
+    relation: str
+    full_name: str
+    phone: Optional[str] = None
+    email: Optional[str] = None
+    access_level: str
+    is_primary: bool
+
+
+class StudentProfileView(BaseModel):
+    """Read-only roll-up of every field needed by the mobile profile +
+    ID card screens. Derived from Student + Tenant; the school block is
+    duplicated here so the Flutter side can render the ID card without
+    a second round-trip."""
+
+    student_id: int
+    full_name: str
+    admission_number: str
+    roll_no: Optional[str] = None
+    photo_url: Optional[str] = None
+    date_of_birth: Optional[date] = None
+    gender: Optional[str] = None
+    blood_group: Optional[str] = None
+    class_label: Optional[str] = None
+    section_name: Optional[str] = None
+    admission_date: Optional[date] = None
+    house_name: Optional[str] = None
+    # Denormalized contact info from Student.
+    address: Optional[str] = None
+    phone: Optional[str] = None
+    email: Optional[str] = None
+    emergency_contact_name: Optional[str] = None
+    emergency_phone: Optional[str] = None
+    allergies: Optional[str] = None
+    medical_conditions: Optional[str] = None
+    # Family — both the legacy denormalized fields and the structured
+    # ParentChildMapping rows so the UI can prefer whichever has data.
+    father_name: Optional[str] = None
+    mother_name: Optional[str] = None
+    guardian_name: Optional[str] = None
+    parent_phone: Optional[str] = None
+    parent_email: Optional[str] = None
+    parents: List[ParentContact] = Field(default_factory=list)
+    # School branding (read from Tenant). Lets the in-app ID card render
+    # the same identity as the PDF.
+    school_name: str
+    school_address: Optional[str] = None
+    school_phone: Optional[str] = None
+    school_logo_url: Optional[str] = None

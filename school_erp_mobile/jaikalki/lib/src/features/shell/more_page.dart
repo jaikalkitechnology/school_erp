@@ -8,6 +8,7 @@ import '../calendar/calendar_page.dart';
 import '../directory/directory_page.dart';
 import '../library/library_catalog_page.dart';
 import '../notifications/notifications_page.dart';
+import '../profile/student_profile_page.dart';
 import '../results/result_cards_page.dart';
 import '../settings/settings_page.dart';
 
@@ -24,6 +25,13 @@ class MorePage extends StatelessWidget {
       appBar: AppBar(title: Text(s.tabMore)),
       body: ListView(
         children: [
+          _Tile(
+            icon: Icons.badge_outlined,
+            label: 'Student profile',
+            onTap: () => _open(
+              context, 'Student profile', const StudentProfilePage(),
+            ),
+          ),
           _Tile(
             icon: Icons.workspace_premium_outlined,
             label: 'Result cards',

@@ -5,6 +5,7 @@ from __future__ import annotations
 from typing import Optional
 
 from fastapi import APIRouter, Depends, Query, status
+from fastapi.responses import FileResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.auth_deps import AuthPrincipal, require_roles
@@ -24,7 +25,9 @@ from app.schemas.parent import (
     ParentPasswordResetResult,
     ParentSelfRead,
     StudentDocSummary,
+    StudentProfileView,
 )
+from app.services.student_id_card import render_id_card_pdf
 from app.schemas.academic import HolidayRead
 from app.schemas.curriculum import CalendarEventRead
 from app.services.parents import (
@@ -41,6 +44,7 @@ from app.services.parents import (
     list_events_for_parent,
     list_holidays_for_parent,
     list_leaves_for_user,
+    profile_for_parent,
     subject_attendance_for_parent,
     list_parent_links,
     list_school_leaves,
@@ -224,6 +228,40 @@ async def parent_directory_route(
     email until the Teacher model grows a per-row visibility flag."""
     return await directory_for_parent(
         session, user_id=principal.user_id, student_id=student_id
+    )
+
+
+@router.get("/children/{student_id}/profile", response_model=StudentProfileView)
+async def parent_profile_route(
+    student_id: int,
+    principal: AuthPrincipal = Depends(_parent_role),
+    session: AsyncSession = Depends(platform_session),
+):
+    return await profile_for_parent(
+        session,
+        user_id=principal.user_id,
+        student_id=student_id,
+        tenant_id=principal.tenant_id,
+    )
+
+
+@router.get("/children/{student_id}/id-card.pdf")
+async def parent_id_card_pdf(
+    student_id: int,
+    principal: AuthPrincipal = Depends(_parent_role),
+    session: AsyncSession = Depends(platform_session),
+):
+    profile = await profile_for_parent(
+        session,
+        user_id=principal.user_id,
+        student_id=student_id,
+        tenant_id=principal.tenant_id,
+    )
+    target = render_id_card_pdf(profile, tenant_id=principal.tenant_id)
+    return FileResponse(
+        target,
+        media_type="application/pdf",
+        filename=f"id_card_{profile.admission_number}.pdf",
     )
 
 
