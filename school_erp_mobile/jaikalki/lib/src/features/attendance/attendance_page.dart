@@ -10,6 +10,7 @@ import '../../core/children_cubit.dart';
 import '../../core/service_locator.dart';
 import '../../core/settings_cubit.dart';
 import '../../theme/brand.dart';
+import '../calendar/calendar_page.dart';
 
 /// Phase 9 + parent-app P0 additions.
 ///
@@ -102,6 +103,8 @@ class _AttendancePageState extends State<AttendancePage> {
                   children: [
                     if (state is AttendanceLoaded) ...[
                       _TodayCard(rows: state.rows, s: s),
+                      const SizedBox(height: 12),
+                      const _CalendarTeaser(),
                       const SizedBox(height: 12),
                       if (state.timetable != null &&
                           state.timetable!.hasData) ...[
@@ -1728,4 +1731,141 @@ String _humanTime(String iso) {
   final mm = local.minute.toString().padLeft(2, '0');
   final ampm = local.hour < 12 ? 'AM' : 'PM';
   return '$h12:$mm $ampm';
+}
+
+/// Compact teaser card that shows counts of upcoming holidays + events
+/// and links to the full Calendar page. Loads counts once on mount —
+/// holiday/event lists shift slowly enough that a stale value is fine
+/// until the user pulls to refresh the attendance page.
+class _CalendarTeaser extends StatefulWidget {
+  const _CalendarTeaser();
+
+  @override
+  State<_CalendarTeaser> createState() => _CalendarTeaserState();
+}
+
+class _CalendarTeaserState extends State<_CalendarTeaser> {
+  late final Future<List<dynamic>> _both;
+
+  @override
+  void initState() {
+    super.initState();
+    final repo = locator<ParentRepository>();
+    _both = Future.wait([repo.holidays(), repo.events()]);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return FutureBuilder<List<dynamic>>(
+      future: _both,
+      builder: (context, snap) {
+        int holidayCount = 0;
+        int eventCount = 0;
+        Holiday? nextHoliday;
+        SchoolEvent? nextEvent;
+        if (snap.connectionState == ConnectionState.done && snap.data != null) {
+          final holidays = snap.data![0] as List<Holiday>;
+          final events = snap.data![1] as List<SchoolEvent>;
+          final today = DateTime.now();
+          for (final h in holidays) {
+            final d = DateTime.tryParse(h.date);
+            if (d != null && !d.isBefore(DateTime(today.year, today.month, today.day))) {
+              holidayCount += 1;
+              nextHoliday ??= h;
+            }
+          }
+          for (final e in events) {
+            final d = DateTime.tryParse(e.startsAt);
+            if (d != null && !d.isBefore(today)) {
+              eventCount += 1;
+              nextEvent ??= e;
+            }
+          }
+        }
+
+        return Material(
+          color: Colors.transparent,
+          child: InkWell(
+            borderRadius: BorderRadius.circular(14),
+            onTap: () => Navigator.of(context).push(
+              MaterialPageRoute(
+                builder: (_) => Scaffold(
+                  appBar: AppBar(title: const Text('Calendar')),
+                  body: const CalendarPage(),
+                ),
+              ),
+            ),
+            child: Container(
+              padding: const EdgeInsets.all(14),
+              decoration: BoxDecoration(
+                color: JaikalkiBrand.tealPale.withOpacity(0.4),
+                borderRadius: BorderRadius.circular(14),
+                border: Border.all(color: JaikalkiBrand.teal.withOpacity(0.4)),
+              ),
+              child: Row(
+                children: [
+                  Container(
+                    width: 44, height: 44,
+                    decoration: BoxDecoration(
+                      color: JaikalkiBrand.teal.withOpacity(0.15),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: const Icon(Icons.event_outlined,
+                        color: JaikalkiBrand.tealDark),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          '$holidayCount holidays · $eventCount events ahead',
+                          style: const TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w700,
+                            color: JaikalkiBrand.tealDark,
+                          ),
+                        ),
+                        const SizedBox(height: 2),
+                        if (nextHoliday != null)
+                          Text(
+                            'Next holiday: ${nextHoliday.name} (${nextHoliday.date})',
+                            style: const TextStyle(
+                              fontSize: 11,
+                              color: JaikalkiBrand.textSecondary,
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          )
+                        else if (nextEvent != null)
+                          Text(
+                            'Next event: ${nextEvent.title}',
+                            style: const TextStyle(
+                              fontSize: 11,
+                              color: JaikalkiBrand.textSecondary,
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          )
+                        else
+                          const Text(
+                            'Tap to see the full calendar',
+                            style: TextStyle(
+                              fontSize: 11,
+                              color: JaikalkiBrand.textSecondary,
+                            ),
+                          ),
+                      ],
+                    ),
+                  ),
+                  const Icon(Icons.chevron_right,
+                      color: JaikalkiBrand.tealDark),
+                ],
+              ),
+            ),
+          ),
+        );
+      },
+    );
+  }
 }

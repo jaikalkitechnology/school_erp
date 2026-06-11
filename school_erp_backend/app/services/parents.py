@@ -842,3 +842,241 @@ async def set_parent_password(
     await session.commit()
     await session.refresh(user)
     return user
+
+
+# ---- Parent calendar feeds (holidays + events) ----------------------------
+
+
+async def list_holidays_for_parent(
+    session: AsyncSession, *, days_back: int = 7, days_forward: int = 180
+) -> list:
+    """Return holidays in a window around today. Tenant-scoped via the
+    parent session's loader criteria, so no tenant_id filter is needed
+    here."""
+    from app.models.academic import Holiday
+
+    today = _now().date()
+    from datetime import timedelta
+
+    start = today - timedelta(days=days_back)
+    end = today + timedelta(days=days_forward)
+    rows = (
+        await session.execute(
+            select(Holiday)
+            .where(Holiday.date >= start, Holiday.date <= end)
+            .order_by(Holiday.date.asc())
+        )
+    ).scalars().all()
+    return list(rows)
+
+
+async def list_events_for_parent(
+    session: AsyncSession, *, days_back: int = 7, days_forward: int = 180
+) -> list:
+    """Events visible to parents: audience in ('all', 'parents'). Class-
+    scoped events (audience='class:XY') aren't surfaced here yet — they
+    need the child's section context which the caller doesn't pass."""
+    today = _now().date()
+    from datetime import datetime as _dt, timedelta
+
+    start = _dt.combine(today - timedelta(days=days_back), _dt.min.time())
+    end = _dt.combine(today + timedelta(days=days_forward), _dt.max.time())
+    rows = (
+        await session.execute(
+            select(CalendarEvent)
+            .where(
+                CalendarEvent.starts_at >= start,
+                CalendarEvent.starts_at <= end,
+                CalendarEvent.audience.in_(["all", "parents"]),
+            )
+            .order_by(CalendarEvent.starts_at.asc())
+        )
+    ).scalars().all()
+    return list(rows)
+
+
+async def profile_for_parent(
+    session: AsyncSession, *, user_id: int, student_id: int, tenant_id: int
+):
+    """Build a self-contained profile blob with everything the mobile
+    side needs to render the profile page *and* the in-app ID card —
+    no follow-up calls required."""
+    from app.models.academic import ClassDef, Section
+    from app.models.curriculum import House
+    from app.models.tenant import Tenant
+    from app.schemas.parent import ParentContact, StudentProfileView
+
+    await _require_linked_child(session, user_id=user_id, student_id=student_id)
+
+    student = (
+        await session.execute(select(Student).where(Student.id == student_id))
+    ).scalar_one_or_none()
+    if student is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Student not found"
+        )
+
+    section_name = None
+    if student.section_id is not None:
+        sec = (
+            await session.execute(
+                select(Section).where(Section.id == student.section_id)
+            )
+        ).scalar_one_or_none()
+        section_name = sec.name if sec else None
+
+    class_label = student.current_class_label
+    if not class_label and student.class_def_id is not None:
+        cls = (
+            await session.execute(
+                select(ClassDef).where(ClassDef.id == student.class_def_id)
+            )
+        ).scalar_one_or_none()
+        class_label = cls.name if cls else None
+
+    house_name = None
+    if student.house_id is not None:
+        hs = (
+            await session.execute(select(House).where(House.id == student.house_id))
+        ).scalar_one_or_none()
+        house_name = hs.name if hs else None
+
+    parent_rows = list(
+        (
+            await session.execute(
+                select(ParentChildMapping, Parent)
+                .join(Parent, Parent.id == ParentChildMapping.parent_id)
+                .where(ParentChildMapping.student_id == student_id)
+            )
+        ).all()
+    )
+    parents = [
+        ParentContact(
+            relation=mapping.relation,
+            full_name=parent.full_name,
+            phone=parent.phone,
+            email=parent.email,
+            access_level=mapping.access_level,
+            is_primary=mapping.is_primary,
+        )
+        for mapping, parent in parent_rows
+    ]
+
+    tenant = (
+        await session.execute(select(Tenant).where(Tenant.id == tenant_id))
+    ).scalar_one_or_none()
+
+    return StudentProfileView(
+        student_id=student.id,
+        full_name=student.full_name,
+        admission_number=student.admission_number,
+        roll_no=student.roll_no,
+        photo_url=student.photo_url,
+        date_of_birth=student.date_of_birth,
+        gender=student.gender,
+        blood_group=student.blood_group,
+        class_label=class_label,
+        section_name=section_name,
+        admission_date=student.admission_date,
+        house_name=house_name,
+        address=student.address,
+        phone=student.phone,
+        email=student.email,
+        emergency_contact_name=student.emergency_contact_name,
+        emergency_phone=student.emergency_phone,
+        allergies=student.allergies,
+        medical_conditions=student.medical_conditions,
+        father_name=student.father_name,
+        mother_name=student.mother_name,
+        guardian_name=student.guardian_name,
+        parent_phone=student.parent_phone,
+        parent_email=student.parent_email,
+        parents=parents,
+        school_name=tenant.school_name if tenant else "School",
+        school_address=tenant.address if tenant else None,
+        school_phone=tenant.phone if tenant else None,
+        school_logo_url=tenant.logo_url if tenant else None,
+    )
+
+
+async def directory_for_parent(
+    session: AsyncSession, *, user_id: int, student_id: int
+) -> list[dict]:
+    """Returns the teachers actually attached to the child's section:
+    every SectionSubject row, plus the section in-charge as the class
+    teacher. Deliberately omits phone + email — the Teacher model has no
+    visibility flag yet, and exposing personal contacts to every parent
+    is a privacy non-starter."""
+    from app.models.academic import Section, Subject
+    from app.models.curriculum import SectionSubject
+    from app.models.teacher import Teacher
+
+    await _require_linked_child(session, user_id=user_id, student_id=student_id)
+
+    student = (
+        await session.execute(select(Student).where(Student.id == student_id))
+    ).scalar_one_or_none()
+    if student is None or student.section_id is None:
+        return []
+
+    section = (
+        await session.execute(select(Section).where(Section.id == student.section_id))
+    ).scalar_one_or_none()
+    if section is None:
+        return []
+
+    assignments = list(
+        (
+            await session.execute(
+                select(SectionSubject, Subject, Teacher)
+                .join(Subject, Subject.id == SectionSubject.subject_id)
+                .join(Teacher, Teacher.user_id == SectionSubject.teacher_user_id)
+                .where(
+                    SectionSubject.section_id == section.id,
+                    SectionSubject.teacher_user_id.is_not(None),
+                )
+            )
+        ).all()
+    )
+
+    entries: list[dict] = []
+    seen_teacher_ids: set[int] = set()
+
+    if section.in_charge_user_id is not None:
+        in_charge = (
+            await session.execute(
+                select(Teacher).where(Teacher.user_id == section.in_charge_user_id)
+            )
+        ).scalar_one_or_none()
+        if in_charge is not None:
+            entries.append({
+                "teacher_id": in_charge.id,
+                "full_name": in_charge.full_name,
+                "designation": in_charge.designation,
+                "photo_url": in_charge.photo_url,
+                "subject_name": None,
+                "is_class_teacher": True,
+            })
+            seen_teacher_ids.add(in_charge.id)
+
+    for _ss, subj, teacher in assignments:
+        # A subject teacher who is *also* the class teacher should appear
+        # only once but with their subject listed; replace the lonely
+        # class-teacher entry instead of duplicating.
+        if teacher.id in seen_teacher_ids:
+            for e in entries:
+                if e["teacher_id"] == teacher.id and e["subject_name"] is None:
+                    e["subject_name"] = subj.name
+                    break
+            continue
+        entries.append({
+            "teacher_id": teacher.id,
+            "full_name": teacher.full_name,
+            "designation": teacher.designation,
+            "photo_url": teacher.photo_url,
+            "subject_name": subj.name,
+            "is_class_teacher": False,
+        })
+        seen_teacher_ids.add(teacher.id)
+
+    return entries

@@ -1,10 +1,11 @@
 import { useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { ClipboardList, Plus, Star, Trash2 } from "lucide-react";
+import { ClipboardList, FileText, Paperclip, Plus, Star, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { api } from "@/lib/api";
 import { cn } from "@/lib/utils";
 import { listClasses, listSections, listSubjects } from "@/features/setup/api";
 import {
@@ -14,6 +15,7 @@ import {
   homeworkReport,
   listHomework,
   submissionsFor,
+  type Submission,
   type SubmissionStatus,
 } from "./api";
 
@@ -227,6 +229,8 @@ function HomeworkDetail({ homeworkId }: { homeworkId: number }) {
     );
   }
 
+  const maxMarks = Number(report.data.max_marks ?? 100) || 100;
+
   return (
     <Card>
       <CardHeader>
@@ -234,7 +238,7 @@ function HomeworkDetail({ homeworkId }: { homeworkId: number }) {
           <ClipboardList className="h-5 w-5" /> {report.data.title}
         </CardTitle>
         <CardDescription>
-          {report.data.submitted_count} / {report.data.total_students} submitted · due {report.data.due_date}
+          {report.data.submitted_count} / {report.data.total_students} submitted · due {report.data.due_date} · max {maxMarks}
         </CardDescription>
       </CardHeader>
       <CardContent className="p-0">
@@ -243,7 +247,7 @@ function HomeworkDetail({ homeworkId }: { homeworkId: number }) {
             <tr>
               <th className="px-6 py-3">Student</th>
               <th className="px-4 py-3">Status</th>
-              <th className="px-4 py-3">Submitted</th>
+              <th className="px-4 py-3">Submission</th>
               <th className="px-4 py-3">Marks</th>
               <th className="px-6 py-3 text-right">Action</th>
             </tr>
@@ -252,12 +256,12 @@ function HomeworkDetail({ homeworkId }: { homeworkId: number }) {
             {report.data.rows.map((row) => {
               const sub = submissionByStudent.get(row.student_id);
               return (
-                <tr key={row.student_id} className="border-b last:border-b-0 align-middle">
-                  <td className="px-6 py-2">
+                <tr key={row.student_id} className="border-b last:border-b-0 align-top">
+                  <td className="px-6 py-3">
                     <p className="font-medium text-indigo-dark">{row.full_name}</p>
                     <p className="font-mono text-xs text-muted-foreground">{row.admission_number}</p>
                   </td>
-                  <td className="px-4 py-2">
+                  <td className="px-4 py-3">
                     {row.status ? (
                       <span className={cn("rounded-full px-2 py-0.5 text-[11px] uppercase tracking-wider", STATUS_TONE[row.status])}>
                         {row.status}
@@ -266,14 +270,14 @@ function HomeworkDetail({ homeworkId }: { homeworkId: number }) {
                       <span className="text-xs text-muted-foreground">pending</span>
                     )}
                   </td>
-                  <td className="px-4 py-2 font-mono text-xs">
-                    {row.submitted_at ? new Date(row.submitted_at).toLocaleString() : "—"}
+                  <td className="px-4 py-3">
+                    <SubmissionCell sub={sub} submittedAt={row.submitted_at} />
                   </td>
-                  <td className="px-4 py-2 font-mono">{row.marks ?? "—"}</td>
-                  <td className="px-6 py-2 text-right">
+                  <td className="px-4 py-3 font-mono">{row.marks ?? "—"}</td>
+                  <td className="px-6 py-3 text-right">
                     {sub && sub.status !== "graded" ? (
                       <GradeInline
-                        max={Number((report.data!.title && (submissions.data?.[0] as any)) || 100)}
+                        max={maxMarks}
                         onSubmit={(marks, feedback) => gradeMut.mutate({ id: sub.id, marks, feedback })}
                       />
                     ) : sub && sub.status === "graded" ? (
@@ -290,6 +294,75 @@ function HomeworkDetail({ homeworkId }: { homeworkId: number }) {
         </table>
       </CardContent>
     </Card>
+  );
+}
+
+function SubmissionCell({
+  sub,
+  submittedAt,
+}: {
+  sub: Submission | undefined;
+  submittedAt: string | null;
+}) {
+  if (!sub) {
+    return <span className="font-mono text-xs text-muted-foreground">—</span>;
+  }
+  return (
+    <div className="space-y-1.5">
+      <p className="font-mono text-xs text-muted-foreground">
+        {submittedAt ? new Date(submittedAt).toLocaleString() : "—"}
+      </p>
+      {sub.content && (
+        <p className="max-w-sm whitespace-pre-wrap text-xs text-indigo-dark">{sub.content}</p>
+      )}
+      {sub.attachments?.length ? (
+        <div className="flex flex-wrap gap-1">
+          {sub.attachments.map((path) => (
+            <AttachmentChip key={path} path={path} />
+          ))}
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+/**
+ * Fetches a tenant-scoped upload via the authed axios client, then opens it
+ * in a new tab via a blob URL. We can't just put the path in an <a href>
+ * because the file-serving endpoint requires the Authorization + tenant
+ * headers that only the axios interceptor knows about.
+ */
+function AttachmentChip({ path }: { path: string }) {
+  const [loading, setLoading] = useState(false);
+  const filename = path.split("/").pop() ?? path;
+  const isImage = /\.(jpe?g|png|gif|webp)$/i.test(filename);
+
+  const open = async () => {
+    setLoading(true);
+    try {
+      const res = await api.get<Blob>(`/v1/uploads/${path}`, { responseType: "blob" });
+      const url = URL.createObjectURL(res.data);
+      window.open(url, "_blank", "noopener");
+      setTimeout(() => URL.revokeObjectURL(url), 60_000);
+    } catch {
+      // Swallow — the request interceptor handles 401 refresh; anything
+      // else just leaves the chip enabled for retry.
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <button
+      type="button"
+      onClick={open}
+      disabled={loading}
+      className="inline-flex max-w-[180px] items-center gap-1 truncate rounded-md border border-saffron-pale bg-saffron-pale/30 px-2 py-1 text-[11px] text-indigo-dark hover:bg-saffron-pale disabled:opacity-50"
+      title={filename}
+    >
+      {isImage ? <Paperclip className="h-3 w-3" /> : <FileText className="h-3 w-3" />}
+      <span className="truncate">{filename}</span>
+    </button>
   );
 }
 

@@ -93,6 +93,7 @@ class HomeworkStatusReport(BaseModel):
     section_id: int
     title: str
     due_date: date
+    max_marks: Optional[Decimal] = None
     rows: List[StudentSubmissionStatus]
     submitted_count: int
     total_students: int

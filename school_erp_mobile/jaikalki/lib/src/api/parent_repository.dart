@@ -271,6 +271,123 @@ class ParentRepository {
     );
     return (res.data?['path'] as String?) ?? '';
   }
+
+  /// Downloads the per-invoice PDF receipt/invoice into [savePath] and
+  /// returns that path. Caller is responsible for picking a temp/cache
+  /// location (typically getTemporaryDirectory + invoice_number.pdf).
+  Future<String> downloadInvoicePdf({
+    required int studentId,
+    required int invoiceId,
+    required String savePath,
+  }) async {
+    await _api.dio.download(
+      '/v1/parent/children/$studentId/fees/invoices/$invoiceId/pdf',
+      savePath,
+    );
+    return savePath;
+  }
+
+  /// Lists every *published* report card for a child (one per exam/term).
+  Future<List<ResultCardRow>> resultCards(int studentId) async {
+    try {
+      final res = await _api.dio.get<Map<String, dynamic>>(
+        '/v1/parent/children/$studentId/report-cards',
+      );
+      final rows = (res.data?['rows'] as List<dynamic>?) ?? const [];
+      return rows
+          .map((e) => ResultCardRow.fromJson(e as Map<String, dynamic>))
+          .toList();
+    } on DioException {
+      return const [];
+    }
+  }
+
+  Future<String> downloadResultCard({
+    required int cardId,
+    required String savePath,
+  }) async {
+    await _api.dio.download(
+      '/v1/parent/report-cards/$cardId/pdf',
+      savePath,
+    );
+    return savePath;
+  }
+
+  Future<List<Holiday>> holidays({int daysBack = 7, int daysForward = 180}) async {
+    try {
+      final res = await _api.dio.get<List<dynamic>>(
+        '/v1/parent/holidays',
+        queryParameters: {'days_back': daysBack, 'days_forward': daysForward},
+      );
+      return (res.data ?? const [])
+          .map((e) => Holiday.fromJson(e as Map<String, dynamic>))
+          .toList();
+    } on DioException {
+      return const [];
+    }
+  }
+
+  Future<List<SchoolEvent>> events({int daysBack = 7, int daysForward = 180}) async {
+    try {
+      final res = await _api.dio.get<List<dynamic>>(
+        '/v1/parent/events',
+        queryParameters: {'days_back': daysBack, 'days_forward': daysForward},
+      );
+      return (res.data ?? const [])
+          .map((e) => SchoolEvent.fromJson(e as Map<String, dynamic>))
+          .toList();
+    } on DioException {
+      return const [];
+    }
+  }
+
+  Future<List<LibraryBookSummary>> libraryCatalog({String? q, String? category}) async {
+    try {
+      final res = await _api.dio.get<List<dynamic>>(
+        '/v1/parent/library/catalog',
+        queryParameters: {
+          if (q != null && q.isNotEmpty) 'q': q,
+          if (category != null && category.isNotEmpty) 'category': category,
+        },
+      );
+      return (res.data ?? const [])
+          .map((e) => LibraryBookSummary.fromJson(e as Map<String, dynamic>))
+          .toList();
+    } on DioException {
+      return const [];
+    }
+  }
+
+  Future<List<DirectoryEntry>> directory(int studentId) async {
+    try {
+      final res = await _api.dio.get<List<dynamic>>(
+        '/v1/parent/children/$studentId/directory',
+      );
+      return (res.data ?? const [])
+          .map((e) => DirectoryEntry.fromJson(e as Map<String, dynamic>))
+          .toList();
+    } on DioException {
+      return const [];
+    }
+  }
+
+  Future<StudentProfile> profile(int studentId) async {
+    final res = await _api.dio.get<Map<String, dynamic>>(
+      '/v1/parent/children/$studentId/profile',
+    );
+    return StudentProfile.fromJson(res.data ?? const {});
+  }
+
+  Future<String> downloadIdCard({
+    required int studentId,
+    required String savePath,
+  }) async {
+    await _api.dio.download(
+      '/v1/parent/children/$studentId/id-card.pdf',
+      savePath,
+    );
+    return savePath;
+  }
 }
 
 class AttendanceRow {
@@ -514,6 +631,44 @@ class ChildFeeView {
       );
 }
 
+// ---- Phase 16 models (report cards / per-semester results) -----------------
+
+class ResultCardRow {
+  const ResultCardRow({
+    required this.reportCardId,
+    required this.examId,
+    required this.examName,
+    required this.status,
+    required this.percentage,
+    required this.overallGrade,
+    required this.rankInSection,
+    required this.publishedAt,
+  });
+
+  final int reportCardId;
+  final int examId;
+  final String examName;
+  /// Backend enum: draft / generated / published. Only "published" cards
+  /// are returned from the parent list endpoint, but we keep the field so
+  /// future statuses (eg. revised) show up explicitly.
+  final String status;
+  final double? percentage;
+  final String? overallGrade;
+  final int? rankInSection;
+  final String? publishedAt;
+
+  factory ResultCardRow.fromJson(Map<String, dynamic> j) => ResultCardRow(
+        reportCardId: (j['report_card_id'] as num).toInt(),
+        examId: (j['exam_id'] as num).toInt(),
+        examName: (j['exam_name'] as String?) ?? '',
+        status: (j['status'] as String?) ?? 'published',
+        percentage: _toDouble(j['percentage']),
+        overallGrade: j['overall_grade'] as String?,
+        rankInSection: (j['rank_in_section'] as num?)?.toInt(),
+        publishedAt: j['published_at'] as String?,
+      );
+}
+
 // ---- Phase 14 models ------------------------------------------------------
 
 class HomeworkItem {
@@ -571,5 +726,254 @@ class HomeworkItem {
         // Backend field is `marks` (not `marks_obtained`).
         marksObtained: _toDouble(j['marks']),
         feedback: j['feedback'] as String?,
+      );
+}
+
+// ---- Calendar feeds: holidays + events ------------------------------------
+
+class Holiday {
+  const Holiday({
+    required this.id,
+    required this.date,
+    required this.name,
+    required this.kind,
+    required this.description,
+  });
+
+  final int id;
+  final String date;
+  final String name;
+  /// public / school / optional / vacation
+  final String kind;
+  final String? description;
+
+  factory Holiday.fromJson(Map<String, dynamic> j) => Holiday(
+        id: (j['id'] as num).toInt(),
+        date: (j['date'] as String?) ?? '',
+        name: (j['name'] as String?) ?? '',
+        kind: (j['kind'] as String?) ?? 'public',
+        description: j['description'] as String?,
+      );
+}
+
+class SchoolEvent {
+  const SchoolEvent({
+    required this.id,
+    required this.title,
+    required this.description,
+    required this.kind,
+    required this.startsAt,
+    required this.endsAt,
+    required this.isAllDay,
+    required this.audience,
+  });
+
+  final int id;
+  final String title;
+  final String? description;
+  /// general / exam / sports / cultural / parent_teacher / holiday
+  final String kind;
+  final String startsAt;
+  final String? endsAt;
+  final bool isAllDay;
+  final String audience;
+
+  factory SchoolEvent.fromJson(Map<String, dynamic> j) => SchoolEvent(
+        id: (j['id'] as num).toInt(),
+        title: (j['title'] as String?) ?? '',
+        description: j['description'] as String?,
+        kind: (j['kind'] as String?) ?? 'general',
+        startsAt: (j['starts_at'] as String?) ?? '',
+        endsAt: j['ends_at'] as String?,
+        isAllDay: (j['is_all_day'] as bool?) ?? true,
+        audience: (j['audience'] as String?) ?? 'all',
+      );
+}
+
+// ---- Library catalog + contact directory ----------------------------------
+
+class LibraryBookSummary {
+  const LibraryBookSummary({
+    required this.id,
+    required this.title,
+    required this.author,
+    required this.category,
+    required this.language,
+    required this.totalCopies,
+    required this.availableCopies,
+  });
+
+  final int id;
+  final String title;
+  final String? author;
+  final String? category;
+  final String? language;
+  final int totalCopies;
+  final int availableCopies;
+
+  bool get hasStock => availableCopies > 0;
+
+  factory LibraryBookSummary.fromJson(Map<String, dynamic> j) => LibraryBookSummary(
+        id: (j['id'] as num).toInt(),
+        title: (j['title'] as String?) ?? '',
+        author: j['author'] as String?,
+        category: j['category'] as String?,
+        language: j['language'] as String?,
+        totalCopies: (j['total_copies'] as num?)?.toInt() ?? 0,
+        availableCopies: (j['available_copies'] as num?)?.toInt() ?? 0,
+      );
+}
+
+class DirectoryEntry {
+  const DirectoryEntry({
+    required this.teacherId,
+    required this.fullName,
+    required this.designation,
+    required this.photoUrl,
+    required this.subjectName,
+    required this.isClassTeacher,
+  });
+
+  final int teacherId;
+  final String fullName;
+  final String? designation;
+  final String? photoUrl;
+  final String? subjectName;
+  final bool isClassTeacher;
+
+  factory DirectoryEntry.fromJson(Map<String, dynamic> j) => DirectoryEntry(
+        teacherId: (j['teacher_id'] as num).toInt(),
+        fullName: (j['full_name'] as String?) ?? '',
+        designation: j['designation'] as String?,
+        photoUrl: j['photo_url'] as String?,
+        subjectName: j['subject_name'] as String?,
+        isClassTeacher: (j['is_class_teacher'] as bool?) ?? false,
+      );
+}
+
+// ---- Student profile + ID card --------------------------------------------
+
+class ParentContactInfo {
+  const ParentContactInfo({
+    required this.relation,
+    required this.fullName,
+    required this.phone,
+    required this.email,
+    required this.accessLevel,
+    required this.isPrimary,
+  });
+
+  final String relation;
+  final String fullName;
+  final String? phone;
+  final String? email;
+  final String accessLevel;
+  final bool isPrimary;
+
+  factory ParentContactInfo.fromJson(Map<String, dynamic> j) => ParentContactInfo(
+        relation: (j['relation'] as String?) ?? '',
+        fullName: (j['full_name'] as String?) ?? '',
+        phone: j['phone'] as String?,
+        email: j['email'] as String?,
+        accessLevel: (j['access_level'] as String?) ?? 'primary',
+        isPrimary: (j['is_primary'] as bool?) ?? false,
+      );
+}
+
+class StudentProfile {
+  const StudentProfile({
+    required this.studentId,
+    required this.fullName,
+    required this.admissionNumber,
+    required this.rollNo,
+    required this.photoUrl,
+    required this.dateOfBirth,
+    required this.gender,
+    required this.bloodGroup,
+    required this.classLabel,
+    required this.sectionName,
+    required this.admissionDate,
+    required this.houseName,
+    required this.address,
+    required this.phone,
+    required this.email,
+    required this.emergencyContactName,
+    required this.emergencyPhone,
+    required this.allergies,
+    required this.medicalConditions,
+    required this.fatherName,
+    required this.motherName,
+    required this.guardianName,
+    required this.parentPhone,
+    required this.parentEmail,
+    required this.parents,
+    required this.schoolName,
+    required this.schoolAddress,
+    required this.schoolPhone,
+    required this.schoolLogoUrl,
+  });
+
+  final int studentId;
+  final String fullName;
+  final String admissionNumber;
+  final String? rollNo;
+  final String? photoUrl;
+  final String? dateOfBirth;
+  final String? gender;
+  final String? bloodGroup;
+  final String? classLabel;
+  final String? sectionName;
+  final String? admissionDate;
+  final String? houseName;
+  final String? address;
+  final String? phone;
+  final String? email;
+  final String? emergencyContactName;
+  final String? emergencyPhone;
+  final String? allergies;
+  final String? medicalConditions;
+  final String? fatherName;
+  final String? motherName;
+  final String? guardianName;
+  final String? parentPhone;
+  final String? parentEmail;
+  final List<ParentContactInfo> parents;
+  final String schoolName;
+  final String? schoolAddress;
+  final String? schoolPhone;
+  final String? schoolLogoUrl;
+
+  factory StudentProfile.fromJson(Map<String, dynamic> j) => StudentProfile(
+        studentId: (j['student_id'] as num?)?.toInt() ?? 0,
+        fullName: (j['full_name'] as String?) ?? '',
+        admissionNumber: (j['admission_number'] as String?) ?? '',
+        rollNo: j['roll_no'] as String?,
+        photoUrl: j['photo_url'] as String?,
+        dateOfBirth: j['date_of_birth'] as String?,
+        gender: j['gender'] as String?,
+        bloodGroup: j['blood_group'] as String?,
+        classLabel: j['class_label'] as String?,
+        sectionName: j['section_name'] as String?,
+        admissionDate: j['admission_date'] as String?,
+        houseName: j['house_name'] as String?,
+        address: j['address'] as String?,
+        phone: j['phone'] as String?,
+        email: j['email'] as String?,
+        emergencyContactName: j['emergency_contact_name'] as String?,
+        emergencyPhone: j['emergency_phone'] as String?,
+        allergies: j['allergies'] as String?,
+        medicalConditions: j['medical_conditions'] as String?,
+        fatherName: j['father_name'] as String?,
+        motherName: j['mother_name'] as String?,
+        guardianName: j['guardian_name'] as String?,
+        parentPhone: j['parent_phone'] as String?,
+        parentEmail: j['parent_email'] as String?,
+        parents: ((j['parents'] as List<dynamic>?) ?? const [])
+            .map((e) => ParentContactInfo.fromJson(e as Map<String, dynamic>))
+            .toList(),
+        schoolName: (j['school_name'] as String?) ?? 'School',
+        schoolAddress: j['school_address'] as String?,
+        schoolPhone: j['school_phone'] as String?,
+        schoolLogoUrl: j['school_logo_url'] as String?,
       );
 }

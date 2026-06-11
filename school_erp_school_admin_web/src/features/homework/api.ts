@@ -43,6 +43,7 @@ export interface HomeworkReport {
   section_id: number;
   title: string;
   due_date: string;
+  max_marks: number | string | null;
   rows: StudentSubmissionStatus[];
   submitted_count: number;
   total_students: number;
