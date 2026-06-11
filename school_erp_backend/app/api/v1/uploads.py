@@ -50,7 +50,12 @@ async def upload_file(
 @router.get("/{file_path:path}")
 async def serve_file(file_path: str, ctx: TenantContext = Depends(require_tenant)):
     base = Path(settings.UPLOAD_DIR).resolve() / f"tenant_{ctx.tenant_id}"
-    target = (base / file_path).resolve()
+    # POST /v1/uploads returns paths like "tenant_1/homework/submissions/abc.jpg"
+    # (relative to UPLOAD_DIR). Clients echo that exact string back here, so
+    # strip the redundant tenant prefix before re-joining with `base`.
+    prefix = f"tenant_{ctx.tenant_id}/"
+    rel = file_path[len(prefix):] if file_path.startswith(prefix) else file_path
+    target = (base / rel).resolve()
     if not str(target).startswith(str(base) + "/"):
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid path")
     if not target.is_file():

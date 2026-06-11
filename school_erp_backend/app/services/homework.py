@@ -295,6 +295,7 @@ async def homework_status_report(
         section_id=homework.section_id,
         title=homework.title,
         due_date=homework.due_date,
+        max_marks=homework.max_marks,
         rows=rows,
         submitted_count=submitted,
         total_students=len(students),
