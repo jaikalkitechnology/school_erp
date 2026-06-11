@@ -167,6 +167,17 @@ class ParentRepository {
     }
   }
 
+  Future<TimetableView?> timetable(int studentId) async {
+    try {
+      final res = await _api.dio.get<Map<String, dynamic>>(
+        '/v1/parent/children/$studentId/timetable',
+      );
+      return TimetableView.fromJson(res.data ?? const {});
+    } on DioException {
+      return null;
+    }
+  }
+
   // ----- Phase 11: Fees -----------------------------------------------------
 
   Future<ChildFeeView> fees(int studentId) async {
@@ -330,6 +341,71 @@ class ClassAverage {
         classSize: (j['class_size'] as num?)?.toInt() ?? 0,
         windowDays: (j['window_days'] as num?)?.toInt() ?? 0,
         childAttendanceDays: (j['child_attendance_days'] as num?)?.toInt() ?? 0,
+      );
+}
+
+class TimetableCell {
+  const TimetableCell({
+    required this.dayOfWeek,
+    required this.periodNumber,
+    required this.subjectName,
+    required this.teacherName,
+    required this.room,
+    required this.startTime,
+    required this.endTime,
+  });
+
+  final int dayOfWeek; // 0=Mon..6=Sun
+  final int periodNumber;
+  final String? subjectName;
+  final String? teacherName;
+  final String? room;
+  final String? startTime; // "08:00:00"
+  final String? endTime;
+
+  factory TimetableCell.fromJson(Map<String, dynamic> j) => TimetableCell(
+        dayOfWeek: (j['day_of_week'] as num).toInt(),
+        periodNumber: (j['period_number'] as num).toInt(),
+        subjectName: j['subject_name'] as String?,
+        teacherName: j['teacher_name'] as String?,
+        room: j['room'] as String?,
+        startTime: j['start_time'] as String?,
+        endTime: j['end_time'] as String?,
+      );
+}
+
+class TimetableView {
+  const TimetableView({
+    required this.sectionId,
+    required this.sectionName,
+    required this.className,
+    required this.cells,
+    required this.note,
+  });
+
+  final int? sectionId;
+  final String? sectionName;
+  final String? className;
+  final List<TimetableCell> cells;
+  final String? note;
+
+  bool get hasData => cells.isNotEmpty;
+
+  /// Cells for one weekday, sorted by period_number.
+  List<TimetableCell> dayCells(int weekday) {
+    final out = cells.where((c) => c.dayOfWeek == weekday).toList()
+      ..sort((a, b) => a.periodNumber.compareTo(b.periodNumber));
+    return out;
+  }
+
+  factory TimetableView.fromJson(Map<String, dynamic> j) => TimetableView(
+        sectionId: (j['section_id'] as num?)?.toInt(),
+        sectionName: j['section_name'] as String?,
+        className: j['class_name'] as String?,
+        cells: ((j['cells'] as List<dynamic>?) ?? const [])
+            .map((e) => TimetableCell.fromJson(e as Map<String, dynamic>))
+            .toList(),
+        note: j['note'] as String?,
       );
 }
 

@@ -126,3 +126,27 @@ class ClassAverageRow(BaseModel):
     class_size: int
     window_days: int
     child_attendance_days: int
+
+
+class ParentTimetableCell(BaseModel):
+    """One period in the parent-facing timetable view. IDs are resolved
+    server-side to names + period start/end times so the mobile UI can
+    render without a fan-out fetch."""
+
+    day_of_week: int  # 0=Mon..6=Sun
+    period_number: int
+    subject_id: Optional[int] = None
+    subject_name: Optional[str] = None
+    teacher_user_id: Optional[int] = None
+    teacher_name: Optional[str] = None
+    room: Optional[str] = None
+    start_time: Optional[str] = None  # "08:00:00"
+    end_time: Optional[str] = None    # "08:45:00"
+
+
+class ParentTimetable(BaseModel):
+    section_id: Optional[int] = None
+    section_name: Optional[str] = None
+    class_name: Optional[str] = None
+    cells: list[ParentTimetableCell]
+    note: Optional[str] = None  # populated when no timetable exists yet

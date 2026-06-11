@@ -80,6 +80,11 @@ class _AttendancePageState extends State<AttendancePage> {
                     if (state is AttendanceLoaded) ...[
                       _TodayCard(rows: state.rows, s: s),
                       const SizedBox(height: 12),
+                      if (state.timetable != null &&
+                          state.timetable!.hasData) ...[
+                        _TodayScheduleCard(timetable: state.timetable!),
+                        const SizedBox(height: 12),
+                      ],
                       _ThresholdBanner(rows: state.rows, s: s),
                       if (state.classAverage != null &&
                           state.classAverage!.isMeaningful)
@@ -116,6 +121,12 @@ class _AttendancePageState extends State<AttendancePage> {
                         state.bySubject != null) ...[
                       const SizedBox(height: 16),
                       _SubjectBreakdown(report: state.bySubject!),
+                    ],
+                    if (state is AttendanceLoaded &&
+                        state.timetable != null &&
+                        state.timetable!.hasData) ...[
+                      const SizedBox(height: 16),
+                      _WeeklyTimetable(timetable: state.timetable!),
                     ],
                     const SizedBox(height: 16),
                     _Legend(s: s),
@@ -1198,6 +1209,351 @@ class _CutoffMarker extends StatelessWidget {
       decoration: BoxDecoration(
         color: const Color(0xFFD32F2F).withOpacity(0.7),
         borderRadius: BorderRadius.circular(1),
+      ),
+    );
+  }
+}
+
+// ---- Today's schedule card -----------------------------------------------
+
+class _TodayScheduleCard extends StatelessWidget {
+  const _TodayScheduleCard({required this.timetable});
+  final TimetableView timetable;
+
+  @override
+  Widget build(BuildContext context) {
+    final weekday = DateTime.now().weekday - 1; // 0=Mon..6=Sun
+    final periods = timetable.dayCells(weekday);
+    if (periods.isEmpty) {
+      return Container(
+        padding: const EdgeInsets.all(14),
+        decoration: BoxDecoration(
+          color: JaikalkiBrand.warmWhite,
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: JaikalkiBrand.saffronPale),
+        ),
+        child: Row(
+          children: const [
+            Icon(Icons.event_available_outlined,
+                size: 18, color: JaikalkiBrand.textSecondary),
+            SizedBox(width: 8),
+            Expanded(
+              child: Text(
+                'No classes scheduled today.',
+                style: TextStyle(
+                  color: JaikalkiBrand.textSecondary,
+                  fontSize: 13,
+                ),
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: JaikalkiBrand.warmWhite,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: JaikalkiBrand.saffronPale),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Icon(Icons.today_rounded,
+                  size: 18, color: JaikalkiBrand.indigoDark),
+              const SizedBox(width: 6),
+              const Text(
+                "Today's classes",
+                style: TextStyle(
+                  fontWeight: FontWeight.w700,
+                  color: JaikalkiBrand.indigoDark,
+                ),
+              ),
+              const Spacer(),
+              if (timetable.className != null && timetable.sectionName != null)
+                Text(
+                  '${timetable.className} · ${timetable.sectionName}',
+                  style: const TextStyle(
+                    fontSize: 11,
+                    color: JaikalkiBrand.textSecondary,
+                  ),
+                ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          for (int i = 0; i < periods.length; i++) ...[
+            _PeriodTile(
+              cell: periods[i],
+              isLast: i == periods.length - 1,
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+class _PeriodTile extends StatelessWidget {
+  const _PeriodTile({required this.cell, required this.isLast});
+  final TimetableCell cell;
+  final bool isLast;
+
+  String _humanHM(String? iso) {
+    if (iso == null) return '';
+    final parts = iso.split(':');
+    if (parts.length < 2) return iso;
+    final h = int.tryParse(parts[0]) ?? 0;
+    final m = parts[1];
+    final h12 = h == 0 ? 12 : (h > 12 ? h - 12 : h);
+    final ampm = h < 12 ? 'AM' : 'PM';
+    return '$h12:$m $ampm';
+  }
+
+  bool _isNow() {
+    final now = DateTime.now();
+    final start = _toToday(cell.startTime);
+    final end = _toToday(cell.endTime);
+    if (start == null || end == null) return false;
+    return now.isAfter(start) && now.isBefore(end);
+  }
+
+  DateTime? _toToday(String? iso) {
+    if (iso == null) return null;
+    final parts = iso.split(':');
+    if (parts.length < 2) return null;
+    final h = int.tryParse(parts[0]);
+    final m = int.tryParse(parts[1]);
+    if (h == null || m == null) return null;
+    final now = DateTime.now();
+    return DateTime(now.year, now.month, now.day, h, m);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final now = _isNow();
+    final start = _humanHM(cell.startTime);
+    final end = _humanHM(cell.endTime);
+
+    return Padding(
+      padding: EdgeInsets.only(bottom: isLast ? 0 : 10),
+      child: Row(
+        children: [
+          Container(
+            width: 56,
+            padding: const EdgeInsets.symmetric(vertical: 6),
+            decoration: BoxDecoration(
+              color: now ? JaikalkiBrand.saffron : JaikalkiBrand.saffronPale,
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Column(
+              children: [
+                Text(
+                  'P${cell.periodNumber}',
+                  style: TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w700,
+                    color: now ? Colors.white : JaikalkiBrand.saffronDarker,
+                  ),
+                ),
+                if (start.isNotEmpty)
+                  Text(
+                    start.split(' ')[0],
+                    style: TextStyle(
+                      fontSize: 11,
+                      color: now ? Colors.white : JaikalkiBrand.saffronDarker,
+                    ),
+                  ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        cell.subjectName ?? '—',
+                        style: TextStyle(
+                          fontWeight: FontWeight.w700,
+                          fontSize: 14,
+                          color: now
+                              ? JaikalkiBrand.saffronDarker
+                              : JaikalkiBrand.indigoDark,
+                        ),
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                    if (now)
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 6, vertical: 2),
+                        decoration: BoxDecoration(
+                          color: JaikalkiBrand.saffron,
+                          borderRadius: BorderRadius.circular(6),
+                        ),
+                        child: const Text(
+                          'NOW',
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontSize: 9,
+                            fontWeight: FontWeight.w800,
+                            letterSpacing: 0.6,
+                          ),
+                        ),
+                      ),
+                  ],
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  [
+                    if (cell.teacherName != null) cell.teacherName,
+                    if (cell.room != null) 'Room ${cell.room}',
+                    if (start.isNotEmpty && end.isNotEmpty) '$start – $end',
+                  ].whereType<String>().join(' · '),
+                  style: const TextStyle(
+                    fontSize: 11,
+                    color: JaikalkiBrand.textSecondary,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ---- Weekly timetable (expandable) ---------------------------------------
+
+class _WeeklyTimetable extends StatefulWidget {
+  const _WeeklyTimetable({required this.timetable});
+  final TimetableView timetable;
+
+  @override
+  State<_WeeklyTimetable> createState() => _WeeklyTimetableState();
+}
+
+class _WeeklyTimetableState extends State<_WeeklyTimetable> {
+  bool _expanded = false;
+  int _selectedDay = DateTime.now().weekday - 1; // 0=Mon..6=Sun
+
+  static const _dayLabels = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+
+  @override
+  Widget build(BuildContext context) {
+    final cells = widget.timetable.dayCells(_selectedDay);
+
+    return Container(
+      decoration: BoxDecoration(
+        color: JaikalkiBrand.warmWhite,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: JaikalkiBrand.saffronPale),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          InkWell(
+            borderRadius: BorderRadius.circular(14),
+            onTap: () => setState(() => _expanded = !_expanded),
+            child: Padding(
+              padding: const EdgeInsets.all(14),
+              child: Row(
+                children: [
+                  const Icon(Icons.calendar_view_week_rounded,
+                      size: 18, color: JaikalkiBrand.indigoDark),
+                  const SizedBox(width: 6),
+                  const Text(
+                    'Weekly schedule',
+                    style: TextStyle(
+                      fontWeight: FontWeight.w700,
+                      color: JaikalkiBrand.indigoDark,
+                    ),
+                  ),
+                  const Spacer(),
+                  Icon(
+                    _expanded
+                        ? Icons.keyboard_arrow_up_rounded
+                        : Icons.keyboard_arrow_down_rounded,
+                    color: JaikalkiBrand.textSecondary,
+                  ),
+                ],
+              ),
+            ),
+          ),
+          if (_expanded) ...[
+            const Divider(height: 1, color: JaikalkiBrand.saffronPale),
+            // Day tabs
+            SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+              child: Row(
+                children: [
+                  for (int i = 0; i < 7; i++)
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 2),
+                      child: InkWell(
+                        borderRadius: BorderRadius.circular(8),
+                        onTap: () => setState(() => _selectedDay = i),
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 12, vertical: 6),
+                          decoration: BoxDecoration(
+                            color: _selectedDay == i
+                                ? JaikalkiBrand.saffron
+                                : Colors.transparent,
+                            borderRadius: BorderRadius.circular(8),
+                            border: Border.all(
+                              color: _selectedDay == i
+                                  ? JaikalkiBrand.saffron
+                                  : JaikalkiBrand.saffronPale,
+                            ),
+                          ),
+                          child: Text(
+                            _dayLabels[i],
+                            style: TextStyle(
+                              fontSize: 11,
+                              fontWeight: FontWeight.w700,
+                              color: _selectedDay == i
+                                  ? Colors.white
+                                  : JaikalkiBrand.indigoDark,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                ],
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(14, 0, 14, 14),
+              child: cells.isEmpty
+                  ? const Text(
+                      'No classes on this day.',
+                      style: TextStyle(
+                        color: JaikalkiBrand.textSecondary,
+                        fontSize: 12,
+                      ),
+                    )
+                  : Column(
+                      children: [
+                        for (int i = 0; i < cells.length; i++)
+                          _PeriodTile(
+                            cell: cells[i],
+                            isLast: i == cells.length - 1,
+                          ),
+                      ],
+                    ),
+            ),
+          ],
+        ],
       ),
     );
   }
