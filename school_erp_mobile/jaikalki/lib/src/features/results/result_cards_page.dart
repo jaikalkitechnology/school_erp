@@ -30,6 +30,17 @@ class _ResultCardsPageState extends State<ResultCardsPage> {
 
   @override
   Widget build(BuildContext context) {
+    // ChildrenCubit isn't provided in the app root or HomeShell — the
+    // bottom-nav tab pages each re-inject it from the locator. Pages
+    // pushed off the More tab need to do the same, or any
+    // `context.watch<ChildrenCubit>()` below throws.
+    return BlocProvider.value(
+      value: locator<ChildrenCubit>(),
+      child: Builder(builder: _build),
+    );
+  }
+
+  Widget _build(BuildContext context) {
     final children = context.watch<ChildrenCubit>().state;
     if (children is! ChildrenLoaded || children.selectedId == null) {
       return const Center(
