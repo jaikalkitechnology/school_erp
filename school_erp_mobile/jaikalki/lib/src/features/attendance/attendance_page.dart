@@ -56,9 +56,9 @@ class _AttendancePageState extends State<AttendancePage> {
       ],
       child: BlocListener<ChildrenCubit, ChildrenState>(
         listenWhen: (a, b) =>
-            a is ChildrenLoaded &&
             b is ChildrenLoaded &&
-            a.selectedId != b.selectedId,
+            b.selectedId != null &&
+            (a is! ChildrenLoaded || a.selectedId != b.selectedId),
         listener: (context, state) => _loadForSelected(),
         child: Scaffold(
           appBar: AppBar(title: Text(s.tabAttendance)),
