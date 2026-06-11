@@ -4,6 +4,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../core/auth_cubit.dart';
 import '../../core/settings_cubit.dart';
 import '../../theme/brand.dart';
+import '../calendar/calendar_page.dart';
 import '../notifications/notifications_page.dart';
 import '../results/result_cards_page.dart';
 import '../settings/settings_page.dart';
@@ -25,6 +26,11 @@ class MorePage extends StatelessWidget {
             icon: Icons.workspace_premium_outlined,
             label: 'Result cards',
             onTap: () => _open(context, 'Result cards', const ResultCardsPage()),
+          ),
+          _Tile(
+            icon: Icons.event_outlined,
+            label: 'Calendar',
+            onTap: () => _open(context, 'Calendar', const CalendarPage()),
           ),
           _Tile(
             icon: Icons.notifications_outlined,

@@ -842,3 +842,54 @@ async def set_parent_password(
     await session.commit()
     await session.refresh(user)
     return user
+
+
+# ---- Parent calendar feeds (holidays + events) ----------------------------
+
+
+async def list_holidays_for_parent(
+    session: AsyncSession, *, days_back: int = 7, days_forward: int = 180
+) -> list:
+    """Return holidays in a window around today. Tenant-scoped via the
+    parent session's loader criteria, so no tenant_id filter is needed
+    here."""
+    from app.models.academic import Holiday
+
+    today = _now().date()
+    from datetime import timedelta
+
+    start = today - timedelta(days=days_back)
+    end = today + timedelta(days=days_forward)
+    rows = (
+        await session.execute(
+            select(Holiday)
+            .where(Holiday.date >= start, Holiday.date <= end)
+            .order_by(Holiday.date.asc())
+        )
+    ).scalars().all()
+    return list(rows)
+
+
+async def list_events_for_parent(
+    session: AsyncSession, *, days_back: int = 7, days_forward: int = 180
+) -> list:
+    """Events visible to parents: audience in ('all', 'parents'). Class-
+    scoped events (audience='class:XY') aren't surfaced here yet — they
+    need the child's section context which the caller doesn't pass."""
+    today = _now().date()
+    from datetime import datetime as _dt, timedelta
+
+    start = _dt.combine(today - timedelta(days=days_back), _dt.min.time())
+    end = _dt.combine(today + timedelta(days=days_forward), _dt.max.time())
+    rows = (
+        await session.execute(
+            select(CalendarEvent)
+            .where(
+                CalendarEvent.starts_at >= start,
+                CalendarEvent.starts_at <= end,
+                CalendarEvent.audience.in_(["all", "parents"]),
+            )
+            .order_by(CalendarEvent.starts_at.asc())
+        )
+    ).scalars().all()
+    return list(rows)

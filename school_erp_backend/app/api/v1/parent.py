@@ -25,6 +25,8 @@ from app.schemas.parent import (
     ParentSelfRead,
     StudentDocSummary,
 )
+from app.schemas.academic import HolidayRead
+from app.schemas.curriculum import CalendarEventRead
 from app.services.parents import (
     apply_leave,
     attendance_history_for_parent,
@@ -35,6 +37,8 @@ from app.services.parents import (
     link_parent_to_student,
     list_children,
     list_documents_for_child,
+    list_events_for_parent,
+    list_holidays_for_parent,
     list_leaves_for_user,
     subject_attendance_for_parent,
     list_parent_links,
@@ -181,6 +185,31 @@ async def apply_leave_route(
     session: AsyncSession = Depends(platform_session),
 ):
     return await apply_leave(session, principal.tenant_id, principal.user_id, payload)
+
+
+# ---- Calendar feeds: parent-visible holidays + events ---------------------
+
+
+@router.get("/holidays", response_model=list[HolidayRead])
+async def parent_holidays_route(
+    days_back: int = Query(7, ge=0, le=60),
+    days_forward: int = Query(180, ge=1, le=365),
+    session: AsyncSession = Depends(tenant_scoped_session),
+):
+    return await list_holidays_for_parent(
+        session, days_back=days_back, days_forward=days_forward
+    )
+
+
+@router.get("/events", response_model=list[CalendarEventRead])
+async def parent_events_route(
+    days_back: int = Query(7, ge=0, le=60),
+    days_forward: int = Query(180, ge=1, le=365),
+    session: AsyncSession = Depends(tenant_scoped_session),
+):
+    return await list_events_for_parent(
+        session, days_back=days_back, days_forward=days_forward
+    )
 
 
 # ---- School-admin parent management ----------------------------------------

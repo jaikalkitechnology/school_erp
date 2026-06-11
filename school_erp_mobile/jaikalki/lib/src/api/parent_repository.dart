@@ -312,6 +312,34 @@ class ParentRepository {
     );
     return savePath;
   }
+
+  Future<List<Holiday>> holidays({int daysBack = 7, int daysForward = 180}) async {
+    try {
+      final res = await _api.dio.get<List<dynamic>>(
+        '/v1/parent/holidays',
+        queryParameters: {'days_back': daysBack, 'days_forward': daysForward},
+      );
+      return (res.data ?? const [])
+          .map((e) => Holiday.fromJson(e as Map<String, dynamic>))
+          .toList();
+    } on DioException {
+      return const [];
+    }
+  }
+
+  Future<List<SchoolEvent>> events({int daysBack = 7, int daysForward = 180}) async {
+    try {
+      final res = await _api.dio.get<List<dynamic>>(
+        '/v1/parent/events',
+        queryParameters: {'days_back': daysBack, 'days_forward': daysForward},
+      );
+      return (res.data ?? const [])
+          .map((e) => SchoolEvent.fromJson(e as Map<String, dynamic>))
+          .toList();
+    } on DioException {
+      return const [];
+    }
+  }
 }
 
 class AttendanceRow {
@@ -650,5 +678,66 @@ class HomeworkItem {
         // Backend field is `marks` (not `marks_obtained`).
         marksObtained: _toDouble(j['marks']),
         feedback: j['feedback'] as String?,
+      );
+}
+
+// ---- Calendar feeds: holidays + events ------------------------------------
+
+class Holiday {
+  const Holiday({
+    required this.id,
+    required this.date,
+    required this.name,
+    required this.kind,
+    required this.description,
+  });
+
+  final int id;
+  final String date;
+  final String name;
+  /// public / school / optional / vacation
+  final String kind;
+  final String? description;
+
+  factory Holiday.fromJson(Map<String, dynamic> j) => Holiday(
+        id: (j['id'] as num).toInt(),
+        date: (j['date'] as String?) ?? '',
+        name: (j['name'] as String?) ?? '',
+        kind: (j['kind'] as String?) ?? 'public',
+        description: j['description'] as String?,
+      );
+}
+
+class SchoolEvent {
+  const SchoolEvent({
+    required this.id,
+    required this.title,
+    required this.description,
+    required this.kind,
+    required this.startsAt,
+    required this.endsAt,
+    required this.isAllDay,
+    required this.audience,
+  });
+
+  final int id;
+  final String title;
+  final String? description;
+  /// general / exam / sports / cultural / parent_teacher / holiday
+  final String kind;
+  final String startsAt;
+  final String? endsAt;
+  final bool isAllDay;
+  final String audience;
+
+  factory SchoolEvent.fromJson(Map<String, dynamic> j) => SchoolEvent(
+        id: (j['id'] as num).toInt(),
+        title: (j['title'] as String?) ?? '',
+        description: j['description'] as String?,
+        kind: (j['kind'] as String?) ?? 'general',
+        startsAt: (j['starts_at'] as String?) ?? '',
+        endsAt: j['ends_at'] as String?,
+        isAllDay: (j['is_all_day'] as bool?) ?? true,
+        audience: (j['audience'] as String?) ?? 'all',
       );
 }
