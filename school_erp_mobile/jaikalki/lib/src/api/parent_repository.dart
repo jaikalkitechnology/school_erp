@@ -234,11 +234,13 @@ class ParentRepository {
     required String content,
     List<String>? attachmentPaths,
   }) async {
+    // Backend route is POST /v1/parent/children/{student_id}/homework/submit
+    // with body { homework_id, content?, attachments[] } — student_id lives
+    // in the path, not the body.
     await _api.dio.post<dynamic>(
-      '/v1/parent/homework/submit',
+      '/v1/parent/children/$studentId/homework/submit',
       data: {
         'homework_id': homeworkId,
-        'student_id': studentId,
         'content': content,
         if (attachmentPaths != null && attachmentPaths.isNotEmpty)
           'attachments': attachmentPaths,
