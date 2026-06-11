@@ -17,6 +17,8 @@ from app.schemas.attendance import (
     AttendanceMarkRequest,
     ClassAverageRow,
     DefaulterRow,
+    ParentTimetable,
+    ParentTimetableCell,
     SectionMonthlyReport,
     SectionRoll,
     StudentHistoryRow,
@@ -636,3 +638,118 @@ def timedelta_days(days: int):
     """Tiny helper so we don't import datetime.timedelta everywhere."""
     from datetime import timedelta
     return timedelta(days=days)
+
+
+# ---- Parent-facing timetable view ----------------------------------------
+
+
+async def student_timetable_view(
+    session: AsyncSession,
+    *,
+    student_id: int,
+) -> ParentTimetable:
+    """Resolve the section's published timetable into a parent-ready
+    payload: subject names, teacher names, and the period start/end
+    times from PeriodDef — all in two extra queries beyond the cells
+    themselves. The mobile UI can render each cell without fan-out."""
+    from app.models.academic import ClassDef, Subject
+    from app.models.auth import User
+    from app.models.timetable import PeriodDef, TimetableEntry
+
+    student = (
+        await session.execute(select(Student).where(Student.id == student_id))
+    ).scalar_one_or_none()
+    if student is None or student.section_id is None:
+        return ParentTimetable(cells=[], note="Student has no section assigned.")
+
+    section = (
+        await session.execute(select(Section).where(Section.id == student.section_id))
+    ).scalar_one_or_none()
+    class_name: Optional[str] = None
+    if section is not None and section.class_def_id is not None:
+        cls = (
+            await session.execute(
+                select(ClassDef).where(ClassDef.id == section.class_def_id)
+            )
+        ).scalar_one_or_none()
+        class_name = cls.name if cls is not None else None
+
+    cells = list(
+        (
+            await session.execute(
+                select(TimetableEntry).where(
+                    TimetableEntry.section_id == student.section_id,
+                )
+            )
+        ).scalars().all()
+    )
+    if not cells:
+        return ParentTimetable(
+            section_id=student.section_id,
+            section_name=section.name if section else None,
+            class_name=class_name,
+            cells=[],
+            note="Timetable hasn't been published for this section yet.",
+        )
+
+    # Subject + teacher names in one round-trip each.
+    subj_ids = {c.subject_id for c in cells if c.subject_id is not None}
+    teacher_ids = {c.teacher_user_id for c in cells if c.teacher_user_id is not None}
+    subj_names: dict[int, str] = {}
+    if subj_ids:
+        subj_names = dict(
+            (
+                await session.execute(
+                    select(Subject.id, Subject.name).where(Subject.id.in_(subj_ids))
+                )
+            ).all()
+        )
+    teacher_names: dict[int, str] = {}
+    if teacher_ids:
+        teacher_names = dict(
+            (
+                await session.execute(
+                    select(User.id, User.full_name).where(User.id.in_(teacher_ids))
+                )
+            ).all()
+        )
+
+    # Period start/end times come from PeriodDef per (weekday, period_number).
+    pd_rows = list(
+        (
+            await session.execute(
+                select(PeriodDef)
+            )
+        ).scalars().all()
+    )
+    period_times: dict[tuple[int, int], tuple[Optional[str], Optional[str]]] = {}
+    for p in pd_rows:
+        period_times[(p.day_of_week, p.period_number)] = (
+            p.start_time.isoformat() if p.start_time else None,
+            p.end_time.isoformat() if p.end_time else None,
+        )
+
+    out_cells: list[ParentTimetableCell] = []
+    for c in cells:
+        start, end = period_times.get((c.day_of_week, c.period_number), (None, None))
+        out_cells.append(
+            ParentTimetableCell(
+                day_of_week=c.day_of_week,
+                period_number=c.period_number,
+                subject_id=c.subject_id,
+                subject_name=subj_names.get(c.subject_id) if c.subject_id else None,
+                teacher_user_id=c.teacher_user_id,
+                teacher_name=teacher_names.get(c.teacher_user_id) if c.teacher_user_id else None,
+                room=c.room,
+                start_time=start,
+                end_time=end,
+            )
+        )
+    out_cells.sort(key=lambda x: (x.day_of_week, x.period_number))
+
+    return ParentTimetable(
+        section_id=student.section_id,
+        section_name=section.name if section else None,
+        class_name=class_name,
+        cells=out_cells,
+    )

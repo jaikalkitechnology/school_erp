@@ -19,6 +19,7 @@ class AttendanceLoaded extends AttendanceState {
     this.rows, {
     this.bySubject,
     this.classAverage,
+    this.timetable,
   });
 
   final List<AttendanceRow> rows;
@@ -32,15 +33,22 @@ class AttendanceLoaded extends AttendanceState {
   /// non-null when computed (may have classSize == 0 for invalid).
   final ClassAverage? classAverage;
 
+  /// Section's published timetable, resolved with subject + teacher
+  /// names + period start/end. Null while loading, an empty TimetableView
+  /// (with note) when nothing's published.
+  final TimetableView? timetable;
+
   AttendanceLoaded copyWith({
     List<AttendanceRow>? rows,
     SubjectAttendanceReport? bySubject,
     ClassAverage? classAverage,
+    TimetableView? timetable,
   }) =>
       AttendanceLoaded(
         rows ?? this.rows,
         bySubject: bySubject ?? this.bySubject,
         classAverage: classAverage ?? this.classAverage,
+        timetable: timetable ?? this.timetable,
       );
 }
 
@@ -75,6 +83,7 @@ class AttendanceCubit extends Cubit<AttendanceState> {
       final results = await Future.wait<dynamic>([
         _repo.attendanceBySubject(studentId, windowDays: 90),
         _repo.attendanceClassAverage(studentId, windowDays: 30),
+        _repo.timetable(studentId),
       ]);
       if (_lastStudentId != studentId) return; // user switched kid mid-flight
       final current = state;
@@ -82,6 +91,7 @@ class AttendanceCubit extends Cubit<AttendanceState> {
         emit(current.copyWith(
           bySubject: results[0] as SubjectAttendanceReport,
           classAverage: results[1] as ClassAverage?,
+          timetable: results[2] as TimetableView?,
         ));
       }
     } catch (e) {

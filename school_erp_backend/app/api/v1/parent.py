@@ -42,6 +42,7 @@ from app.services.parents import (
     parent_self,
     select_child,
     set_parent_password,
+    timetable_for_parent,
     unlink_parent_from_student,
 )
 
@@ -148,6 +149,20 @@ async def child_attendance_class_average(
         user_id=principal.user_id,
         student_id=student_id,
         window_days=window_days,
+    )
+
+
+@router.get("/children/{student_id}/timetable")
+async def child_timetable(
+    student_id: int,
+    principal: AuthPrincipal = Depends(_parent_role),
+    session: AsyncSession = Depends(platform_session),
+):
+    return await timetable_for_parent(
+        session,
+        tenant_id=principal.tenant_id,
+        user_id=principal.user_id,
+        student_id=student_id,
     )
 
 

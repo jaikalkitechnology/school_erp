@@ -456,6 +456,21 @@ async def class_average_for_parent(
     )
 
 
+async def timetable_for_parent(
+    session: AsyncSession,
+    *,
+    tenant_id: int,
+    user_id: int,
+    student_id: int,
+):
+    await _require_linked_child(
+        session, tenant_id=tenant_id, user_id=user_id, student_id=student_id,
+    )
+    from app.services.attendance import student_timetable_view
+
+    return await student_timetable_view(session, student_id=student_id)
+
+
 async def list_documents_for_child(
     session: AsyncSession, tenant_id: int, user_id: int, student_id: int
 ) -> list[StudentDocSummary]:
