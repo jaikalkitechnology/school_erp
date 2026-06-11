@@ -23,12 +23,12 @@ class MorePage extends StatelessWidget {
           _Tile(
             icon: Icons.notifications_outlined,
             label: s.tabNotifications,
-            onTap: () => _open(context, const NotificationsPage()),
+            onTap: () => _open(context, s.tabNotifications, const NotificationsPage()),
           ),
           _Tile(
             icon: Icons.settings_outlined,
             label: s.tabSettings,
-            onTap: () => _open(context, const SettingsPage()),
+            onTap: () => _open(context, s.tabSettings, const SettingsPage()),
           ),
           const Divider(height: 0),
           ListTile(
@@ -45,9 +45,18 @@ class MorePage extends StatelessWidget {
     );
   }
 
-  void _open(BuildContext context, Widget page) {
+  /// Wraps the pushed page in a Scaffold + AppBar so widgets like
+  /// ChoiceChip can find a Material ancestor. The original pages used to
+  /// live inside HomeShell's Scaffold and never had their own — moving
+  /// them behind the "More" tab via Navigator.push lost that ancestor.
+  void _open(BuildContext context, String title, Widget page) {
     Navigator.of(context).push(
-      MaterialPageRoute(builder: (_) => page),
+      MaterialPageRoute(
+        builder: (_) => Scaffold(
+          appBar: AppBar(title: Text(title)),
+          body: page,
+        ),
+      ),
     );
   }
 }
