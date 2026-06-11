@@ -4,6 +4,19 @@ import 'package:dio/dio.dart';
 
 import 'api_client.dart';
 
+/// Pydantic v2 serialises Decimal columns as JSON *strings* (e.g.
+/// `"10.00"`) to preserve precision. Dart's `as num?` cast fails on
+/// strings, so every field that maps to a backend Decimal goes through
+/// this helper. Accepts num, string, or null; returns null on bad data.
+double? _toDouble(dynamic v) {
+  if (v == null) return null;
+  if (v is num) return v.toDouble();
+  if (v is String) return double.tryParse(v);
+  return null;
+}
+
+double _toDoubleOrZero(dynamic v) => _toDouble(v) ?? 0.0;
+
 class Child {
   Child({
     required this.studentId,
@@ -75,7 +88,7 @@ class ChildDashboard {
             .toList(),
         upcomingEventsCount: (j['upcoming_events_count'] as num?)?.toInt() ?? 0,
         todayAttendance: j['today_attendance'] as String?,
-        feeDueAmount: (j['fee_due_amount'] as num?)?.toDouble() ?? 0.0,
+        feeDueAmount: _toDoubleOrZero(j['fee_due_amount']),
       );
 }
 
@@ -315,7 +328,7 @@ class SubjectAttendanceRow {
         halfDay: (j['half_day'] as num?)?.toInt() ?? 0,
         absent: (j['absent'] as num?)?.toInt() ?? 0,
         total: (j['total'] as num?)?.toInt() ?? 0,
-        percentage: (j['percentage'] as num?)?.toDouble() ?? 0.0,
+        percentage: _toDoubleOrZero(j['percentage']),
       );
 }
 
@@ -362,8 +375,8 @@ class ClassAverage {
   bool get isMeaningful => childAttendanceDays > 0 && classSize > 1;
 
   factory ClassAverage.fromJson(Map<String, dynamic> j) => ClassAverage(
-        childPct: (j['child_pct'] as num?)?.toDouble() ?? 0.0,
-        classPct: (j['class_pct'] as num?)?.toDouble() ?? 0.0,
+        childPct: _toDoubleOrZero(j['child_pct']),
+        classPct: _toDoubleOrZero(j['class_pct']),
         classSize: (j['class_size'] as num?)?.toInt() ?? 0,
         windowDays: (j['window_days'] as num?)?.toInt() ?? 0,
         childAttendanceDays: (j['child_attendance_days'] as num?)?.toInt() ?? 0,
@@ -470,8 +483,8 @@ class FeeInvoice {
         periodStart: (j['period_start'] as String?) ?? '',
         periodEnd: (j['period_end'] as String?) ?? '',
         dueDate: (j['due_date'] as String?) ?? '',
-        totalAmount: (j['total_amount'] as num?)?.toDouble() ?? 0.0,
-        paidAmount: (j['paid_amount'] as num?)?.toDouble() ?? 0.0,
+        totalAmount: _toDoubleOrZero(j['total_amount']),
+        paidAmount: _toDoubleOrZero(j['paid_amount']),
         status: (j['status'] as String?) ?? 'pending',
       );
 }
@@ -490,8 +503,8 @@ class ChildFeeView {
   final List<FeeInvoice> invoices;
 
   factory ChildFeeView.fromJson(Map<String, dynamic> j) => ChildFeeView(
-        totalDue: (j['total_due'] as num?)?.toDouble() ?? 0.0,
-        totalPaid: (j['total_paid'] as num?)?.toDouble() ?? 0.0,
+        totalDue: _toDoubleOrZero(j['total_due']),
+        totalPaid: _toDoubleOrZero(j['total_paid']),
         overdueCount: (j['overdue_count'] as num?)?.toInt() ?? 0,
         invoices: ((j['invoices'] as List<dynamic>?) ?? const [])
             .map((e) => FeeInvoice.fromJson(e as Map<String, dynamic>))
@@ -545,7 +558,7 @@ class HomeworkItem {
         subjectName: j['subject_name'] as String?,
         assignedOn: (j['assigned_on'] as String?) ?? '',
         dueDate: (j['due_date'] as String?) ?? '',
-        maxMarks: (j['max_marks'] as num?)?.toDouble(),
+        maxMarks: _toDouble(j['max_marks']),
         teacherAttachments: ((j['teacher_attachments'] as List<dynamic>?) ?? const [])
             .map((e) => e.toString())
             .toList(),
@@ -554,7 +567,7 @@ class HomeworkItem {
             ((j['submitted'] as bool?) == true ? 'submitted' : 'open'),
         submittedAt: j['submitted_at'] as String?,
         // Backend field is `marks` (not `marks_obtained`).
-        marksObtained: (j['marks'] as num?)?.toDouble(),
+        marksObtained: _toDouble(j['marks']),
         feedback: j['feedback'] as String?,
       );
 }
