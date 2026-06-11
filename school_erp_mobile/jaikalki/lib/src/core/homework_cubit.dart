@@ -60,6 +60,7 @@ class HomeworkCubit extends Cubit<HomeworkState> {
     required int homeworkId,
     required int studentId,
     required String content,
+    List<String>? attachmentPaths,
   }) async {
     final current = state;
     if (current is! HomeworkLoaded) return false;
@@ -69,6 +70,7 @@ class HomeworkCubit extends Cubit<HomeworkState> {
         homeworkId: homeworkId,
         studentId: studentId,
         content: content,
+        attachmentPaths: attachmentPaths,
       );
       await load(studentId, force: true);
       return true;
@@ -77,4 +79,9 @@ class HomeworkCubit extends Cubit<HomeworkState> {
       return false;
     }
   }
+
+  /// Uploads a local file and returns the server-side relative path. The
+  /// caller stages these paths in local UI state until submit time.
+  Future<String> uploadAttachment(String localPath) =>
+      _repo.uploadFile(localPath: localPath);
 }

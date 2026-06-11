@@ -1,3 +1,5 @@
+import 'dart:io' show Platform;
+
 import 'package:dio/dio.dart';
 
 import 'api_client.dart';
@@ -229,6 +231,30 @@ class ParentRepository {
           'attachments': attachmentPaths,
       },
     );
+  }
+
+  /// Uploads a single local file via /v1/uploads and returns the server-
+  /// side relative path (tenant_X/homework/submissions/<filename>). The
+  /// upload endpoint is gated by require_tenant only — parents have a
+  /// resolved TenantContext on every request via their bearer token, so
+  /// they can call this without a school-admin role.
+  Future<String> uploadFile({
+    required String localPath,
+    String category = 'homework',
+    String subcategory = 'submissions',
+  }) async {
+    final filename = localPath.split(Platform.pathSeparator).last;
+    final form = FormData.fromMap({
+      'category': category,
+      'subcategory': subcategory,
+      'file': await MultipartFile.fromFile(localPath, filename: filename),
+    });
+    final res = await _api.dio.post<Map<String, dynamic>>(
+      '/v1/uploads',
+      data: form,
+      options: Options(contentType: 'multipart/form-data'),
+    );
+    return (res.data?['path'] as String?) ?? '';
   }
 }
 
