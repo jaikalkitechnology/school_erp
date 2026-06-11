@@ -67,9 +67,9 @@ class _HomeworkPageState extends State<HomeworkPage>
       ],
       child: BlocListener<ChildrenCubit, ChildrenState>(
         listenWhen: (a, b) =>
-            a is ChildrenLoaded &&
             b is ChildrenLoaded &&
-            a.selectedId != b.selectedId,
+            b.selectedId != null &&
+            (a is! ChildrenLoaded || a.selectedId != b.selectedId),
         listener: (context, state) => _loadForSelected(),
         child: Scaffold(
           appBar: AppBar(
