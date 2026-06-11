@@ -28,6 +28,13 @@ class _DirectoryPageState extends State<DirectoryPage> {
 
   @override
   Widget build(BuildContext context) {
+    return BlocProvider.value(
+      value: locator<ChildrenCubit>(),
+      child: Builder(builder: _build),
+    );
+  }
+
+  Widget _build(BuildContext context) {
     final children = context.watch<ChildrenCubit>().state;
     if (children is! ChildrenLoaded || children.selectedId == null) {
       return const Center(
