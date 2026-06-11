@@ -272,3 +272,25 @@ async def parent_library_route(
         student_id=student_id,
         rows=[ParentLibraryRow(**r) for r in rows],
     )
+
+
+@parent_router.get("/library/catalog", response_model=list[BookWithStock])
+async def parent_library_catalog(
+    q: Optional[str] = None,
+    category: Optional[str] = None,
+    session: AsyncSession = Depends(tenant_scoped_session),
+):
+    """Read-only book search for parents. Same search/filter shape as the
+    librarian endpoint but without write actions — parents shouldn't be
+    able to add/edit/delete books, and circulation still flows through
+    the librarian-only POST /issue route."""
+    books = await list_books(session, q=q, category=category)
+    stocks = await book_stock(session, [b.id for b in books])
+    return [
+        {
+            **{c.name: getattr(b, c.name) for c in b.__table__.columns},
+            "total_copies": stocks.get(b.id, {}).get("total", 0),
+            "available_copies": stocks.get(b.id, {}).get("available", 0),
+        }
+        for b in books
+    ]

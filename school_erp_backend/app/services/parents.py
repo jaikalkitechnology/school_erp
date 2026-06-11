@@ -893,3 +893,86 @@ async def list_events_for_parent(
         )
     ).scalars().all()
     return list(rows)
+
+
+async def directory_for_parent(
+    session: AsyncSession, *, user_id: int, student_id: int
+) -> list[dict]:
+    """Returns the teachers actually attached to the child's section:
+    every SectionSubject row, plus the section in-charge as the class
+    teacher. Deliberately omits phone + email — the Teacher model has no
+    visibility flag yet, and exposing personal contacts to every parent
+    is a privacy non-starter."""
+    from app.models.academic import Section, Subject
+    from app.models.curriculum import SectionSubject
+    from app.models.teacher import Teacher
+
+    await _require_linked_child(session, user_id=user_id, student_id=student_id)
+
+    student = (
+        await session.execute(select(Student).where(Student.id == student_id))
+    ).scalar_one_or_none()
+    if student is None or student.section_id is None:
+        return []
+
+    section = (
+        await session.execute(select(Section).where(Section.id == student.section_id))
+    ).scalar_one_or_none()
+    if section is None:
+        return []
+
+    assignments = list(
+        (
+            await session.execute(
+                select(SectionSubject, Subject, Teacher)
+                .join(Subject, Subject.id == SectionSubject.subject_id)
+                .join(Teacher, Teacher.user_id == SectionSubject.teacher_user_id)
+                .where(
+                    SectionSubject.section_id == section.id,
+                    SectionSubject.teacher_user_id.is_not(None),
+                )
+            )
+        ).all()
+    )
+
+    entries: list[dict] = []
+    seen_teacher_ids: set[int] = set()
+
+    if section.in_charge_user_id is not None:
+        in_charge = (
+            await session.execute(
+                select(Teacher).where(Teacher.user_id == section.in_charge_user_id)
+            )
+        ).scalar_one_or_none()
+        if in_charge is not None:
+            entries.append({
+                "teacher_id": in_charge.id,
+                "full_name": in_charge.full_name,
+                "designation": in_charge.designation,
+                "photo_url": in_charge.photo_url,
+                "subject_name": None,
+                "is_class_teacher": True,
+            })
+            seen_teacher_ids.add(in_charge.id)
+
+    for _ss, subj, teacher in assignments:
+        # A subject teacher who is *also* the class teacher should appear
+        # only once but with their subject listed; replace the lonely
+        # class-teacher entry instead of duplicating.
+        if teacher.id in seen_teacher_ids:
+            for e in entries:
+                if e["teacher_id"] == teacher.id and e["subject_name"] is None:
+                    e["subject_name"] = subj.name
+                    break
+            continue
+        entries.append({
+            "teacher_id": teacher.id,
+            "full_name": teacher.full_name,
+            "designation": teacher.designation,
+            "photo_url": teacher.photo_url,
+            "subject_name": subj.name,
+            "is_class_teacher": False,
+        })
+        seen_teacher_ids.add(teacher.id)
+
+    return entries

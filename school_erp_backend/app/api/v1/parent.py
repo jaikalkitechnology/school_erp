@@ -34,6 +34,7 @@ from app.services.parents import (
     create_parent_user,
     dashboard_for_child,
     decide_leave,
+    directory_for_parent,
     link_parent_to_student,
     list_children,
     list_documents_for_child,
@@ -209,6 +210,20 @@ async def parent_events_route(
 ):
     return await list_events_for_parent(
         session, days_back=days_back, days_forward=days_forward
+    )
+
+
+@router.get("/children/{student_id}/directory")
+async def parent_directory_route(
+    student_id: int,
+    principal: AuthPrincipal = Depends(_parent_role),
+    session: AsyncSession = Depends(platform_session),
+):
+    """Read-only teacher directory for the selected child's section.
+    Returns name + designation + subject + photo only — never phone or
+    email until the Teacher model grows a per-row visibility flag."""
+    return await directory_for_parent(
+        session, user_id=principal.user_id, student_id=student_id
     )
 
 

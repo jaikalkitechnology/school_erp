@@ -340,6 +340,36 @@ class ParentRepository {
       return const [];
     }
   }
+
+  Future<List<LibraryBookSummary>> libraryCatalog({String? q, String? category}) async {
+    try {
+      final res = await _api.dio.get<List<dynamic>>(
+        '/v1/parent/library/catalog',
+        queryParameters: {
+          if (q != null && q.isNotEmpty) 'q': q,
+          if (category != null && category.isNotEmpty) 'category': category,
+        },
+      );
+      return (res.data ?? const [])
+          .map((e) => LibraryBookSummary.fromJson(e as Map<String, dynamic>))
+          .toList();
+    } on DioException {
+      return const [];
+    }
+  }
+
+  Future<List<DirectoryEntry>> directory(int studentId) async {
+    try {
+      final res = await _api.dio.get<List<dynamic>>(
+        '/v1/parent/children/$studentId/directory',
+      );
+      return (res.data ?? const [])
+          .map((e) => DirectoryEntry.fromJson(e as Map<String, dynamic>))
+          .toList();
+    } on DioException {
+      return const [];
+    }
+  }
 }
 
 class AttendanceRow {
@@ -739,5 +769,66 @@ class SchoolEvent {
         endsAt: j['ends_at'] as String?,
         isAllDay: (j['is_all_day'] as bool?) ?? true,
         audience: (j['audience'] as String?) ?? 'all',
+      );
+}
+
+// ---- Library catalog + contact directory ----------------------------------
+
+class LibraryBookSummary {
+  const LibraryBookSummary({
+    required this.id,
+    required this.title,
+    required this.author,
+    required this.category,
+    required this.language,
+    required this.totalCopies,
+    required this.availableCopies,
+  });
+
+  final int id;
+  final String title;
+  final String? author;
+  final String? category;
+  final String? language;
+  final int totalCopies;
+  final int availableCopies;
+
+  bool get hasStock => availableCopies > 0;
+
+  factory LibraryBookSummary.fromJson(Map<String, dynamic> j) => LibraryBookSummary(
+        id: (j['id'] as num).toInt(),
+        title: (j['title'] as String?) ?? '',
+        author: j['author'] as String?,
+        category: j['category'] as String?,
+        language: j['language'] as String?,
+        totalCopies: (j['total_copies'] as num?)?.toInt() ?? 0,
+        availableCopies: (j['available_copies'] as num?)?.toInt() ?? 0,
+      );
+}
+
+class DirectoryEntry {
+  const DirectoryEntry({
+    required this.teacherId,
+    required this.fullName,
+    required this.designation,
+    required this.photoUrl,
+    required this.subjectName,
+    required this.isClassTeacher,
+  });
+
+  final int teacherId;
+  final String fullName;
+  final String? designation;
+  final String? photoUrl;
+  final String? subjectName;
+  final bool isClassTeacher;
+
+  factory DirectoryEntry.fromJson(Map<String, dynamic> j) => DirectoryEntry(
+        teacherId: (j['teacher_id'] as num).toInt(),
+        fullName: (j['full_name'] as String?) ?? '',
+        designation: j['designation'] as String?,
+        photoUrl: j['photo_url'] as String?,
+        subjectName: j['subject_name'] as String?,
+        isClassTeacher: (j['is_class_teacher'] as bool?) ?? false,
       );
 }

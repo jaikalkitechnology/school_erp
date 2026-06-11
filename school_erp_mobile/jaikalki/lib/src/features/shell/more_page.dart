@@ -5,6 +5,8 @@ import '../../core/auth_cubit.dart';
 import '../../core/settings_cubit.dart';
 import '../../theme/brand.dart';
 import '../calendar/calendar_page.dart';
+import '../directory/directory_page.dart';
+import '../library/library_catalog_page.dart';
 import '../notifications/notifications_page.dart';
 import '../results/result_cards_page.dart';
 import '../settings/settings_page.dart';
@@ -31,6 +33,16 @@ class MorePage extends StatelessWidget {
             icon: Icons.event_outlined,
             label: 'Calendar',
             onTap: () => _open(context, 'Calendar', const CalendarPage()),
+          ),
+          _Tile(
+            icon: Icons.menu_book_outlined,
+            label: 'Library',
+            onTap: () => _open(context, 'Library', const LibraryCatalogPage()),
+          ),
+          _Tile(
+            icon: Icons.contacts_outlined,
+            label: 'Contact directory',
+            onTap: () => _open(context, 'Teachers', const DirectoryPage()),
           ),
           _Tile(
             icon: Icons.notifications_outlined,
