@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
@@ -30,18 +32,39 @@ class AttendancePage extends StatefulWidget {
 
 class _AttendancePageState extends State<AttendancePage> {
   DateTime _month = DateTime(DateTime.now().year, DateTime.now().month);
+  StreamSubscription<ChildrenState>? _childrenSub;
+  int? _bootstrappedFor;
 
   void _loadForSelected() {
     final children = context.read<ChildrenCubit>().state;
     if (children is ChildrenLoaded && children.selectedId != null) {
+      _bootstrappedFor = children.selectedId;
       context.read<AttendanceCubit>().load(children.selectedId!);
     }
+  }
+
+  void _maybeLoadFromState(ChildrenState s) {
+    if (s is! ChildrenLoaded || s.selectedId == null) return;
+    if (_bootstrappedFor == s.selectedId) return;
+    _bootstrappedFor = s.selectedId;
+    locator<AttendanceCubit>().load(s.selectedId!);
   }
 
   @override
   void initState() {
     super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) => _loadForSelected());
+    // Direct stream subscription bypasses the BlocListener race window —
+    // we always see the first ChildrenInitial → Loaded emission, even if
+    // BlocListener is installed too late in the first frame.
+    final children = locator<ChildrenCubit>();
+    _maybeLoadFromState(children.state);
+    _childrenSub = children.stream.listen(_maybeLoadFromState);
+  }
+
+  @override
+  void dispose() {
+    _childrenSub?.cancel();
+    super.dispose();
   }
 
   @override

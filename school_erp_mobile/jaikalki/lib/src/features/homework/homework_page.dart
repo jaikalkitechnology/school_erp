@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 
 import 'package:file_picker/file_picker.dart';
@@ -34,16 +35,34 @@ class _HomeworkPageState extends State<HomeworkPage>
     with SingleTickerProviderStateMixin {
   late final TabController _tabs;
   String? _subjectFilter; // null = all
+  StreamSubscription<ChildrenState>? _childrenSub;
+  int? _bootstrappedFor;
 
   @override
   void initState() {
     super.initState();
     _tabs = TabController(length: 3, vsync: this);
-    WidgetsBinding.instance.addPostFrameCallback((_) => _loadForSelected());
+    // Subscribe directly to the singleton ChildrenCubit. This catches every
+    // state transition including the very first ChildrenInitial → Loaded —
+    // BlocListener inside the widget tree has a race window during the first
+    // frame where it can miss that emission entirely (which leaves the page
+    // stuck on a loading spinner forever, since the page-local cubit never
+    // gets a load() call).
+    final children = locator<ChildrenCubit>();
+    _maybeLoadFromState(children.state);
+    _childrenSub = children.stream.listen(_maybeLoadFromState);
+  }
+
+  void _maybeLoadFromState(ChildrenState s) {
+    if (s is! ChildrenLoaded || s.selectedId == null) return;
+    if (_bootstrappedFor == s.selectedId) return;
+    _bootstrappedFor = s.selectedId;
+    locator<HomeworkCubit>().load(s.selectedId!);
   }
 
   @override
   void dispose() {
+    _childrenSub?.cancel();
     _tabs.dispose();
     super.dispose();
   }
@@ -51,6 +70,7 @@ class _HomeworkPageState extends State<HomeworkPage>
   void _loadForSelected() {
     final children = context.read<ChildrenCubit>().state;
     if (children is ChildrenLoaded && children.selectedId != null) {
+      _bootstrappedFor = children.selectedId;
       context.read<HomeworkCubit>().load(children.selectedId!);
     }
   }
