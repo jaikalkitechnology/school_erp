@@ -6,6 +6,7 @@ from datetime import date as _date
 from typing import Optional
 
 from fastapi import APIRouter, Depends, Query, status
+from fastapi.responses import FileResponse
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -13,6 +14,7 @@ from app.core.auth_deps import AuthPrincipal, require_roles
 from app.core.tenant_session import platform_session, tenant_scoped_session
 from app.models.fees import FeeInvoice, FeePayment
 from app.models.parent import ParentChildMapping
+from app.services.fees_invoice_pdf import render_invoice_pdf
 from app.schemas.fees import (
     CollectPaymentRequest,
     CollectionSummary,
@@ -192,6 +194,20 @@ async def receipt_route(
     )
 
 
+@router.get("/invoices/{invoice_id}/pdf")
+async def admin_invoice_pdf_route(
+    invoice_id: int,
+    principal: AuthPrincipal = Depends(_school_view),
+    session: AsyncSession = Depends(tenant_scoped_session),
+):
+    path, invoice_number = await render_invoice_pdf(
+        session, tenant_id=principal.tenant_id, invoice_id=invoice_id
+    )
+    return FileResponse(
+        path, media_type="application/pdf", filename=f"invoice_{invoice_number}.pdf"
+    )
+
+
 # ---- Reports ----------------------------------------------------------------
 
 
@@ -292,3 +308,29 @@ async def parent_confirm_payment(
     session: AsyncSession = Depends(platform_session),
 ):
     return await confirm_online_payment(session, payload)
+
+
+@parent_router.get(
+    "/children/{student_id}/fees/invoices/{invoice_id}/pdf",
+    dependencies=[Depends(_parent_role)],
+)
+async def parent_invoice_pdf(
+    student_id: int,
+    invoice_id: int,
+    principal: AuthPrincipal = Depends(_parent_role),
+    session: AsyncSession = Depends(platform_session),
+):
+    await _ensure_linked_to_parent(
+        session, user_id=principal.user_id, student_id=student_id
+    )
+    invoice = (
+        await session.execute(select(FeeInvoice).where(FeeInvoice.id == invoice_id))
+    ).scalar_one_or_none()
+    if invoice is None or invoice.student_id != student_id:
+        raise from_403("Invoice not found")
+    path, invoice_number = await render_invoice_pdf(
+        session, tenant_id=principal.tenant_id, invoice_id=invoice_id
+    )
+    return FileResponse(
+        path, media_type="application/pdf", filename=f"invoice_{invoice_number}.pdf"
+    )

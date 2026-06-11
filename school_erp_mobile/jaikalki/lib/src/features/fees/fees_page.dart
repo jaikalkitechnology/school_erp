@@ -2,6 +2,8 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:open_filex/open_filex.dart';
+import 'package:path_provider/path_provider.dart';
 
 import '../../api/parent_repository.dart';
 import '../../core/children_cubit.dart';
@@ -294,41 +296,86 @@ class _InvoiceCard extends StatelessWidget {
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text('${s.feesDueOn} ${invoice.dueDate}',
-                        style: const TextStyle(
-                          fontSize: 11,
-                          color: JaikalkiBrand.textSecondary,
-                        )),
-                    const SizedBox(height: 2),
-                    Text('₹${invoice.totalAmount.toStringAsFixed(0)}',
-                        style: const TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.w700,
-                          color: JaikalkiBrand.indigoDark,
-                        )),
-                  ],
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text('${s.feesDueOn} ${invoice.dueDate}',
+                          style: const TextStyle(
+                            fontSize: 11,
+                            color: JaikalkiBrand.textSecondary,
+                          )),
+                      const SizedBox(height: 2),
+                      Text('₹${invoice.totalAmount.toStringAsFixed(0)}',
+                          style: const TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.w700,
+                            color: JaikalkiBrand.indigoDark,
+                          )),
+                    ],
+                  ),
                 ),
-                if (!invoice.isPaid)
-                  ElevatedButton(
-                    onPressed: () => _pay(context, invoice),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: JaikalkiBrand.saffron,
-                      foregroundColor: Colors.white,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(10),
+                Wrap(
+                  spacing: 6,
+                  children: [
+                    OutlinedButton.icon(
+                      onPressed: () => _downloadInvoice(context, invoice),
+                      icon: const Icon(Icons.download_outlined, size: 16),
+                      label: Text(invoice.isPaid ? 'Receipt' : 'Invoice'),
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: JaikalkiBrand.indigoDark,
+                        side: const BorderSide(color: JaikalkiBrand.saffronPale),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 10, vertical: 6,
+                        ),
                       ),
                     ),
-                    child: Text(s.feesPayNow),
-                  ),
+                    if (!invoice.isPaid)
+                      ElevatedButton(
+                        onPressed: () => _pay(context, invoice),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: JaikalkiBrand.saffron,
+                          foregroundColor: Colors.white,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                        ),
+                        child: Text(s.feesPayNow),
+                      ),
+                  ],
+                ),
               ],
             ),
           ],
         ),
       ),
     );
+  }
+
+  Future<void> _downloadInvoice(BuildContext context, FeeInvoice invoice) async {
+    final children = context.read<ChildrenCubit>().state;
+    if (children is! ChildrenLoaded || children.selectedId == null) return;
+    final messenger = ScaffoldMessenger.of(context);
+    try {
+      final dir = await getTemporaryDirectory();
+      // Sanitize the invoice number for the filename — most are
+      // ALNUM-hyphen but defend against the odd legacy entry.
+      final safe = invoice.invoiceNumber.replaceAll(RegExp(r'[^A-Za-z0-9_-]'), '_');
+      final localPath = '${dir.path}/invoice_$safe.pdf';
+      await locator<ParentRepository>().downloadInvoicePdf(
+        studentId: children.selectedId!,
+        invoiceId: invoice.id,
+        savePath: localPath,
+      );
+      await OpenFilex.open(localPath);
+    } catch (e) {
+      messenger.showSnackBar(
+        SnackBar(content: Text('Could not open invoice: $e')),
+      );
+    }
   }
 
   Future<void> _pay(BuildContext context, FeeInvoice invoice) async {

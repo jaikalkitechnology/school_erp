@@ -271,6 +271,47 @@ class ParentRepository {
     );
     return (res.data?['path'] as String?) ?? '';
   }
+
+  /// Downloads the per-invoice PDF receipt/invoice into [savePath] and
+  /// returns that path. Caller is responsible for picking a temp/cache
+  /// location (typically getTemporaryDirectory + invoice_number.pdf).
+  Future<String> downloadInvoicePdf({
+    required int studentId,
+    required int invoiceId,
+    required String savePath,
+  }) async {
+    await _api.dio.download(
+      '/v1/parent/children/$studentId/fees/invoices/$invoiceId/pdf',
+      savePath,
+    );
+    return savePath;
+  }
+
+  /// Lists every *published* report card for a child (one per exam/term).
+  Future<List<ResultCardRow>> resultCards(int studentId) async {
+    try {
+      final res = await _api.dio.get<Map<String, dynamic>>(
+        '/v1/parent/children/$studentId/report-cards',
+      );
+      final rows = (res.data?['rows'] as List<dynamic>?) ?? const [];
+      return rows
+          .map((e) => ResultCardRow.fromJson(e as Map<String, dynamic>))
+          .toList();
+    } on DioException {
+      return const [];
+    }
+  }
+
+  Future<String> downloadResultCard({
+    required int cardId,
+    required String savePath,
+  }) async {
+    await _api.dio.download(
+      '/v1/parent/report-cards/$cardId/pdf',
+      savePath,
+    );
+    return savePath;
+  }
 }
 
 class AttendanceRow {
@@ -511,6 +552,44 @@ class ChildFeeView {
         invoices: ((j['invoices'] as List<dynamic>?) ?? const [])
             .map((e) => FeeInvoice.fromJson(e as Map<String, dynamic>))
             .toList(),
+      );
+}
+
+// ---- Phase 16 models (report cards / per-semester results) -----------------
+
+class ResultCardRow {
+  const ResultCardRow({
+    required this.reportCardId,
+    required this.examId,
+    required this.examName,
+    required this.status,
+    required this.percentage,
+    required this.overallGrade,
+    required this.rankInSection,
+    required this.publishedAt,
+  });
+
+  final int reportCardId;
+  final int examId;
+  final String examName;
+  /// Backend enum: draft / generated / published. Only "published" cards
+  /// are returned from the parent list endpoint, but we keep the field so
+  /// future statuses (eg. revised) show up explicitly.
+  final String status;
+  final double? percentage;
+  final String? overallGrade;
+  final int? rankInSection;
+  final String? publishedAt;
+
+  factory ResultCardRow.fromJson(Map<String, dynamic> j) => ResultCardRow(
+        reportCardId: (j['report_card_id'] as num).toInt(),
+        examId: (j['exam_id'] as num).toInt(),
+        examName: (j['exam_name'] as String?) ?? '',
+        status: (j['status'] as String?) ?? 'published',
+        percentage: _toDouble(j['percentage']),
+        overallGrade: j['overall_grade'] as String?,
+        rankInSection: (j['rank_in_section'] as num?)?.toInt(),
+        publishedAt: j['published_at'] as String?,
       );
 }
 
