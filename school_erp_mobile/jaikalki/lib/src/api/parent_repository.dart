@@ -510,6 +510,7 @@ class HomeworkItem {
     required this.assignedOn,
     required this.dueDate,
     required this.maxMarks,
+    required this.teacherAttachments,
     required this.submissionStatus,
     required this.submittedAt,
     required this.marksObtained,
@@ -523,6 +524,10 @@ class HomeworkItem {
   final String assignedOn;
   final String dueDate;
   final double? maxMarks;
+  /// Files attached by the teacher when posting the homework (worksheet
+  /// PDFs, reference notes). Server-side relative paths under
+  /// uploads/tenant_X/...
+  final List<String> teacherAttachments;
   final String submissionStatus; // open / submitted / late / missing / graded
   final String? submittedAt;
   final double? marksObtained;
@@ -541,6 +546,9 @@ class HomeworkItem {
         assignedOn: (j['assigned_on'] as String?) ?? '',
         dueDate: (j['due_date'] as String?) ?? '',
         maxMarks: (j['max_marks'] as num?)?.toDouble(),
+        teacherAttachments: ((j['teacher_attachments'] as List<dynamic>?) ?? const [])
+            .map((e) => e.toString())
+            .toList(),
         // Backend uses "open" implicitly when null + not overdue, else "missing".
         submissionStatus: (j['submission_status'] as String?) ??
             ((j['submitted'] as bool?) == true ? 'submitted' : 'open'),

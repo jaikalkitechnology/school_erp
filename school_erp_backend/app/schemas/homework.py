@@ -107,6 +107,7 @@ class StudentHomeworkRow(BaseModel):
     subject_id: Optional[int]
     subject_name: Optional[str] = None
     max_marks: Optional[Decimal] = None
+    teacher_attachments: List[str] = Field(default_factory=list)
     submission_status: Optional[SubmissionStatus]
     submitted: bool
     submitted_at: Optional[date] = None

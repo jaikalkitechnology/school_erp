@@ -4,7 +4,10 @@ import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:open_filex/open_filex.dart';
+import 'package:path_provider/path_provider.dart';
 
+import '../../api/api_client.dart';
 import '../../api/parent_repository.dart';
 import '../../core/children_cubit.dart';
 import '../../core/homework_cubit.dart';
@@ -102,6 +105,11 @@ class _HomeworkPageState extends State<HomeworkPage>
               return Column(
                 children: [
                   if (stats.total > 0) _StatsBar(stats: stats),
+                  if (loaded.items.isNotEmpty)
+                    _WeeklyProgressBar(items: loaded.items),
+                  if (subjects.length > 1)
+                    _SubjectCompletionRow(items: loaded.items, subjects: subjects),
+                  if (loaded.items.any((h) => h.isOpen)) _UpcomingTimeline(items: loaded.items),
                   if (subjects.length > 1)
                     _SubjectFilterChips(
                       subjects: subjects,
@@ -341,6 +349,325 @@ class _SubjectFilterChips extends StatelessWidget {
               onTap: () => onSelect(selected == s ? null : s),
             ),
         ],
+      ),
+    );
+  }
+}
+
+// ---- P1: This-week progress ----------------------------------------------
+
+class _WeeklyProgressBar extends StatelessWidget {
+  const _WeeklyProgressBar({required this.items});
+  final List<HomeworkItem> items;
+
+  @override
+  Widget build(BuildContext context) {
+    final today = DateTime.now();
+    final weekAgo = DateTime(today.year, today.month, today.day)
+        .subtract(const Duration(days: 7));
+
+    int dueThisWeek = 0;
+    int submittedThisWeek = 0;
+    for (final h in items) {
+      final due = DateTime.tryParse(h.dueDate);
+      if (due == null) continue;
+      if (due.isBefore(weekAgo) || due.isAfter(today)) continue;
+      dueThisWeek++;
+      if (h.isSubmitted || h.isGraded) submittedThisWeek++;
+    }
+
+    if (dueThisWeek == 0) return const SizedBox.shrink();
+
+    final pct = submittedThisWeek / dueThisWeek;
+    final isStrong = pct >= 0.8;
+
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
+      child: Container(
+        padding: const EdgeInsets.all(14),
+        decoration: BoxDecoration(
+          color: JaikalkiBrand.warmWhite,
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: JaikalkiBrand.saffronPale),
+        ),
+        child: Row(
+          children: [
+            SizedBox(
+              width: 52, height: 52,
+              child: Stack(
+                alignment: Alignment.center,
+                children: [
+                  CircularProgressIndicator(
+                    value: pct.clamp(0, 1),
+                    strokeWidth: 5,
+                    backgroundColor: JaikalkiBrand.saffronPale,
+                    valueColor: AlwaysStoppedAnimation(
+                      isStrong ? JaikalkiBrand.tealDark : JaikalkiBrand.saffron,
+                    ),
+                  ),
+                  Text(
+                    '${(pct * 100).round()}%',
+                    style: TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w700,
+                      color: isStrong
+                          ? JaikalkiBrand.tealDark
+                          : JaikalkiBrand.saffronDarker,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(width: 14),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    'This week',
+                    style: TextStyle(
+                      fontSize: 11,
+                      letterSpacing: 0.4,
+                      fontWeight: FontWeight.w600,
+                      color: JaikalkiBrand.textSecondary,
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    '$submittedThisWeek of $dueThisWeek submitted',
+                    style: const TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w700,
+                      color: JaikalkiBrand.indigoDark,
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    isStrong
+                        ? 'On track. Keep it up.'
+                        : 'Falling behind — ${dueThisWeek - submittedThisWeek} pending.',
+                    style: TextStyle(
+                      fontSize: 11,
+                      color: isStrong
+                          ? JaikalkiBrand.tealDark
+                          : JaikalkiBrand.saffronDarker,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// ---- P1: Per-subject completion % ----------------------------------------
+
+class _SubjectCompletionRow extends StatelessWidget {
+  const _SubjectCompletionRow({required this.items, required this.subjects});
+  final List<HomeworkItem> items;
+  final List<String> subjects;
+
+  @override
+  Widget build(BuildContext context) {
+    // Look-back window: 30 days. Match the attendance-by-subject heuristic.
+    final today = DateTime.now();
+    final cutoff = DateTime(today.year, today.month, today.day)
+        .subtract(const Duration(days: 30));
+
+    final perSubject = <String, ({int done, int total})>{};
+    for (final h in items) {
+      if (h.subjectName == null) continue;
+      final assigned = DateTime.tryParse(h.assignedOn);
+      if (assigned != null && assigned.isBefore(cutoff)) continue;
+      final existing = perSubject[h.subjectName!] ?? (done: 0, total: 0);
+      final isDone = h.isSubmitted || h.isGraded;
+      perSubject[h.subjectName!] = (
+        done: existing.done + (isDone ? 1 : 0),
+        total: existing.total + 1,
+      );
+    }
+    if (perSubject.isEmpty) return const SizedBox.shrink();
+
+    // Sort by completion % asc — lowest first, most actionable.
+    final sorted = perSubject.entries.toList()
+      ..sort((a, b) {
+        final pa = a.value.total == 0 ? 1.0 : a.value.done / a.value.total;
+        final pb = b.value.total == 0 ? 1.0 : b.value.done / b.value.total;
+        return pa.compareTo(pb);
+      });
+
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
+      child: SizedBox(
+        height: 92,
+        child: ListView.separated(
+          scrollDirection: Axis.horizontal,
+          itemBuilder: (context, i) {
+            final e = sorted[i];
+            final pct = e.value.total == 0 ? 0.0 : e.value.done / e.value.total;
+            final pctInt = (pct * 100).round();
+            final tone = pct >= 0.8
+                ? JaikalkiBrand.tealDark
+                : pct >= 0.5
+                    ? JaikalkiBrand.marigold
+                    : const Color(0xFFD32F2F);
+            return Container(
+              width: 110,
+              padding: const EdgeInsets.all(10),
+              decoration: BoxDecoration(
+                color: JaikalkiBrand.warmWhite,
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: tone.withOpacity(0.4)),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    e.key,
+                    style: const TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w700,
+                      color: JaikalkiBrand.indigoDark,
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  const SizedBox(height: 6),
+                  Text(
+                    '$pctInt%',
+                    style: TextStyle(
+                      fontSize: 20,
+                      fontWeight: FontWeight.w700,
+                      color: tone,
+                    ),
+                  ),
+                  const Spacer(),
+                  Text(
+                    '${e.value.done}/${e.value.total} done',
+                    style: const TextStyle(
+                      fontSize: 10,
+                      color: JaikalkiBrand.textSecondary,
+                    ),
+                  ),
+                ],
+              ),
+            );
+          },
+          separatorBuilder: (_, __) => const SizedBox(width: 8),
+          itemCount: sorted.length,
+        ),
+      ),
+    );
+  }
+}
+
+// ---- P1: Upcoming timeline -----------------------------------------------
+
+class _UpcomingTimeline extends StatelessWidget {
+  const _UpcomingTimeline({required this.items});
+  final List<HomeworkItem> items;
+
+  static const _weekdays = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+
+  @override
+  Widget build(BuildContext context) {
+    final today = DateTime.now();
+    final todayMidnight = DateTime(today.year, today.month, today.day);
+
+    // Group open items by due-day for the next 7 days.
+    final byDay = <int, List<HomeworkItem>>{};
+    for (final h in items) {
+      if (!h.isOpen) continue;
+      final due = DateTime.tryParse(h.dueDate);
+      if (due == null) continue;
+      final diff = due.difference(todayMidnight).inDays;
+      if (diff < 0 || diff > 6) continue;
+      byDay.putIfAbsent(diff, () => []).add(h);
+    }
+
+    if (byDay.isEmpty) return const SizedBox.shrink();
+
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
+      child: SizedBox(
+        height: 80,
+        child: ListView.separated(
+          scrollDirection: Axis.horizontal,
+          itemBuilder: (context, i) {
+            final date = todayMidnight.add(Duration(days: i));
+            final dayItems = byDay[i] ?? const <HomeworkItem>[];
+            final isToday = i == 0;
+            return Container(
+              width: 78,
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: isToday
+                    ? JaikalkiBrand.saffron.withOpacity(0.10)
+                    : JaikalkiBrand.warmWhite,
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(
+                  color: isToday
+                      ? JaikalkiBrand.saffron
+                      : JaikalkiBrand.saffronPale,
+                ),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    _weekdays[date.weekday - 1],
+                    style: TextStyle(
+                      fontSize: 10,
+                      fontWeight: FontWeight.w700,
+                      letterSpacing: 0.4,
+                      color: isToday
+                          ? JaikalkiBrand.saffronDarker
+                          : JaikalkiBrand.textSecondary,
+                    ),
+                  ),
+                  Text(
+                    '${date.day}',
+                    style: TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.w700,
+                      color: isToday
+                          ? JaikalkiBrand.saffronDarker
+                          : JaikalkiBrand.indigoDark,
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Expanded(
+                    child: dayItems.isEmpty
+                        ? const Text(
+                            '—',
+                            style: TextStyle(
+                              fontSize: 11,
+                              color: JaikalkiBrand.textSecondary,
+                            ),
+                          )
+                        : Text(
+                            dayItems.length == 1
+                                ? dayItems.first.subjectName ?? '1 task'
+                                : '${dayItems.length} tasks',
+                            style: const TextStyle(
+                              fontSize: 11,
+                              fontWeight: FontWeight.w600,
+                              color: JaikalkiBrand.indigoDark,
+                            ),
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                  ),
+                ],
+              ),
+            );
+          },
+          separatorBuilder: (_, __) => const SizedBox(width: 6),
+          itemCount: 7,
+        ),
       ),
     );
   }
@@ -801,6 +1128,10 @@ class _HomeworkDetailPageState extends State<_HomeworkDetailPage> {
               if (item.description != null && item.description!.isNotEmpty)
                 Text(item.description!,
                     style: const TextStyle(fontSize: 14, height: 1.5)),
+              if (item.teacherAttachments.isNotEmpty) ...[
+                const SizedBox(height: 14),
+                _TeacherAttachmentsCard(paths: item.teacherAttachments),
+              ],
               const SizedBox(height: 18),
               if (item.isGraded)
                 _graderCard(s)
@@ -1130,6 +1461,109 @@ class _PickerButton extends StatelessWidget {
                 )),
           ],
         ),
+      ),
+    );
+  }
+}
+
+
+// ---- P2: Teacher attachments on the assignment ---------------------------
+
+class _TeacherAttachmentsCard extends StatelessWidget {
+  const _TeacherAttachmentsCard({required this.paths});
+  final List<String> paths;
+
+  String _filename(String p) {
+    final clean = p.split('/').last.split('\\').last;
+    return clean.isEmpty ? p : clean;
+  }
+
+  bool _isImage(String p) {
+    final lower = p.toLowerCase();
+    return lower.endsWith('.jpg') ||
+        lower.endsWith('.jpeg') ||
+        lower.endsWith('.png');
+  }
+
+  Future<void> _download(BuildContext context, String path) async {
+    final api = locator<ApiClient>();
+    final dir = await getTemporaryDirectory();
+    final filename = _filename(path);
+    final localPath = '${dir.path}/$filename';
+    try {
+      await api.dio.download('/v1/uploads/$path', localPath);
+      await OpenFilex.open(localPath);
+    } catch (e) {
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Could not open file: $e')),
+      );
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: JaikalkiBrand.tealPale.withOpacity(0.45),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: JaikalkiBrand.teal.withOpacity(0.4)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: const [
+              Icon(Icons.folder_shared_outlined,
+                  size: 16, color: JaikalkiBrand.tealDark),
+              SizedBox(width: 6),
+              Text(
+                'From the teacher',
+                style: TextStyle(
+                  fontWeight: FontWeight.w700,
+                  fontSize: 13,
+                  color: JaikalkiBrand.tealDark,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          for (final p in paths)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 6),
+              child: InkWell(
+                borderRadius: BorderRadius.circular(8),
+                onTap: () => _download(context, p),
+                child: Row(
+                  children: [
+                    Icon(
+                      _isImage(p)
+                          ? Icons.image_outlined
+                          : Icons.insert_drive_file_outlined,
+                      size: 18,
+                      color: JaikalkiBrand.tealDark,
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        _filename(p),
+                        style: const TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w600,
+                          color: JaikalkiBrand.tealDark,
+                          decoration: TextDecoration.underline,
+                        ),
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                    const Icon(Icons.download_rounded,
+                        size: 16, color: JaikalkiBrand.tealDark),
+                  ],
+                ),
+              ),
+            ),
+        ],
       ),
     );
   }
