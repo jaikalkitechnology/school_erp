@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
@@ -17,17 +19,36 @@ class FeesPage extends StatefulWidget {
 }
 
 class _FeesPageState extends State<FeesPage> {
+  StreamSubscription<ChildrenState>? _childrenSub;
+  int? _bootstrappedFor;
+
   void _loadForSelected() {
     final children = context.read<ChildrenCubit>().state;
     if (children is ChildrenLoaded && children.selectedId != null) {
+      _bootstrappedFor = children.selectedId;
       context.read<FeesCubit>().load(children.selectedId!);
     }
+  }
+
+  void _maybeLoadFromState(ChildrenState s) {
+    if (s is! ChildrenLoaded || s.selectedId == null) return;
+    if (_bootstrappedFor == s.selectedId) return;
+    _bootstrappedFor = s.selectedId;
+    locator<FeesCubit>().load(s.selectedId!);
   }
 
   @override
   void initState() {
     super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) => _loadForSelected());
+    final children = locator<ChildrenCubit>();
+    _maybeLoadFromState(children.state);
+    _childrenSub = children.stream.listen(_maybeLoadFromState);
+  }
+
+  @override
+  void dispose() {
+    _childrenSub?.cancel();
+    super.dispose();
   }
 
   @override
