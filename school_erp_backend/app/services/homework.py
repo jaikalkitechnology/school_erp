@@ -373,6 +373,8 @@ async def list_for_student(
                 submission_status=stat,
                 submitted=sub is not None,
                 submitted_at=sub.submitted_at.date() if (sub and sub.submitted_at) else None,
+                submission_content=sub.content if sub else None,
+                submission_attachments=list(sub.attachments or []) if sub else [],
                 marks=sub.marks if sub else None,
                 feedback=sub.feedback if sub else None,
             )

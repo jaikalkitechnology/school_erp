@@ -227,7 +227,10 @@ async def parent_directory_route(
     Returns name + designation + subject + photo only — never phone or
     email until the Teacher model grows a per-row visibility flag."""
     return await directory_for_parent(
-        session, user_id=principal.user_id, student_id=student_id
+        session,
+        tenant_id=principal.tenant_id,
+        user_id=principal.user_id,
+        student_id=student_id,
     )
 
 

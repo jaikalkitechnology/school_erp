@@ -906,7 +906,9 @@ async def profile_for_parent(
     from app.models.tenant import Tenant
     from app.schemas.parent import ParentContact, StudentProfileView
 
-    await _require_linked_child(session, user_id=user_id, student_id=student_id)
+    await _require_linked_child(
+        session, tenant_id=tenant_id, user_id=user_id, student_id=student_id,
+    )
 
     student = (
         await session.execute(select(Student).where(Student.id == student_id))
@@ -1000,7 +1002,7 @@ async def profile_for_parent(
 
 
 async def directory_for_parent(
-    session: AsyncSession, *, user_id: int, student_id: int
+    session: AsyncSession, *, tenant_id: int, user_id: int, student_id: int
 ) -> list[dict]:
     """Returns the teachers actually attached to the child's section:
     every SectionSubject row, plus the section in-charge as the class
@@ -1011,7 +1013,9 @@ async def directory_for_parent(
     from app.models.curriculum import SectionSubject
     from app.models.teacher import Teacher
 
-    await _require_linked_child(session, user_id=user_id, student_id=student_id)
+    await _require_linked_child(
+        session, tenant_id=tenant_id, user_id=user_id, student_id=student_id,
+    )
 
     student = (
         await session.execute(select(Student).where(Student.id == student_id))
