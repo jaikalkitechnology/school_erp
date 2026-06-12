@@ -1,12 +1,18 @@
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useMutation, useQuery } from "@tanstack/react-query";
+import { Camera } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { listClasses, listSections } from "@/features/setup/api";
-import { createStudent, type StudentCreatePayload } from "./api";
+import {
+  createStudent,
+  uploadStudentPhoto,
+  type StudentCreatePayload,
+} from "./api";
+import { StudentAvatar } from "./StudentAvatar";
 
 const CATEGORIES = ["general", "obc", "sc", "st", "ews"] as const;
 
@@ -31,8 +37,27 @@ export function AdmitStudentPage() {
     address: "",
     phone: "",
     category: undefined,
+    photo_url: undefined,
   });
   const [error, setError] = useState<string | null>(null);
+  const [photoUploading, setPhotoUploading] = useState(false);
+  const fileRef = useRef<HTMLInputElement>(null);
+
+  const onPhotoPicked = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setPhotoUploading(true);
+    setError(null);
+    try {
+      const path = await uploadStudentPhoto(file);
+      set("photo_url", path);
+    } catch (err: any) {
+      setError(err?.response?.data?.detail ?? "Photo upload failed");
+    } finally {
+      setPhotoUploading(false);
+      if (fileRef.current) fileRef.current.value = "";
+    }
+  };
 
   const filteredSections = useMemo(
     () => (sections.data ?? []).filter((s) => !form.class_def_id || s.class_def_id === form.class_def_id),
@@ -75,6 +100,46 @@ export function AdmitStudentPage() {
               submit.mutate();
             }}
           >
+            <div className="col-span-2 flex items-center gap-4 border-b border-saffron-pale pb-4">
+              <StudentAvatar
+                photoUrl={form.photo_url ?? null}
+                name={form.full_name || "Student"}
+                size={72}
+              />
+              <div className="flex flex-col gap-1">
+                <input
+                  ref={fileRef}
+                  type="file"
+                  accept="image/jpeg,image/png"
+                  className="hidden"
+                  onChange={onPhotoPicked}
+                />
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  disabled={photoUploading}
+                  onClick={() => fileRef.current?.click()}
+                >
+                  <Camera className="h-4 w-4" />
+                  {photoUploading
+                    ? "Uploading…"
+                    : form.photo_url
+                      ? "Replace photo"
+                      : "Add photo"}
+                </Button>
+                {form.photo_url && (
+                  <button
+                    type="button"
+                    onClick={() => set("photo_url", undefined)}
+                    className="text-left text-[11px] text-destructive hover:underline"
+                  >
+                    Remove photo
+                  </button>
+                )}
+                <p className="text-[11px] text-muted-foreground">JPG or PNG.</p>
+              </div>
+            </div>
             <Field label="Full name *" value={form.full_name} onChange={(v) => set("full_name", v)} />
             <Field label="Admission number" value={form.admission_number ?? ""} onChange={(v) => set("admission_number", v || undefined)} hint="Leave blank to auto-generate." />
             <Field label="First name" value={form.first_name ?? ""} onChange={(v) => set("first_name", v)} />

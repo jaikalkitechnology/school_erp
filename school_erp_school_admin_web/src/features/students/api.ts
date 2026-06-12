@@ -86,6 +86,7 @@ export interface StudentCreatePayload {
   phone?: string;
   admission_number?: string;
   category?: Category;
+  photo_url?: string;
 }
 
 export interface Admission {
