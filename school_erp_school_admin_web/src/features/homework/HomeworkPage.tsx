@@ -334,35 +334,57 @@ function SubmissionCell({
  */
 function AttachmentChip({ path }: { path: string }) {
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const filename = path.split("/").pop() ?? path;
   const isImage = /\.(jpe?g|png|gif|webp)$/i.test(filename);
 
   const open = async () => {
     setLoading(true);
+    setError(null);
     try {
       const res = await api.get<Blob>(`/v1/uploads/${path}`, { responseType: "blob" });
       const url = URL.createObjectURL(res.data);
       window.open(url, "_blank", "noopener");
       setTimeout(() => URL.revokeObjectURL(url), 60_000);
-    } catch {
-      // Swallow — the request interceptor handles 401 refresh; anything
-      // else just leaves the chip enabled for retry.
+    } catch (e: any) {
+      // Surface the real reason instead of pretending nothing happened.
+      // Detail comes back as a Blob when responseType is "blob", so we
+      // have to read it back to a string.
+      const status = e?.response?.status;
+      let detail = e?.message ?? "Could not open file";
+      const blob = e?.response?.data;
+      if (blob instanceof Blob) {
+        try {
+          const text = await blob.text();
+          try { detail = JSON.parse(text)?.detail ?? text; } catch { detail = text; }
+        } catch { /* keep fallback */ }
+      } else if (typeof blob === "object" && blob?.detail) {
+        detail = blob.detail;
+      }
+      setError(status ? `${status}: ${detail}` : detail);
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <button
-      type="button"
-      onClick={open}
-      disabled={loading}
-      className="inline-flex max-w-[180px] items-center gap-1 truncate rounded-md border border-saffron-pale bg-saffron-pale/30 px-2 py-1 text-[11px] text-indigo-dark hover:bg-saffron-pale disabled:opacity-50"
-      title={filename}
-    >
-      {isImage ? <Paperclip className="h-3 w-3" /> : <FileText className="h-3 w-3" />}
-      <span className="truncate">{filename}</span>
-    </button>
+    <div className="inline-flex flex-col items-start gap-0.5">
+      <button
+        type="button"
+        onClick={open}
+        disabled={loading}
+        className="inline-flex max-w-[180px] items-center gap-1 truncate rounded-md border border-saffron-pale bg-saffron-pale/30 px-2 py-1 text-[11px] text-indigo-dark hover:bg-saffron-pale disabled:opacity-50"
+        title={filename}
+      >
+        {isImage ? <Paperclip className="h-3 w-3" /> : <FileText className="h-3 w-3" />}
+        <span className="truncate">{filename}</span>
+      </button>
+      {error && (
+        <span className="max-w-[200px] truncate text-[10px] text-destructive" title={error}>
+          {error}
+        </span>
+      )}
+    </div>
   );
 }
 

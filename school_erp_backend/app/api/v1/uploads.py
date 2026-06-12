@@ -12,6 +12,7 @@ from fastapi.responses import FileResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import settings
+from app.core.auth_deps import AuthPrincipal, get_current_principal
 from app.core.file_storage import ensure_tenant_dirs, save_upload
 from app.core.tenant import TenantContext, require_tenant
 from app.core.tenant_session import platform_session
@@ -48,16 +49,33 @@ async def upload_file(
 
 
 @router.get("/{file_path:path}")
-async def serve_file(file_path: str, ctx: TenantContext = Depends(require_tenant)):
-    base = Path(settings.UPLOAD_DIR).resolve() / f"tenant_{ctx.tenant_id}"
+async def serve_file(
+    file_path: str,
+    principal: AuthPrincipal = Depends(get_current_principal),
+):
+    """Authenticated file download.
+
+    We deliberately derive the tenant from the JWT (via get_current_principal)
+    rather than from the TenantMiddleware's request.state.tenant. The middleware
+    extracts a subdomain from the Host header — on shared hosts like
+    api.campus.jaikalki.in the resolved subdomain is "api" which doesn't match
+    any school, and the middleware short-circuits with 400 before this handler
+    ever runs. JWT-derived tenant is robust to that, still tenant-scoped, and
+    still requires a valid bearer token to view anything.
+    """
+    tenant_id = principal.tenant_id
+    base = Path(settings.UPLOAD_DIR).resolve() / f"tenant_{tenant_id}"
     # POST /v1/uploads returns paths like "tenant_1/homework/submissions/abc.jpg"
     # (relative to UPLOAD_DIR). Clients echo that exact string back here, so
     # strip the redundant tenant prefix before re-joining with `base`.
-    prefix = f"tenant_{ctx.tenant_id}/"
+    prefix = f"tenant_{tenant_id}/"
     rel = file_path[len(prefix):] if file_path.startswith(prefix) else file_path
     target = (base / rel).resolve()
     if not str(target).startswith(str(base) + "/"):
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid path")
     if not target.is_file():
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="File not found")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"File not found: {file_path}",
+        )
     return FileResponse(target)
