@@ -129,6 +129,24 @@ export const withdrawStudent = async (
   payload: { status: StudentStatus; exit_date?: string; remarks?: string },
 ): Promise<Student> => (await api.post<Student>(`${base}/${id}/withdraw`, payload)).data;
 
+export const deleteStudent = async (id: number): Promise<void> => {
+  await api.delete(`${base}/${id}`);
+};
+
+/** Uploads a single file via /v1/uploads and returns the relative path
+ * the backend stored it under (tenant_X/students/photos/...). The
+ * caller then writes that path to Student.photo_url via updateStudent. */
+export const uploadStudentPhoto = async (file: File): Promise<string> => {
+  const form = new FormData();
+  form.append("file", file);
+  form.append("category", "students");
+  form.append("subcategory", "photos");
+  const res = await api.post<{ path: string }>("/v1/uploads", form, {
+    headers: { "Content-Type": "multipart/form-data" },
+  });
+  return res.data.path;
+};
+
 export const transferCertificate = async (id: number) =>
   (await api.get(`${base}/${id}/transfer-certificate`)).data;
 

@@ -1,13 +1,20 @@
 import { useMemo, useState } from "react";
 import { Link } from "react-router-dom";
-import { useQuery } from "@tanstack/react-query";
-import { Plus, Search } from "lucide-react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { Pencil, Plus, Search, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 import { listClasses, listSections } from "@/features/setup/api";
-import { listStudents, type StudentStatus } from "./api";
+import {
+  deleteStudent,
+  listStudents,
+  type Student,
+  type StudentStatus,
+} from "./api";
+import { EditStudentDialog } from "./EditStudentDialog";
+import { StudentAvatar } from "./StudentAvatar";
 
 const STATUS_TONE: Record<StudentStatus, string> = {
   active: "bg-teal-pale text-teal-dark",
@@ -44,6 +51,32 @@ export function StudentsPage() {
 
   const total = list.data?.total ?? 0;
   const showingTo = Math.min(offset + limit, total);
+
+  const qc = useQueryClient();
+  const [editing, setEditing] = useState<Student | null>(null);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
+  const removeMut = useMutation({
+    mutationFn: (id: number) => deleteStudent(id),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["students"] });
+      setDeleteError(null);
+    },
+    onError: (e: any) =>
+      setDeleteError(e?.response?.data?.detail ?? "Could not delete"),
+  });
+
+  // Single confirm flow — we use window.confirm rather than a second
+  // bespoke dialog because hard delete is destructive and the standard
+  // browser prompt is unmistakable.
+  const onDelete = (s: Student) => {
+    setDeleteError(null);
+    const ok = window.confirm(
+      `Delete ${s.full_name} (${s.admission_number})?\n\n` +
+        "This permanently removes the student record. " +
+        "If they had attendance, fees, or marks, use 'Issue TC / Withdraw' instead.",
+    );
+    if (ok) removeMut.mutate(s.id);
+  };
 
   return (
     <div className="space-y-6">
@@ -142,17 +175,26 @@ export function StudentsPage() {
               <table className="w-full text-sm">
                 <thead>
                   <tr className="border-y bg-muted/30 text-left text-xs uppercase tracking-wider text-muted-foreground">
-                    <th className="px-6 py-3">Student</th>
+                    <th className="w-12 px-6 py-3">Photo</th>
+                    <th className="px-4 py-3">Student</th>
                     <th className="px-4 py-3">Admission</th>
                     <th className="px-4 py-3">Class</th>
                     <th className="px-4 py-3">Parent</th>
                     <th className="px-4 py-3">Status</th>
+                    <th className="px-4 py-3 text-right">Actions</th>
                   </tr>
                 </thead>
                 <tbody>
                   {list.data.items.map((s) => (
                     <tr key={s.id} className="border-b last:border-b-0 hover:bg-saffron-pale/30">
                       <td className="px-6 py-3">
+                        <StudentAvatar
+                          photoUrl={s.photo_url}
+                          name={s.full_name}
+                          size={36}
+                        />
+                      </td>
+                      <td className="px-4 py-3">
                         <Link to={`/students/${s.id}`} className="font-medium text-indigo-dark hover:underline">
                           {s.full_name}
                         </Link>
@@ -179,10 +221,36 @@ export function StudentsPage() {
                           {s.status.replace(/_/g, " ")}
                         </span>
                       </td>
+                      <td className="px-4 py-3">
+                        <div className="flex items-center justify-end gap-1">
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            title="Edit"
+                            onClick={() => setEditing(s)}
+                          >
+                            <Pencil className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            title="Delete"
+                            disabled={removeMut.isPending}
+                            onClick={() => onDelete(s)}
+                          >
+                            <Trash2 className="h-4 w-4 text-destructive" />
+                          </Button>
+                        </div>
+                      </td>
                     </tr>
                   ))}
                 </tbody>
               </table>
+              {deleteError && (
+                <p className="border-t bg-destructive/10 px-6 py-2 text-xs text-destructive">
+                  {deleteError}
+                </p>
+              )}
             </div>
           )}
         </CardContent>
@@ -197,6 +265,14 @@ export function StudentsPage() {
             Next
           </Button>
         </div>
+      )}
+
+      {editing && (
+        <EditStudentDialog
+          student={editing}
+          open
+          onClose={() => setEditing(null)}
+        />
       )}
     </div>
   );
