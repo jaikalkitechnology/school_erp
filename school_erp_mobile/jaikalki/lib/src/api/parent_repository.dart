@@ -683,6 +683,8 @@ class HomeworkItem {
     required this.teacherAttachments,
     required this.submissionStatus,
     required this.submittedAt,
+    required this.submissionContent,
+    required this.submissionAttachments,
     required this.marksObtained,
     required this.feedback,
   });
@@ -700,6 +702,10 @@ class HomeworkItem {
   final List<String> teacherAttachments;
   final String submissionStatus; // open / submitted / late / missing / graded
   final String? submittedAt;
+  /// What the student actually sent in: text + uploaded files. Empty on
+  /// the open tab; populated on submitted/graded.
+  final String? submissionContent;
+  final List<String> submissionAttachments;
   final double? marksObtained;
   final String? feedback;
 
@@ -723,6 +729,11 @@ class HomeworkItem {
         submissionStatus: (j['submission_status'] as String?) ??
             ((j['submitted'] as bool?) == true ? 'submitted' : 'open'),
         submittedAt: j['submitted_at'] as String?,
+        submissionContent: j['submission_content'] as String?,
+        submissionAttachments:
+            ((j['submission_attachments'] as List<dynamic>?) ?? const [])
+                .map((e) => e.toString())
+                .toList(),
         // Backend field is `marks` (not `marks_obtained`).
         marksObtained: _toDouble(j['marks']),
         feedback: j['feedback'] as String?,

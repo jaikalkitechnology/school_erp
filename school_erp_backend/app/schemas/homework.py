@@ -112,5 +112,9 @@ class StudentHomeworkRow(BaseModel):
     submission_status: Optional[SubmissionStatus]
     submitted: bool
     submitted_at: Optional[date] = None
+    # Echo back what the student actually sent in so the parent app can
+    # show "here's what you submitted" instead of just a timestamp pill.
+    submission_content: Optional[str] = None
+    submission_attachments: List[str] = Field(default_factory=list)
     marks: Optional[Decimal]
     feedback: Optional[str] = None

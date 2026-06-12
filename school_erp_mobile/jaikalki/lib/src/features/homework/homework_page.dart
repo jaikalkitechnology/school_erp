@@ -1153,6 +1153,19 @@ class _HomeworkDetailPageState extends State<_HomeworkDetailPage> {
                 _TeacherAttachmentsCard(paths: item.teacherAttachments),
               ],
               const SizedBox(height: 18),
+              // For submitted + graded items, surface what the student
+              // actually sent in before the grader / "submitted on" pill.
+              // Open items don't have a submission yet.
+              if (!item.isOpen &&
+                  ((item.submissionContent != null &&
+                          item.submissionContent!.isNotEmpty) ||
+                      item.submissionAttachments.isNotEmpty)) ...[
+                _MySubmissionCard(
+                  content: item.submissionContent,
+                  attachments: item.submissionAttachments,
+                ),
+                const SizedBox(height: 12),
+              ],
               if (item.isGraded)
                 _graderCard(s)
               else if (item.isOpen) ...[
@@ -1481,6 +1494,121 @@ class _PickerButton extends StatelessWidget {
                 )),
           ],
         ),
+      ),
+    );
+  }
+}
+
+
+// ---- "Here's what you submitted" card on the Submitted / Graded tabs ----
+
+class _MySubmissionCard extends StatelessWidget {
+  const _MySubmissionCard({required this.content, required this.attachments});
+  final String? content;
+  final List<String> attachments;
+
+  String _filename(String p) {
+    final clean = p.split('/').last.split('\\').last;
+    return clean.isEmpty ? p : clean;
+  }
+
+  bool _isImage(String p) {
+    final lower = p.toLowerCase();
+    return lower.endsWith('.jpg') ||
+        lower.endsWith('.jpeg') ||
+        lower.endsWith('.png');
+  }
+
+  Future<void> _download(BuildContext context, String path) async {
+    // Same authed-download flow as _TeacherAttachmentsCard — dio carries
+    // the bearer + tenant subdomain so the FileResponse resolves.
+    final api = locator<ApiClient>();
+    final dir = await getTemporaryDirectory();
+    final filename = _filename(path);
+    final localPath = '${dir.path}/$filename';
+    try {
+      await api.dio.download('/v1/uploads/$path', localPath);
+      await OpenFilex.open(localPath);
+    } catch (e) {
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Could not open file: $e')),
+      );
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final hasText = content != null && content!.isNotEmpty;
+    final hasFiles = attachments.isNotEmpty;
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: JaikalkiBrand.saffronPale.withOpacity(0.55),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: JaikalkiBrand.saffron.withOpacity(0.4)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: const [
+              Icon(Icons.assignment_turned_in_outlined,
+                  size: 16, color: JaikalkiBrand.saffronDark),
+              SizedBox(width: 6),
+              Text(
+                'Your submission',
+                style: TextStyle(
+                  fontWeight: FontWeight.w700,
+                  fontSize: 13,
+                  color: JaikalkiBrand.saffronDark,
+                ),
+              ),
+            ],
+          ),
+          if (hasText) ...[
+            const SizedBox(height: 8),
+            Text(content!,
+                style: const TextStyle(fontSize: 13, height: 1.4)),
+          ],
+          if (hasFiles) ...[
+            const SizedBox(height: 8),
+            for (final p in attachments)
+              Padding(
+                padding: const EdgeInsets.only(bottom: 6),
+                child: InkWell(
+                  borderRadius: BorderRadius.circular(8),
+                  onTap: () => _download(context, p),
+                  child: Row(
+                    children: [
+                      Icon(
+                        _isImage(p)
+                            ? Icons.image_outlined
+                            : Icons.insert_drive_file_outlined,
+                        size: 18,
+                        color: JaikalkiBrand.saffronDark,
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          _filename(p),
+                          style: const TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w600,
+                            color: JaikalkiBrand.saffronDark,
+                            decoration: TextDecoration.underline,
+                          ),
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                      const Icon(Icons.download_rounded,
+                          size: 16, color: JaikalkiBrand.saffronDark),
+                    ],
+                  ),
+                ),
+              ),
+          ],
+        ],
       ),
     );
   }

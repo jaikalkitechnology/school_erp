@@ -8,6 +8,8 @@ import '../../core/children_cubit.dart';
 import '../../core/service_locator.dart';
 import '../../core/settings_cubit.dart';
 import '../../theme/brand.dart';
+import '../profile/id_card_preview_page.dart';
+import '../profile/student_profile_page.dart';
 
 class DashboardPage extends StatefulWidget {
   const DashboardPage({super.key});
@@ -49,6 +51,8 @@ class _DashboardPageState extends State<DashboardPage> {
                   const _ChildSwitcher(),
                   const SizedBox(height: 16),
                   const _ChildDashboardCard(),
+                  const SizedBox(height: 16),
+                  const _IdCardTile(),
                   const SizedBox(height: 16),
                   const _AttendanceCard(),
                 ] else ...[
@@ -441,6 +445,155 @@ class _Tile extends StatelessWidget {
           Text(hint, style: t.bodyMedium?.copyWith(fontSize: 11)),
         ],
       ),
+    );
+  }
+}
+
+/// Front-page quick access to the selected child's ID card. Lazy-loads
+/// the profile so we don't make the dashboard wait on a request that
+/// only matters when the user actually has a child selected.
+class _IdCardTile extends StatefulWidget {
+  const _IdCardTile();
+
+  @override
+  State<_IdCardTile> createState() => _IdCardTileState();
+}
+
+class _IdCardTileState extends State<_IdCardTile> {
+  Future<StudentProfile>? _future;
+  int? _loadedFor;
+
+  void _loadFor(int studentId) {
+    _loadedFor = studentId;
+    _future = locator<ParentRepository>().profile(studentId);
+  }
+
+  String _initials(String name) {
+    final parts = name.trim().split(RegExp(r'\s+'));
+    if (parts.isEmpty || parts[0].isEmpty) return '?';
+    if (parts.length == 1) return parts[0][0].toUpperCase();
+    return '${parts.first[0]}${parts.last[0]}'.toUpperCase();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final children = context.watch<ChildrenCubit>().state;
+    if (children is! ChildrenLoaded || children.selectedId == null) {
+      return const SizedBox.shrink();
+    }
+    final selected = children.selectedId!;
+    if (_loadedFor != selected) {
+      _loadFor(selected);
+    }
+    return FutureBuilder<StudentProfile>(
+      future: _future,
+      builder: (context, snap) {
+        final profile = snap.data;
+        return Material(
+          color: Colors.transparent,
+          child: InkWell(
+            borderRadius: BorderRadius.circular(16),
+            onTap: profile == null
+                ? null
+                : () => Navigator.of(context).push(
+                      MaterialPageRoute(
+                        builder: (_) => Scaffold(
+                          appBar: AppBar(title: const Text('ID card')),
+                          body: IdCardPreviewPage(profile: profile),
+                        ),
+                      ),
+                    ),
+            child: Container(
+              padding: const EdgeInsets.all(14),
+              decoration: BoxDecoration(
+                gradient: const LinearGradient(
+                  colors: [JaikalkiBrand.indigoDark, Color(0xFF3A2A6B)],
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                ),
+                borderRadius: BorderRadius.circular(16),
+                boxShadow: [
+                  BoxShadow(
+                    color: JaikalkiBrand.indigoDark.withOpacity(0.18),
+                    blurRadius: 12, offset: const Offset(0, 6),
+                  ),
+                ],
+              ),
+              child: Row(
+                children: [
+                  CircleAvatar(
+                    radius: 28,
+                    backgroundColor: Colors.white.withOpacity(0.18),
+                    foregroundColor: Colors.white,
+                    child: Text(
+                      profile != null ? _initials(profile.fullName) : '··',
+                      style: const TextStyle(
+                          fontSize: 16, fontWeight: FontWeight.w700),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          profile?.fullName ?? 'Student ID card',
+                          maxLines: 1, overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 14, fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          profile == null
+                              ? 'Tap to view'
+                              : '${profile.admissionNumber} · ${[
+                                  profile.classLabel, profile.sectionName
+                                ].where((s) => s != null && s!.isNotEmpty).join(" / ")}',
+                          maxLines: 1, overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            color: Colors.white.withOpacity(0.85),
+                            fontSize: 11,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.end,
+                    children: [
+                      const Icon(Icons.badge_outlined,
+                          color: Colors.white, size: 22),
+                      const SizedBox(height: 4),
+                      InkWell(
+                        onTap: () => Navigator.of(context).push(
+                          MaterialPageRoute(
+                            builder: (_) => Scaffold(
+                              appBar: AppBar(title: const Text('Student profile')),
+                              body: const StudentProfilePage(),
+                            ),
+                          ),
+                        ),
+                        child: Text(
+                          'PROFILE',
+                          style: TextStyle(
+                            color: Colors.white.withOpacity(0.85),
+                            fontSize: 9,
+                            letterSpacing: 1.2,
+                            fontWeight: FontWeight.w700,
+                            decoration: TextDecoration.underline,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ),
+        );
+      },
     );
   }
 }
