@@ -144,6 +144,23 @@ async def patch_student(
     return await update_student(session, student, payload)
 
 
+@router.delete("/{student_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_student_route(
+    student_id: int,
+    principal: AuthPrincipal = Depends(_school_admin),
+    session: AsyncSession = Depends(tenant_scoped_session),
+):
+    """Hard-delete a student row.
+
+    Cascading FKs handle the obvious children (documents, parent links).
+    For history-bearing records — attendance, fees, exam marks — the
+    admin should typically /withdraw instead. We keep DELETE for the
+    case where the row was a data-entry mistake and was never used."""
+    student = await _get_student(session, student_id)
+    await session.delete(student)
+    await session.commit()
+
+
 @router.post("/{student_id}/withdraw", response_model=StudentRead)
 async def withdraw_student(
     student_id: int,
