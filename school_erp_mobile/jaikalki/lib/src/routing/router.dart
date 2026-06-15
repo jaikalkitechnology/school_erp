@@ -4,7 +4,7 @@ import '../core/auth_cubit.dart';
 import '../core/service_locator.dart';
 import '../core/settings_cubit.dart';
 import '../features/auth/login_page.dart';
-import '../features/shell/home_shell.dart';
+import '../features/shell/role_home.dart';
 import '../features/splash/onboarding_page.dart';
 import '../features/splash/splash_page.dart';
 
@@ -29,7 +29,7 @@ GoRouter buildRouter() {
       GoRoute(path: '/', builder: (_, __) => const SplashPage()),
       GoRoute(path: '/onboarding', builder: (_, __) => const OnboardingPage()),
       GoRoute(path: '/login', builder: (_, __) => const LoginPage()),
-      GoRoute(path: '/home', builder: (_, __) => const HomeShell()),
+      GoRoute(path: '/home', builder: (_, __) => const RoleHome()),
       GoRoute(path: '/dashboard', redirect: (_, __) => '/home'),
     ],
   );
