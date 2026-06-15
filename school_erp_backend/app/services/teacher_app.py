@@ -67,6 +67,24 @@ class TodayPeriod(BaseModel):
     room: Optional[str] = None
 
 
+class WeekPeriod(BaseModel):
+    day_of_week: int  # 0 Mon → 6 Sun
+    period_number: int
+    starts_at: Optional[str] = None  # "HH:MM"
+    ends_at: Optional[str] = None
+    section_id: Optional[int] = None
+    section_label: Optional[str] = None
+    subject_id: Optional[int] = None
+    subject_name: Optional[str] = None
+    room: Optional[str] = None
+    is_break: bool = False
+
+
+class TeacherTimetable(BaseModel):
+    days: list[int]  # which days have any periods (0..6)
+    rows: list[WeekPeriod]
+
+
 class TeacherToday(BaseModel):
     date: _date
     day_of_week: int
@@ -362,3 +380,59 @@ async def section_roster(
         )
         for s in students
     ]
+
+
+# ---- Weekly timetable for the logged-in teacher --------------------------
+
+
+async def teacher_timetable(
+    session: AsyncSession, *, tenant_id: int, user_id: int,
+) -> TeacherTimetable:
+    """Build the teacher's weekly grid. We pull every TimetableEntry
+    assigned to this user, join in section + subject + class, and slot
+    in PeriodDef start/end times where available so the mobile UI can
+    render real clock times instead of bare period numbers."""
+    from app.models.timetable import PeriodDef, TimetableEntry
+
+    entries = list(
+        (
+            await session.execute(
+                select(TimetableEntry, Section, Subject, ClassDef)
+                .join(Section, Section.id == TimetableEntry.section_id)
+                .outerjoin(Subject, Subject.id == TimetableEntry.subject_id)
+                .outerjoin(ClassDef, ClassDef.id == Section.class_def_id)
+                .where(TimetableEntry.teacher_user_id == user_id)
+                .order_by(
+                    TimetableEntry.day_of_week, TimetableEntry.period_number,
+                )
+            )
+        ).all()
+    )
+
+    # Period defs are tenant-wide; load once and key by (dow, period).
+    pdefs = {
+        (p.day_of_week, p.period_number): p
+        for p in (
+            await session.execute(select(PeriodDef))
+        ).scalars().all()
+    }
+
+    rows: list[WeekPeriod] = []
+    days: set[int] = set()
+    for e, sec, sub, cls in entries:
+        pdef = pdefs.get((e.day_of_week, e.period_number))
+        rows.append(WeekPeriod(
+            day_of_week=e.day_of_week,
+            period_number=e.period_number,
+            starts_at=pdef.starts_at.strftime("%H:%M") if pdef and pdef.starts_at else None,
+            ends_at=pdef.ends_at.strftime("%H:%M") if pdef and pdef.ends_at else None,
+            section_id=sec.id,
+            section_label=f"{cls.name if cls else ''} {sec.name}".strip() or sec.name,
+            subject_id=sub.id if sub else None,
+            subject_name=sub.name if sub else None,
+            room=e.room,
+            is_break=False,
+        ))
+        days.add(e.day_of_week)
+
+    return TeacherTimetable(days=sorted(days), rows=rows)
