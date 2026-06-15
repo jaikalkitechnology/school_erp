@@ -7,6 +7,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 import { listDepartments } from "@/features/setup/api";
+import { StudentAvatar } from "@/features/students/StudentAvatar";
 import { listTeachers, type EmploymentStatus } from "./api";
 
 const STATUS_TONE: Record<EmploymentStatus, string> = {
@@ -115,7 +116,8 @@ export function TeachersPage() {
               <table className="w-full text-sm">
                 <thead className="border-y bg-muted/30 text-left text-xs uppercase tracking-wider text-muted-foreground">
                   <tr>
-                    <th className="px-6 py-3">Teacher</th>
+                    <th className="w-12 px-6 py-3">Photo</th>
+                    <th className="px-4 py-3">Teacher</th>
                     <th className="px-4 py-3">Employee</th>
                     <th className="px-4 py-3">Designation</th>
                     <th className="px-4 py-3">Contact</th>
@@ -126,6 +128,13 @@ export function TeachersPage() {
                   {list.data.items.map((t) => (
                     <tr key={t.id} className="border-b last:border-b-0 hover:bg-saffron-pale/30">
                       <td className="px-6 py-3">
+                        <StudentAvatar
+                          photoUrl={t.photo_url}
+                          name={t.full_name}
+                          size={36}
+                        />
+                      </td>
+                      <td className="px-4 py-3">
                         <Link to={`/teachers/${t.id}`} className="font-medium text-indigo-dark hover:underline">
                           {t.full_name}
                         </Link>

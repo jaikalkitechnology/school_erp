@@ -53,6 +53,7 @@ export interface TeacherCreatePayload {
   is_available_for_substitution?: boolean;
   role_codes?: string[];
   employee_no?: string;
+  photo_url?: string;
 }
 
 export interface WorkloadEntry {
@@ -149,3 +150,18 @@ export const listAttendance = async (id: number, params: { start?: string; end?:
 
 export const substitutionPool = async (target_date: string, subject_id?: number): Promise<SubCandidate[]> =>
   (await api.get<SubCandidate[]>(`${base}/substitution-pool`, { params: { target_date, subject_id } })).data;
+
+/** Uploads a teacher photo to /v1/uploads and returns the relative
+ * path the backend stored it under (tenant_X/teachers/photos/...).
+ * Save the returned string to Teacher.photo_url via updateTeacher /
+ * createTeacher. */
+export const uploadTeacherPhoto = async (file: File): Promise<string> => {
+  const form = new FormData();
+  form.append("file", file);
+  form.append("category", "teachers");
+  form.append("subcategory", "photos");
+  const res = await api.post<{ path: string }>("/v1/uploads", form, {
+    headers: { "Content-Type": "multipart/form-data" },
+  });
+  return res.data.path;
+};
