@@ -245,6 +245,41 @@ ROLES: tuple[RoleSpec, ...] = (
         ),
     ),
     RoleSpec(
+        code="bus_staff",
+        name="Bus Staff",
+        level=3,
+        description="Bus driver / conductor — marks pickup-drop attendance.",
+        grants=(
+            "user.read", "student.view.all", "parent.view.all",
+            "transport.view", "transport.attendance.mark",
+            "communication.read",
+        ),
+    ),
+    RoleSpec(
+        code="supervisor",
+        name="Area Supervisor",
+        level=4,
+        description=(
+            "Multi-section / area supervisor. Read-only view across "
+            "students, attendance, fees for the zone they cover."
+        ),
+        grants=(
+            "user.read", "student.view.all", "parent.view.all",
+            "teacher.view.all", "attendance.view.all", "exam.view.all",
+            "fee.view", "communication.send.class", "communication.read",
+            "reports.view",
+        ),
+    ),
+    RoleSpec(
+        code="visitor_desk",
+        name="Visitor Desk",
+        level=2,
+        description="Front-desk operator for visitor check-in / out.",
+        grants=(
+            "user.read", "visitor.*", "communication.read",
+        ),
+    ),
+    RoleSpec(
         code="hostel_warden",
         name="Hostel Warden",
         level=4,

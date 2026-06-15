@@ -3,6 +3,7 @@
 from fastapi import APIRouter
 
 from app.api.v1 import (
+    admin_users,
     attendance,
     auth,
     comms,
@@ -60,3 +61,4 @@ router.include_router(hostel.router)
 router.include_router(hostel.parent_router)
 router.include_router(school_analytics.router)
 router.include_router(subscription.router)
+router.include_router(admin_users.router)
