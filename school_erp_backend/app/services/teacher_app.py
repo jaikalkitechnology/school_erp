@@ -51,6 +51,12 @@ class TeacherProfile(BaseModel):
     is_class_teacher: bool
     qualifications: list[str] = Field(default_factory=list)
     experience_years: int = 0
+    # School-side context — surfaced here so the in-app ID card preview
+    # doesn't need a second call to read the tenant block.
+    school_name: Optional[str] = None
+    school_address: Optional[str] = None
+    school_phone: Optional[str] = None
+    school_logo_url: Optional[str] = None
 
 
 class TeacherMe(BaseModel):
@@ -166,10 +172,27 @@ async def assert_section_access(
 # ---- Profile + access map -------------------------------------------------
 
 
+async def _load_tenant_block(session: AsyncSession, tenant_id: int) -> dict:
+    from app.models.tenant import Tenant
+
+    t = (
+        await session.execute(select(Tenant).where(Tenant.id == tenant_id))
+    ).scalar_one_or_none()
+    if t is None:
+        return {}
+    return {
+        "school_name": t.school_name,
+        "school_address": t.address,
+        "school_phone": t.phone,
+        "school_logo_url": t.logo_url,
+    }
+
+
 async def teacher_me(
     session: AsyncSession, *, tenant_id: int, user_id: int
 ) -> TeacherMe:
     teacher = await _teacher_for_user(session, tenant_id=tenant_id, user_id=user_id)
+    tenant_block = await _load_tenant_block(session, tenant_id)
 
     accessible_ids = await _accessible_sections(session, user_id=user_id)
     if not accessible_ids:
@@ -182,6 +205,7 @@ async def teacher_me(
             designation=teacher.designation,
             phone=teacher.phone,
             email=teacher.email,
+            **tenant_block,
             is_class_teacher=teacher.is_class_teacher,
             qualifications=list(teacher.qualifications or []),
             experience_years=teacher.experience_years or 0,
@@ -249,6 +273,7 @@ async def teacher_me(
         is_class_teacher=teacher.is_class_teacher,
         qualifications=list(teacher.qualifications or []),
         experience_years=teacher.experience_years or 0,
+        **tenant_block,
     )
     return TeacherMe(profile=profile, sections=sec_access)
 
@@ -436,3 +461,349 @@ async def teacher_timetable(
         days.add(e.day_of_week)
 
     return TeacherTimetable(days=sorted(days), rows=rows)
+
+
+# ---- Student drill-down -------------------------------------------------
+
+
+class StudentDrill(BaseModel):
+    student_id: int
+    full_name: str
+    admission_number: str
+    roll_no: Optional[str] = None
+    photo_url: Optional[str] = None
+    date_of_birth: Optional[str] = None
+    gender: Optional[str] = None
+    blood_group: Optional[str] = None
+    class_label: Optional[str] = None
+    section_name: Optional[str] = None
+    address: Optional[str] = None
+    parent_phone: Optional[str] = None
+    parent_email: Optional[str] = None
+    father_name: Optional[str] = None
+    mother_name: Optional[str] = None
+    emergency_phone: Optional[str] = None
+    medical_conditions: Optional[str] = None
+    allergies: Optional[str] = None
+    attendance_30d_pct: Optional[float] = None
+    behaviour_notes: list[dict] = Field(default_factory=list)
+
+
+async def student_drill(
+    session: AsyncSession, *, user_id: int, student_id: int,
+) -> StudentDrill:
+    student = (
+        await session.execute(select(Student).where(Student.id == student_id))
+    ).scalar_one_or_none()
+    if student is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Student not found")
+    if student.section_id is None:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Student has no section",
+        )
+    await assert_section_access(
+        session, user_id=user_id, section_id=student.section_id,
+    )
+
+    section = (
+        await session.execute(select(Section).where(Section.id == student.section_id))
+    ).scalar_one_or_none()
+    class_label: Optional[str] = None
+    if section is not None and section.class_def_id:
+        cls = (
+            await session.execute(
+                select(ClassDef).where(ClassDef.id == section.class_def_id)
+            )
+        ).scalar_one_or_none()
+        class_label = cls.name if cls else None
+
+    # 30-day attendance %.
+    from datetime import timedelta
+
+    from app.models.attendance import StudentAttendance
+
+    today = datetime.now(timezone.utc).date()
+    start = today - timedelta(days=30)
+    rows = list(
+        (
+            await session.execute(
+                select(StudentAttendance).where(
+                    StudentAttendance.student_id == student_id,
+                    StudentAttendance.date >= start,
+                    StudentAttendance.date <= today,
+                )
+            )
+        ).scalars().all()
+    )
+    pct: Optional[float] = None
+    if rows:
+        present = sum(1 for r in rows if r.status in {"present", "late", "half_day"})
+        pct = round(100.0 * present / len(rows), 1)
+
+    # Behaviour notes (latest first).
+    from app.models.staff_extras import BehaviourNote
+
+    notes = list(
+        (
+            await session.execute(
+                select(BehaviourNote)
+                .where(BehaviourNote.student_id == student_id)
+                .order_by(BehaviourNote.occurred_on.desc(), BehaviourNote.id.desc())
+                .limit(20)
+            )
+        ).scalars().all()
+    )
+
+    return StudentDrill(
+        student_id=student.id,
+        full_name=student.full_name,
+        admission_number=student.admission_number,
+        roll_no=student.roll_no,
+        photo_url=student.photo_url,
+        date_of_birth=student.date_of_birth.isoformat() if student.date_of_birth else None,
+        gender=student.gender,
+        blood_group=student.blood_group,
+        class_label=class_label,
+        section_name=section.name if section else None,
+        address=student.address,
+        parent_phone=student.parent_phone,
+        parent_email=student.parent_email,
+        father_name=student.father_name,
+        mother_name=student.mother_name,
+        emergency_phone=student.emergency_phone,
+        medical_conditions=student.medical_conditions,
+        allergies=student.allergies,
+        attendance_30d_pct=pct,
+        behaviour_notes=[{
+            "id": n.id,
+            "occurred_on": n.occurred_on.isoformat(),
+            "kind": n.kind,
+            "headline": n.headline,
+            "detail": n.detail,
+            "visible_to_parent": n.visible_to_parent,
+        } for n in notes],
+    )
+
+
+# ---- Behaviour notes ----------------------------------------------------
+
+
+class BehaviourNoteRead(BaseModel):
+    id: int
+    student_id: int
+    occurred_on: str
+    kind: str
+    headline: str
+    detail: Optional[str] = None
+    visible_to_parent: bool
+
+
+class BehaviourNoteWrite(BaseModel):
+    student_id: int
+    occurred_on: Optional[str] = None
+    kind: str = Field(default="neutral")  # positive / concern / neutral
+    headline: str = Field(min_length=1, max_length=180)
+    detail: Optional[str] = None
+    visible_to_parent: bool = True
+
+
+async def add_behaviour_note(
+    session: AsyncSession,
+    *,
+    tenant_id: int,
+    teacher_user_id: int,
+    payload: BehaviourNoteWrite,
+) -> BehaviourNoteRead:
+    from datetime import date as _date
+
+    from app.models.staff_extras import BehaviourNote
+
+    student = (
+        await session.execute(
+            select(Student).where(Student.id == payload.student_id)
+        )
+    ).scalar_one_or_none()
+    if student is None or student.section_id is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Student not found")
+    await assert_section_access(
+        session, user_id=teacher_user_id, section_id=student.section_id,
+    )
+
+    occurred = (
+        _date.fromisoformat(payload.occurred_on)
+        if payload.occurred_on
+        else datetime.now(timezone.utc).date()
+    )
+    obj = BehaviourNote(
+        tenant_id=tenant_id,
+        student_id=payload.student_id,
+        teacher_user_id=teacher_user_id,
+        occurred_on=occurred,
+        kind=payload.kind,
+        headline=payload.headline,
+        detail=payload.detail,
+        visible_to_parent=payload.visible_to_parent,
+    )
+    session.add(obj)
+    await session.commit()
+    await session.refresh(obj)
+    return BehaviourNoteRead(
+        id=obj.id,
+        student_id=obj.student_id,
+        occurred_on=obj.occurred_on.isoformat(),
+        kind=obj.kind,
+        headline=obj.headline,
+        detail=obj.detail,
+        visible_to_parent=obj.visible_to_parent,
+    )
+
+
+# ---- Staff leave (my own) -----------------------------------------------
+
+
+class StaffLeaveRead(BaseModel):
+    id: int
+    user_id: int
+    start_date: str
+    end_date: str
+    reason: str
+    kind: str
+    status: str
+    decision_remarks: Optional[str] = None
+    decided_at: Optional[str] = None
+
+
+class StaffLeaveWrite(BaseModel):
+    start_date: str
+    end_date: str
+    reason: str = Field(min_length=3)
+    kind: str = Field(default="casual")
+
+
+class StaffLeaveDecide(BaseModel):
+    status: str  # approved / rejected
+    decision_remarks: Optional[str] = None
+
+
+def _staff_leave_to_read(obj) -> StaffLeaveRead:
+    return StaffLeaveRead(
+        id=obj.id,
+        user_id=obj.user_id,
+        start_date=obj.start_date.isoformat() if obj.start_date else "",
+        end_date=obj.end_date.isoformat() if obj.end_date else "",
+        reason=obj.reason or "",
+        kind=obj.kind or "casual",
+        status=obj.status or "pending",
+        decision_remarks=obj.decision_remarks,
+        decided_at=obj.decided_at.isoformat() if obj.decided_at else None,
+    )
+
+
+async def apply_staff_leave(
+    session: AsyncSession,
+    *,
+    tenant_id: int,
+    user_id: int,
+    payload: StaffLeaveWrite,
+) -> StaffLeaveRead:
+    from datetime import date as _date
+
+    from app.models.staff_extras import StaffLeave
+
+    try:
+        start = _date.fromisoformat(payload.start_date)
+        end = _date.fromisoformat(payload.end_date)
+    except ValueError as e:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Invalid date: {e}",
+        )
+    if end < start:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="end_date must be on or after start_date",
+        )
+    obj = StaffLeave(
+        tenant_id=tenant_id,
+        user_id=user_id,
+        start_date=start,
+        end_date=end,
+        reason=payload.reason.strip(),
+        kind=payload.kind,
+        status="pending",
+    )
+    session.add(obj)
+    await session.commit()
+    await session.refresh(obj)
+    return _staff_leave_to_read(obj)
+
+
+async def list_my_staff_leaves(
+    session: AsyncSession, *, user_id: int, limit: int = 50,
+) -> list[StaffLeaveRead]:
+    from app.models.staff_extras import StaffLeave
+
+    rows = list(
+        (
+            await session.execute(
+                select(StaffLeave)
+                .where(StaffLeave.user_id == user_id)
+                .order_by(StaffLeave.id.desc())
+                .limit(limit)
+            )
+        ).scalars().all()
+    )
+    return [_staff_leave_to_read(r) for r in rows]
+
+
+async def list_pending_staff_leaves_for_principal(
+    session: AsyncSession,
+) -> list[StaffLeaveRead]:
+    from app.models.staff_extras import StaffLeave
+
+    rows = list(
+        (
+            await session.execute(
+                select(StaffLeave)
+                .where(StaffLeave.status == "pending")
+                .order_by(StaffLeave.start_date)
+            )
+        ).scalars().all()
+    )
+    return [_staff_leave_to_read(r) for r in rows]
+
+
+async def decide_staff_leave(
+    session: AsyncSession,
+    *,
+    leave_id: int,
+    decided_by_user_id: int,
+    payload: StaffLeaveDecide,
+) -> StaffLeaveRead:
+    from app.models.staff_extras import StaffLeave
+
+    if payload.status not in {"approved", "rejected"}:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="status must be 'approved' or 'rejected'",
+        )
+    obj = (
+        await session.execute(
+            select(StaffLeave).where(StaffLeave.id == leave_id)
+        )
+    ).scalar_one_or_none()
+    if obj is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Leave not found")
+    if obj.status != "pending":
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=f"Leave already {obj.status}",
+        )
+    obj.status = payload.status
+    obj.decision_remarks = payload.decision_remarks
+    obj.decided_by_user_id = decided_by_user_id
+    obj.decided_at = datetime.now(timezone.utc).replace(tzinfo=None)
+    await session.commit()
+    await session.refresh(obj)
+    return _staff_leave_to_read(obj)

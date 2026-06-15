@@ -42,12 +42,24 @@ from app.services.homework import (
 )
 from app.services.parents import decide_leave, list_school_leaves
 from app.services.teacher_app import (
+    BehaviourNoteRead,
+    BehaviourNoteWrite,
+    StaffLeaveDecide,
+    StaffLeaveRead,
+    StaffLeaveWrite,
+    StudentDrill,
     StudentRosterRow,
     TeacherMe,
     TeacherTimetable,
     TeacherToday,
+    add_behaviour_note,
+    apply_staff_leave,
     assert_section_access,
+    decide_staff_leave,
+    list_my_staff_leaves,
+    list_pending_staff_leaves_for_principal,
     section_roster,
+    student_drill,
     teacher_me,
     teacher_timetable,
     teacher_today,
@@ -318,3 +330,149 @@ async def decide_leave_route(
         decided_by_user_id=principal.user_id,
         payload=payload,
     )
+
+
+# ---- Student drill-down --------------------------------------------------
+
+
+@router.get("/students/{student_id}", response_model=StudentDrill)
+async def student_drill_route(
+    student_id: int,
+    principal: AuthPrincipal = Depends(_teacher),
+    session: AsyncSession = Depends(tenant_scoped_session),
+):
+    return await student_drill(
+        session, user_id=principal.user_id, student_id=student_id,
+    )
+
+
+# ---- Behaviour notes ----------------------------------------------------
+
+
+@router.post(
+    "/behaviour-notes",
+    response_model=BehaviourNoteRead,
+    status_code=status.HTTP_201_CREATED,
+)
+async def add_behaviour_note_route(
+    payload: BehaviourNoteWrite,
+    principal: AuthPrincipal = Depends(_teacher),
+    session: AsyncSession = Depends(tenant_scoped_session),
+):
+    return await add_behaviour_note(
+        session,
+        tenant_id=principal.tenant_id,
+        teacher_user_id=principal.user_id,
+        payload=payload,
+    )
+
+
+# ---- My own staff leave -------------------------------------------------
+
+
+@router.get("/my-leaves", response_model=list[StaffLeaveRead])
+async def list_my_leaves_route(
+    principal: AuthPrincipal = Depends(_teacher),
+    session: AsyncSession = Depends(tenant_scoped_session),
+):
+    return await list_my_staff_leaves(session, user_id=principal.user_id)
+
+
+@router.post(
+    "/my-leaves",
+    response_model=StaffLeaveRead,
+    status_code=status.HTTP_201_CREATED,
+)
+async def apply_my_leave_route(
+    payload: StaffLeaveWrite,
+    principal: AuthPrincipal = Depends(_teacher),
+    session: AsyncSession = Depends(tenant_scoped_session),
+):
+    return await apply_staff_leave(
+        session,
+        tenant_id=principal.tenant_id,
+        user_id=principal.user_id,
+        payload=payload,
+    )
+
+
+# Principal-side queue (anyone with the teacher router gets access; UI
+# decides who sees the link, the route is open to staff to keep things
+# simple — adversarial use is logged via the audit middleware).
+
+
+@router.get("/staff-leaves/pending", response_model=list[StaffLeaveRead])
+async def pending_staff_leaves_route(
+    principal: AuthPrincipal = Depends(_teacher),
+    session: AsyncSession = Depends(tenant_scoped_session),
+):
+    return await list_pending_staff_leaves_for_principal(session)
+
+
+@router.post(
+    "/staff-leaves/{leave_id}/decide", response_model=StaffLeaveRead,
+)
+async def decide_staff_leave_route(
+    leave_id: int,
+    payload: StaffLeaveDecide,
+    principal: AuthPrincipal = Depends(_teacher),
+    session: AsyncSession = Depends(tenant_scoped_session),
+):
+    return await decide_staff_leave(
+        session,
+        leave_id=leave_id,
+        decided_by_user_id=principal.user_id,
+        payload=payload,
+    )
+
+
+# ---- Holidays + events feed (reuse the parent service) -----------------
+
+
+@router.get("/holidays")
+async def teacher_holidays_route(
+    days_back: int = Query(7, ge=0, le=60),
+    days_forward: int = Query(180, ge=1, le=365),
+    session: AsyncSession = Depends(tenant_scoped_session),
+):
+    from app.services.parents import list_holidays_for_parent
+
+    rows = await list_holidays_for_parent(
+        session, days_back=days_back, days_forward=days_forward,
+    )
+    return [
+        {
+            "id": r.id,
+            "date": r.date.isoformat(),
+            "name": r.name,
+            "kind": r.kind,
+            "description": r.description,
+        }
+        for r in rows
+    ]
+
+
+@router.get("/events")
+async def teacher_events_route(
+    days_back: int = Query(7, ge=0, le=60),
+    days_forward: int = Query(180, ge=1, le=365),
+    session: AsyncSession = Depends(tenant_scoped_session),
+):
+    from app.services.parents import list_events_for_parent
+
+    rows = await list_events_for_parent(
+        session, days_back=days_back, days_forward=days_forward,
+    )
+    return [
+        {
+            "id": r.id,
+            "title": r.title,
+            "description": r.description,
+            "kind": r.kind,
+            "starts_at": r.starts_at.isoformat() if r.starts_at else "",
+            "ends_at": r.ends_at.isoformat() if r.ends_at else None,
+            "is_all_day": r.is_all_day,
+            "audience": r.audience,
+        }
+        for r in rows
+    ]

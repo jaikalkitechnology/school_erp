@@ -7,6 +7,8 @@ import '../notifications/notifications_page.dart';
 import '../settings/settings_page.dart';
 import 'homework_list_page.dart';
 import 'leaves_page.dart';
+import 'my_leaves_page.dart';
+import 'teacher_calendar_page.dart';
 
 /// More menu for the teacher shell — homework grading, leave approvals,
 /// settings, sign-out. Each row pushes a new full-screen page (with its
@@ -32,6 +34,20 @@ class TeacherMorePage extends StatelessWidget {
             label: 'Leave approvals',
             onTap: () => Navigator.of(context).push(
               MaterialPageRoute(builder: (_) => const LeavesPage()),
+            ),
+          ),
+          _Tile(
+            icon: Icons.event_busy_outlined,
+            label: 'My leaves',
+            onTap: () => Navigator.of(context).push(
+              MaterialPageRoute(builder: (_) => const MyLeavesPage()),
+            ),
+          ),
+          _Tile(
+            icon: Icons.event_outlined,
+            label: 'Calendar',
+            onTap: () => Navigator.of(context).push(
+              MaterialPageRoute(builder: (_) => const TeacherCalendarPage()),
             ),
           ),
           _Tile(

@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../api/teacher_repository.dart';
 import '../../core/service_locator.dart';
 import '../../theme/brand.dart';
+import 'student_drill_page.dart';
 
 /// Take-attendance flow for one section. Loads the current day's roll
 /// (defaults to "all present" server-side for any student without a row
@@ -298,33 +299,48 @@ class _StudentRow extends StatelessWidget {
       ),
       child: Row(
         children: [
-          CircleAvatar(
-            radius: 16,
-            backgroundColor: JaikalkiBrand.saffronPale,
-            foregroundColor: JaikalkiBrand.saffronDark,
-            child: Text(
-              student.rollNo ?? _initials(student.fullName),
-              style: const TextStyle(
-                fontSize: 11, fontWeight: FontWeight.w700,
+          InkWell(
+            onTap: () => Navigator.of(context).push(
+              MaterialPageRoute(
+                builder: (_) => StudentDrillPage(studentId: student.studentId),
+              ),
+            ),
+            borderRadius: BorderRadius.circular(16),
+            child: CircleAvatar(
+              radius: 16,
+              backgroundColor: JaikalkiBrand.saffronPale,
+              foregroundColor: JaikalkiBrand.saffronDark,
+              child: Text(
+                student.rollNo ?? _initials(student.fullName),
+                style: const TextStyle(
+                  fontSize: 11, fontWeight: FontWeight.w700,
+                ),
               ),
             ),
           ),
           const SizedBox(width: 10),
           Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(student.fullName,
-                    style: const TextStyle(
-                      fontSize: 14, fontWeight: FontWeight.w700,
-                      color: JaikalkiBrand.indigoDark,
-                    ),
-                    maxLines: 1, overflow: TextOverflow.ellipsis),
-                Text(student.admissionNumber,
-                    style: const TextStyle(
-                      fontSize: 11, color: JaikalkiBrand.textSecondary,
-                    )),
-              ],
+            child: InkWell(
+              onTap: () => Navigator.of(context).push(
+                MaterialPageRoute(
+                  builder: (_) => StudentDrillPage(studentId: student.studentId),
+                ),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(student.fullName,
+                      style: const TextStyle(
+                        fontSize: 14, fontWeight: FontWeight.w700,
+                        color: JaikalkiBrand.indigoDark,
+                      ),
+                      maxLines: 1, overflow: TextOverflow.ellipsis),
+                  Text(student.admissionNumber,
+                      style: const TextStyle(
+                        fontSize: 11, color: JaikalkiBrand.textSecondary,
+                      )),
+                ],
+              ),
             ),
           ),
           Wrap(

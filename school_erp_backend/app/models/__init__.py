@@ -166,3 +166,9 @@ from app.models.tenant import (  # noqa: F401
     TenantStatus,
     TenantUsageSnapshot,
 )
+from app.models.staff_extras import (  # noqa: F401
+    BehaviourNote,
+    BehaviourNoteKind,
+    StaffLeave,
+    StaffLeaveStatus,
+)
