@@ -138,7 +138,11 @@ async def save_upload(
     target.parent.mkdir(parents=True, exist_ok=True)
     target.write_bytes(content)
 
-    rel = target.relative_to(_base_dir())
+    # _resolve_safe(.resolve()) gave us an absolute target; _base_dir()
+    # is whatever settings.UPLOAD_DIR holds (often relative like
+    # "uploads"). relative_to() can't compare across that mix, so
+    # resolve the base too before subtracting.
+    rel = target.relative_to(_base_dir().resolve())
     return str(rel), len(content)
 
 
