@@ -4,6 +4,7 @@ import 'package:url_launcher/url_launcher.dart';
 import '../../api/teacher_repository.dart';
 import '../../core/service_locator.dart';
 import '../../theme/brand.dart';
+import '../../widgets/authed_photo.dart';
 import 'add_behaviour_note_dialog.dart';
 
 /// Per-student profile drill-down opened from the section roster:
@@ -273,14 +274,25 @@ class _Header extends StatelessWidget {
       ),
       child: Row(
         children: [
-          CircleAvatar(
-            radius: 28,
-            backgroundColor: Colors.white24,
-            foregroundColor: Colors.white,
-            child: Text(_initials(drill.fullName),
+          Container(
+            width: 56, height: 56,
+            decoration: const BoxDecoration(
+              shape: BoxShape.circle,
+              color: Colors.white24,
+            ),
+            clipBehavior: Clip.antiAlias,
+            alignment: Alignment.center,
+            child: AuthedPhoto(
+              path: drill.photoUrl,
+              placeholder: Text(
+                _initials(drill.fullName),
                 style: const TextStyle(
-                  fontSize: 17, fontWeight: FontWeight.w700,
-                )),
+                  fontSize: 17,
+                  fontWeight: FontWeight.w700,
+                  color: Colors.white,
+                ),
+              ),
+            ),
           ),
           const SizedBox(width: 12),
           Expanded(

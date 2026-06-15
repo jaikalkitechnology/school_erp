@@ -4,6 +4,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../api/auth_repository.dart';
 import '../../api/parent_repository.dart';
 import '../../core/auth_cubit.dart';
+import '../../widgets/authed_photo.dart';
 import '../../core/children_cubit.dart';
 import '../../core/service_locator.dart';
 import '../../core/settings_cubit.dart';
@@ -521,14 +522,24 @@ class _IdCardTileState extends State<_IdCardTile> {
               ),
               child: Row(
                 children: [
-                  CircleAvatar(
-                    radius: 28,
-                    backgroundColor: Colors.white.withOpacity(0.18),
-                    foregroundColor: Colors.white,
-                    child: Text(
-                      profile != null ? _initials(profile.fullName) : '··',
-                      style: const TextStyle(
-                          fontSize: 16, fontWeight: FontWeight.w700),
+                  Container(
+                    width: 56, height: 56,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      color: Colors.white.withOpacity(0.18),
+                    ),
+                    clipBehavior: Clip.antiAlias,
+                    alignment: Alignment.center,
+                    child: AuthedPhoto(
+                      path: profile?.photoUrl,
+                      placeholder: Text(
+                        profile != null
+                            ? _initials(profile.fullName) : '··',
+                        style: const TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w700,
+                            color: Colors.white),
+                      ),
                     ),
                   ),
                   const SizedBox(width: 12),

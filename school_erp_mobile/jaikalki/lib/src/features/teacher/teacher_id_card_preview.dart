@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../api/teacher_repository.dart';
 import '../../theme/brand.dart';
+import '../../widgets/authed_photo.dart';
 
 /// In-app teacher ID card — visual mirror of the reportlab PDF that
 /// /v1/teacher/me/id-card.pdf renders. Photo + logo are stubbed with
@@ -116,12 +117,16 @@ class TeacherIdCardPreview extends StatelessWidget {
                             ),
                           ),
                           alignment: Alignment.center,
-                          child: Text(
-                            _initials(profile.fullName),
-                            style: const TextStyle(
-                              fontSize: 26,
-                              fontWeight: FontWeight.w700,
-                              color: JaikalkiBrand.indigoDark,
+                          clipBehavior: Clip.antiAlias,
+                          child: AuthedPhoto(
+                            path: profile.photoUrl,
+                            placeholder: Text(
+                              _initials(profile.fullName),
+                              style: const TextStyle(
+                                fontSize: 26,
+                                fontWeight: FontWeight.w700,
+                                color: JaikalkiBrand.indigoDark,
+                              ),
                             ),
                           ),
                         ),
