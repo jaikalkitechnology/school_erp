@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../api/teacher_repository.dart';
 import '../../core/service_locator.dart';
 import '../../theme/brand.dart';
+import 'create_homework_page.dart';
 import 'homework_submissions_page.dart';
 
 /// Teacher's own homework — sorted by due date desc, tap to view the
@@ -16,11 +17,14 @@ class HomeworkListPage extends StatefulWidget {
 
 class _HomeworkListPageState extends State<HomeworkListPage> {
   late Future<List<TeacherHomework>> _future;
+  late Future<TeacherMe> _me;
+  int? _sectionFilter; // null = all
 
   @override
   void initState() {
     super.initState();
     _future = locator<TeacherRepository>().myHomework();
+    _me = locator<TeacherRepository>().me();
   }
 
   Future<void> _reload() async {
@@ -30,10 +34,28 @@ class _HomeworkListPageState extends State<HomeworkListPage> {
     await _future;
   }
 
+  Future<void> _createNew() async {
+    final me = await _me;
+    if (!mounted) return;
+    final ok = await Navigator.of(context).push<bool>(
+      MaterialPageRoute(
+        builder: (_) => CreateHomeworkPage(sections: me.sections),
+      ),
+    );
+    if (ok == true) _reload();
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(title: const Text('Homework')),
+      floatingActionButton: FloatingActionButton.extended(
+        onPressed: _createNew,
+        backgroundColor: JaikalkiBrand.saffron,
+        foregroundColor: Colors.white,
+        icon: const Icon(Icons.add),
+        label: const Text('New'),
+      ),
       body: RefreshIndicator(
         onRefresh: _reload,
         child: FutureBuilder<List<TeacherHomework>>(
@@ -53,26 +75,54 @@ class _HomeworkListPageState extends State<HomeworkListPage> {
                 ),
               ]);
             }
-            final items = snap.data ?? const [];
-            if (items.isEmpty) {
-              return ListView(children: const [
-                SizedBox(height: 80),
-                Center(
-                  child: Padding(
-                    padding: EdgeInsets.all(24),
-                    child: Text(
-                      'No homework posted yet.',
-                      style: TextStyle(color: JaikalkiBrand.textSecondary),
-                    ),
-                  ),
+            final all = snap.data ?? const [];
+            final items = _sectionFilter == null
+                ? all
+                : all.where((h) => h.sectionId == _sectionFilter).toList();
+            return ListView(
+              padding: const EdgeInsets.fromLTRB(16, 16, 16, 96),
+              children: [
+                FutureBuilder<TeacherMe>(
+                  future: _me,
+                  builder: (_, meSnap) {
+                    final secs = meSnap.data?.sections ?? const [];
+                    if (secs.length <= 1) return const SizedBox.shrink();
+                    return SizedBox(
+                      height: 38,
+                      child: ListView(
+                        scrollDirection: Axis.horizontal,
+                        children: [
+                          _filterChip('All', _sectionFilter == null,
+                              () => setState(() => _sectionFilter = null)),
+                          for (final s in secs)
+                            _filterChip(
+                              s.displayLabel,
+                              _sectionFilter == s.sectionId,
+                              () => setState(
+                                  () => _sectionFilter = s.sectionId),
+                            ),
+                        ],
+                      ),
+                    );
+                  },
                 ),
-              ]);
-            }
-            return ListView.separated(
-              padding: const EdgeInsets.fromLTRB(16, 16, 16, 32),
-              itemCount: items.length,
-              separatorBuilder: (_, __) => const SizedBox(height: 10),
-              itemBuilder: (_, i) => _HomeworkCard(item: items[i]),
+                const SizedBox(height: 8),
+                if (items.isEmpty)
+                  const Padding(
+                    padding: EdgeInsets.symmetric(vertical: 60),
+                    child: Center(
+                      child: Text(
+                        'Nothing matches.',
+                        style: TextStyle(color: JaikalkiBrand.textSecondary),
+                      ),
+                    ),
+                  )
+                else
+                  ...items.map((h) => Padding(
+                        padding: const EdgeInsets.only(bottom: 10),
+                        child: _HomeworkCard(item: h),
+                      )),
+              ],
             );
           },
         ),
@@ -80,6 +130,22 @@ class _HomeworkListPageState extends State<HomeworkListPage> {
     );
   }
 }
+
+Widget _filterChip(String label, bool selected, VoidCallback onTap) => Padding(
+      padding: const EdgeInsets.only(right: 6),
+      child: ChoiceChip(
+        label: Text(label),
+        selected: selected,
+        onSelected: (_) => onTap(),
+        selectedColor: JaikalkiBrand.saffron,
+        labelStyle: TextStyle(
+          fontSize: 12,
+          fontWeight: FontWeight.w700,
+          color: selected ? Colors.white : JaikalkiBrand.indigoDark,
+        ),
+        backgroundColor: JaikalkiBrand.saffronPale.withOpacity(0.5),
+      ),
+    );
 
 class _HomeworkCard extends StatelessWidget {
   const _HomeworkCard({required this.item});

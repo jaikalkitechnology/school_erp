@@ -323,8 +323,7 @@ class _IdCardTileState extends State<_IdCardTile> {
           appBar: AppBar(title: const Text('ID card')),
           body: TeacherIdCardPreview(
             profile: widget.profile,
-            schoolName:
-                widget.profile.designation != null ? 'Jaikalki' : 'Jaikalki',
+            schoolName: widget.profile.schoolName ?? 'School',
           ),
         ),
       ),

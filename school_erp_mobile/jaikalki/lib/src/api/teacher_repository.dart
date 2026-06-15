@@ -154,6 +154,169 @@ class TeacherRepository {
     );
     return LeaveRowForTeacher.fromJson(res.data ?? const {});
   }
+
+  // ---- Student drill-down ------------------------------------------------
+
+  Future<StudentDrill> studentDrill(int studentId) async {
+    final res = await _api.dio.get<Map<String, dynamic>>(
+      '/v1/teacher/students/$studentId',
+    );
+    return StudentDrill.fromJson(res.data ?? const {});
+  }
+
+  // ---- Behaviour notes ---------------------------------------------------
+
+  Future<BehaviourNote> addBehaviourNote({
+    required int studentId,
+    required String headline,
+    String kind = 'neutral',
+    String? detail,
+    String? occurredOn,
+    bool visibleToParent = true,
+  }) async {
+    final res = await _api.dio.post<Map<String, dynamic>>(
+      '/v1/teacher/behaviour-notes',
+      data: {
+        'student_id': studentId,
+        'kind': kind,
+        'headline': headline,
+        if (detail != null && detail.isNotEmpty) 'detail': detail,
+        if (occurredOn != null) 'occurred_on': occurredOn,
+        'visible_to_parent': visibleToParent,
+      },
+    );
+    return BehaviourNote.fromJson(res.data ?? const {});
+  }
+
+  // ---- My own staff leave ----------------------------------------------
+
+  Future<List<StaffLeaveRow>> myLeaves() async {
+    try {
+      final res = await _api.dio.get<List<dynamic>>('/v1/teacher/my-leaves');
+      return (res.data ?? const [])
+          .map((e) => StaffLeaveRow.fromJson(e as Map<String, dynamic>))
+          .toList();
+    } on DioException {
+      return const [];
+    }
+  }
+
+  Future<StaffLeaveRow> applyMyLeave({
+    required String startDate,
+    required String endDate,
+    required String reason,
+    String kind = 'casual',
+  }) async {
+    final res = await _api.dio.post<Map<String, dynamic>>(
+      '/v1/teacher/my-leaves',
+      data: {
+        'start_date': startDate,
+        'end_date': endDate,
+        'reason': reason,
+        'kind': kind,
+      },
+    );
+    return StaffLeaveRow.fromJson(res.data ?? const {});
+  }
+
+  Future<List<StaffLeaveRow>> pendingStaffLeaves() async {
+    try {
+      final res = await _api.dio.get<List<dynamic>>(
+        '/v1/teacher/staff-leaves/pending',
+      );
+      return (res.data ?? const [])
+          .map((e) => StaffLeaveRow.fromJson(e as Map<String, dynamic>))
+          .toList();
+    } on DioException {
+      return const [];
+    }
+  }
+
+  Future<StaffLeaveRow> decideStaffLeave({
+    required int leaveId,
+    required String status,
+    String? remarks,
+  }) async {
+    final res = await _api.dio.post<Map<String, dynamic>>(
+      '/v1/teacher/staff-leaves/$leaveId/decide',
+      data: {
+        'status': status,
+        if (remarks != null && remarks.isNotEmpty) 'decision_remarks': remarks,
+      },
+    );
+    return StaffLeaveRow.fromJson(res.data ?? const {});
+  }
+
+  // ---- Holidays + events -----------------------------------------------
+
+  Future<List<Holiday>> holidays() async {
+    try {
+      final res = await _api.dio.get<List<dynamic>>('/v1/teacher/holidays');
+      return (res.data ?? const [])
+          .map((e) => Holiday.fromJson(e as Map<String, dynamic>))
+          .toList();
+    } on DioException {
+      return const [];
+    }
+  }
+
+  Future<List<SchoolEvent>> events() async {
+    try {
+      final res = await _api.dio.get<List<dynamic>>('/v1/teacher/events');
+      return (res.data ?? const [])
+          .map((e) => SchoolEvent.fromJson(e as Map<String, dynamic>))
+          .toList();
+    } on DioException {
+      return const [];
+    }
+  }
+
+  // ---- Create homework -------------------------------------------------
+
+  Future<String> uploadFile({
+    required String localPath,
+    String category = 'homework',
+    String subcategory = 'assignments',
+  }) async {
+    final filename = localPath.split('/').last;
+    final form = FormData.fromMap({
+      'category': category,
+      'subcategory': subcategory,
+      'file': await MultipartFile.fromFile(localPath, filename: filename),
+    });
+    final res = await _api.dio.post<Map<String, dynamic>>(
+      '/v1/uploads',
+      data: form,
+      options: Options(contentType: 'multipart/form-data'),
+    );
+    return (res.data?['path'] as String?) ?? '';
+  }
+
+  Future<TeacherHomework> createHomework({
+    required int sectionId,
+    int? subjectId,
+    required String title,
+    String? description,
+    required String dueDate,
+    required double maxMarks,
+    List<String>? attachments,
+  }) async {
+    final res = await _api.dio.post<Map<String, dynamic>>(
+      '/v1/teacher/homework',
+      data: {
+        'section_id': sectionId,
+        if (subjectId != null) 'subject_id': subjectId,
+        'title': title,
+        if (description != null && description.isNotEmpty)
+          'description': description,
+        'due_date': dueDate,
+        'max_marks': maxMarks,
+        if (attachments != null && attachments.isNotEmpty)
+          'attachments': attachments,
+      },
+    );
+    return TeacherHomework.fromJson(res.data ?? const {});
+  }
 }
 
 // ---- Models --------------------------------------------------------------
@@ -171,6 +334,10 @@ class TeacherProfile {
     required this.isClassTeacher,
     required this.qualifications,
     required this.experienceYears,
+    required this.schoolName,
+    required this.schoolAddress,
+    required this.schoolPhone,
+    required this.schoolLogoUrl,
   });
 
   final int userId;
@@ -184,6 +351,10 @@ class TeacherProfile {
   final bool isClassTeacher;
   final List<String> qualifications;
   final int experienceYears;
+  final String? schoolName;
+  final String? schoolAddress;
+  final String? schoolPhone;
+  final String? schoolLogoUrl;
 
   factory TeacherProfile.fromJson(Map<String, dynamic> j) => TeacherProfile(
         userId: (j['user_id'] as num?)?.toInt() ?? 0,
@@ -199,6 +370,10 @@ class TeacherProfile {
             .map((e) => e.toString())
             .toList(),
         experienceYears: (j['experience_years'] as num?)?.toInt() ?? 0,
+        schoolName: j['school_name'] as String?,
+        schoolAddress: j['school_address'] as String?,
+        schoolPhone: j['school_phone'] as String?,
+        schoolLogoUrl: j['school_logo_url'] as String?,
       );
 }
 
@@ -654,3 +829,209 @@ class LeaveRowForTeacher {
         studentName: j['student_name'] as String?,
       );
 }
+
+// ---- Student drill-down / behaviour notes --------------------------------
+
+class BehaviourNote {
+  const BehaviourNote({
+    required this.id,
+    required this.studentId,
+    required this.occurredOn,
+    required this.kind,
+    required this.headline,
+    required this.detail,
+    required this.visibleToParent,
+  });
+
+  final int id;
+  final int studentId;
+  final String occurredOn;
+  /// positive / concern / neutral
+  final String kind;
+  final String headline;
+  final String? detail;
+  final bool visibleToParent;
+
+  factory BehaviourNote.fromJson(Map<String, dynamic> j) => BehaviourNote(
+        id: (j['id'] as num?)?.toInt() ?? 0,
+        studentId: (j['student_id'] as num?)?.toInt() ?? 0,
+        occurredOn: (j['occurred_on'] as String?) ?? '',
+        kind: (j['kind'] as String?) ?? 'neutral',
+        headline: (j['headline'] as String?) ?? '',
+        detail: j['detail'] as String?,
+        visibleToParent: (j['visible_to_parent'] as bool?) ?? true,
+      );
+}
+
+class StudentDrill {
+  const StudentDrill({
+    required this.studentId,
+    required this.fullName,
+    required this.admissionNumber,
+    required this.rollNo,
+    required this.photoUrl,
+    required this.dateOfBirth,
+    required this.gender,
+    required this.bloodGroup,
+    required this.classLabel,
+    required this.sectionName,
+    required this.address,
+    required this.parentPhone,
+    required this.parentEmail,
+    required this.fatherName,
+    required this.motherName,
+    required this.emergencyPhone,
+    required this.medicalConditions,
+    required this.allergies,
+    required this.attendance30dPct,
+    required this.behaviourNotes,
+  });
+
+  final int studentId;
+  final String fullName;
+  final String admissionNumber;
+  final String? rollNo;
+  final String? photoUrl;
+  final String? dateOfBirth;
+  final String? gender;
+  final String? bloodGroup;
+  final String? classLabel;
+  final String? sectionName;
+  final String? address;
+  final String? parentPhone;
+  final String? parentEmail;
+  final String? fatherName;
+  final String? motherName;
+  final String? emergencyPhone;
+  final String? medicalConditions;
+  final String? allergies;
+  final double? attendance30dPct;
+  final List<BehaviourNote> behaviourNotes;
+
+  factory StudentDrill.fromJson(Map<String, dynamic> j) => StudentDrill(
+        studentId: (j['student_id'] as num).toInt(),
+        fullName: (j['full_name'] as String?) ?? '',
+        admissionNumber: (j['admission_number'] as String?) ?? '',
+        rollNo: j['roll_no'] as String?,
+        photoUrl: j['photo_url'] as String?,
+        dateOfBirth: j['date_of_birth'] as String?,
+        gender: j['gender'] as String?,
+        bloodGroup: j['blood_group'] as String?,
+        classLabel: j['class_label'] as String?,
+        sectionName: j['section_name'] as String?,
+        address: j['address'] as String?,
+        parentPhone: j['parent_phone'] as String?,
+        parentEmail: j['parent_email'] as String?,
+        fatherName: j['father_name'] as String?,
+        motherName: j['mother_name'] as String?,
+        emergencyPhone: j['emergency_phone'] as String?,
+        medicalConditions: j['medical_conditions'] as String?,
+        allergies: j['allergies'] as String?,
+        attendance30dPct: _toDoubleOrNull(j['attendance_30d_pct']),
+        behaviourNotes: ((j['behaviour_notes'] as List<dynamic>?) ?? const [])
+            .map((e) => BehaviourNote.fromJson(e as Map<String, dynamic>))
+            .toList(),
+      );
+}
+
+// ---- Staff (my own) leave ------------------------------------------------
+
+class StaffLeaveRow {
+  const StaffLeaveRow({
+    required this.id,
+    required this.userId,
+    required this.startDate,
+    required this.endDate,
+    required this.reason,
+    required this.kind,
+    required this.status,
+    required this.decisionRemarks,
+    required this.decidedAt,
+  });
+
+  final int id;
+  final int userId;
+  final String startDate;
+  final String endDate;
+  final String reason;
+  final String kind;
+  /// pending / approved / rejected / cancelled
+  final String status;
+  final String? decisionRemarks;
+  final String? decidedAt;
+
+  bool get isPending => status == 'pending';
+
+  factory StaffLeaveRow.fromJson(Map<String, dynamic> j) => StaffLeaveRow(
+        id: (j['id'] as num).toInt(),
+        userId: (j['user_id'] as num).toInt(),
+        startDate: (j['start_date'] as String?) ?? '',
+        endDate: (j['end_date'] as String?) ?? '',
+        reason: (j['reason'] as String?) ?? '',
+        kind: (j['kind'] as String?) ?? 'casual',
+        status: (j['status'] as String?) ?? 'pending',
+        decisionRemarks: j['decision_remarks'] as String?,
+        decidedAt: j['decided_at'] as String?,
+      );
+}
+
+// ---- Holidays + events (reuse same shape as parent feed) ----------------
+
+class Holiday {
+  const Holiday({
+    required this.id,
+    required this.date,
+    required this.name,
+    required this.kind,
+    required this.description,
+  });
+
+  final int id;
+  final String date;
+  final String name;
+  final String kind;
+  final String? description;
+
+  factory Holiday.fromJson(Map<String, dynamic> j) => Holiday(
+        id: (j['id'] as num).toInt(),
+        date: (j['date'] as String?) ?? '',
+        name: (j['name'] as String?) ?? '',
+        kind: (j['kind'] as String?) ?? 'public',
+        description: j['description'] as String?,
+      );
+}
+
+class SchoolEvent {
+  const SchoolEvent({
+    required this.id,
+    required this.title,
+    required this.description,
+    required this.kind,
+    required this.startsAt,
+    required this.endsAt,
+    required this.isAllDay,
+    required this.audience,
+  });
+
+  final int id;
+  final String title;
+  final String? description;
+  final String kind;
+  final String startsAt;
+  final String? endsAt;
+  final bool isAllDay;
+  final String audience;
+
+  factory SchoolEvent.fromJson(Map<String, dynamic> j) => SchoolEvent(
+        id: (j['id'] as num).toInt(),
+        title: (j['title'] as String?) ?? '',
+        description: j['description'] as String?,
+        kind: (j['kind'] as String?) ?? 'general',
+        startsAt: (j['starts_at'] as String?) ?? '',
+        endsAt: j['ends_at'] as String?,
+        isAllDay: (j['is_all_day'] as bool?) ?? true,
+        audience: (j['audience'] as String?) ?? 'all',
+      );
+}
+
+void _addProfileSchoolFields(TeacherProfile _) {}
