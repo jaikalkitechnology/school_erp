@@ -5,6 +5,7 @@ import 'package:path_provider/path_provider.dart';
 import '../../api/teacher_repository.dart';
 import '../../core/service_locator.dart';
 import '../../theme/brand.dart';
+import '../../widgets/authed_photo.dart';
 import 'take_attendance_page.dart';
 import 'teacher_id_card_preview.dart';
 import 'weekly_timetable.dart';
@@ -159,10 +160,18 @@ class _Greeting extends StatelessWidget {
       ),
       child: Row(
         children: [
-          const CircleAvatar(
-            radius: 24,
-            backgroundColor: Colors.white24,
-            child: Icon(Icons.school, color: Colors.white),
+          Container(
+            width: 48, height: 48,
+            decoration: const BoxDecoration(
+              shape: BoxShape.circle,
+              color: Colors.white24,
+            ),
+            clipBehavior: Clip.antiAlias,
+            alignment: Alignment.center,
+            child: AuthedPhoto(
+              path: profile?.photoUrl,
+              placeholder: const Icon(Icons.school, color: Colors.white),
+            ),
           ),
           const SizedBox(width: 12),
           Expanded(
@@ -361,14 +370,23 @@ class _IdCardTileState extends State<_IdCardTile> {
         children: [
           Row(
             children: [
-              CircleAvatar(
-                radius: 26,
-                backgroundColor: Colors.white.withOpacity(0.18),
-                foregroundColor: Colors.white,
-                child: Text(
-                  _initials(p.fullName),
-                  style: const TextStyle(
-                    fontSize: 16, fontWeight: FontWeight.w700,
+              Container(
+                width: 52, height: 52,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: Colors.white.withOpacity(0.18),
+                ),
+                clipBehavior: Clip.antiAlias,
+                alignment: Alignment.center,
+                child: AuthedPhoto(
+                  path: p.photoUrl,
+                  placeholder: Text(
+                    _initials(p.fullName),
+                    style: const TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w700,
+                      color: Colors.white,
+                    ),
                   ),
                 ),
               ),

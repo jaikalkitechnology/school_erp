@@ -7,6 +7,7 @@ import '../../api/parent_repository.dart';
 import '../../core/children_cubit.dart';
 import '../../core/service_locator.dart';
 import '../../theme/brand.dart';
+import '../../widgets/authed_photo.dart';
 import 'id_card_preview_page.dart';
 
 class StudentProfilePage extends StatefulWidget {
@@ -188,14 +189,25 @@ class _HeaderCard extends StatelessWidget {
       ),
       child: Row(
         children: [
-          CircleAvatar(
-            radius: 36,
-            backgroundColor: Colors.white.withOpacity(0.18),
-            foregroundColor: Colors.white,
-            child: Text(_initials(profile.fullName),
+          Container(
+            width: 72, height: 72,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              color: Colors.white.withOpacity(0.18),
+            ),
+            clipBehavior: Clip.antiAlias,
+            alignment: Alignment.center,
+            child: AuthedPhoto(
+              path: profile.photoUrl,
+              placeholder: Text(
+                _initials(profile.fullName),
                 style: const TextStyle(
-                  fontSize: 22, fontWeight: FontWeight.w700,
-                )),
+                  fontSize: 22,
+                  fontWeight: FontWeight.w700,
+                  color: Colors.white,
+                ),
+              ),
+            ),
           ),
           const SizedBox(width: 14),
           Expanded(

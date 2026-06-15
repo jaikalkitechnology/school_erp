@@ -2,12 +2,11 @@ import 'package:flutter/material.dart';
 
 import '../../api/parent_repository.dart';
 import '../../theme/brand.dart';
+import '../../widgets/authed_photo.dart';
 
 /// Flutter-rendered preview of the student ID card. Mirrors the
 /// reportlab layout the backend ships in the PDF — same blocks, same
-/// order — so what parents see in-app matches what prints. Photo +
-/// logo would need /v1/uploads auth, so they're stubbed with initials
-/// + the school's first letter for now.
+/// order — so what parents see in-app matches what prints.
 class IdCardPreviewPage extends StatelessWidget {
   const IdCardPreviewPage({required this.profile, super.key});
 
@@ -120,12 +119,16 @@ class IdCardPreviewPage extends StatelessWidget {
                             ),
                           ),
                           alignment: Alignment.center,
-                          child: Text(
-                            _initials(profile.fullName),
-                            style: const TextStyle(
-                              fontSize: 26,
-                              fontWeight: FontWeight.w700,
-                              color: JaikalkiBrand.indigoDark,
+                          clipBehavior: Clip.antiAlias,
+                          child: AuthedPhoto(
+                            path: profile.photoUrl,
+                            placeholder: Text(
+                              _initials(profile.fullName),
+                              style: const TextStyle(
+                                fontSize: 26,
+                                fontWeight: FontWeight.w700,
+                                color: JaikalkiBrand.indigoDark,
+                              ),
                             ),
                           ),
                         ),
