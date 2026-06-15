@@ -13,10 +13,13 @@ from datetime import date as _date
 from typing import Optional
 
 from fastapi import APIRouter, Depends, Query, status
+from fastapi.responses import FileResponse
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.auth_deps import AuthPrincipal, require_roles
 from app.core.tenant_session import tenant_scoped_session
+from app.models.tenant import Tenant
 from app.schemas.attendance import AttendanceMarkRequest, SectionRoll
 from app.schemas.homework import (
     GradeWrite,
@@ -41,12 +44,15 @@ from app.services.parents import decide_leave, list_school_leaves
 from app.services.teacher_app import (
     StudentRosterRow,
     TeacherMe,
+    TeacherTimetable,
     TeacherToday,
     assert_section_access,
     section_roster,
     teacher_me,
+    teacher_timetable,
     teacher_today,
 )
+from app.services.teacher_id_card import render_teacher_id_card_pdf
 
 # Same roster as the school-admin "teacher-ish" reader set, minus the
 # back-office roles that have no business marking attendance.
@@ -86,6 +92,49 @@ async def today_route(
 ):
     return await teacher_today(
         session, tenant_id=principal.tenant_id, user_id=principal.user_id,
+    )
+
+
+@router.get("/timetable", response_model=TeacherTimetable)
+async def timetable_route(
+    principal: AuthPrincipal = Depends(_teacher),
+    session: AsyncSession = Depends(tenant_scoped_session),
+):
+    return await teacher_timetable(
+        session, tenant_id=principal.tenant_id, user_id=principal.user_id,
+    )
+
+
+@router.get("/me/id-card.pdf")
+async def my_id_card_route(
+    principal: AuthPrincipal = Depends(_teacher),
+    session: AsyncSession = Depends(tenant_scoped_session),
+):
+    me = await teacher_me(
+        session, tenant_id=principal.tenant_id, user_id=principal.user_id,
+    )
+    tenant = (
+        await session.execute(
+            select(Tenant).where(Tenant.id == principal.tenant_id)
+        )
+    ).scalar_one_or_none()
+    profile_dict = me.profile.model_dump()
+    school_dict = {
+        "name": tenant.school_name if tenant else "School",
+        "address": tenant.address if tenant else None,
+        "phone": tenant.phone if tenant else None,
+        "logo_url": tenant.logo_url if tenant else None,
+    }
+    target = render_teacher_id_card_pdf(
+        tenant_id=principal.tenant_id,
+        profile_dict=profile_dict,
+        school_dict=school_dict,
+    )
+    safe_no = (me.profile.employee_no or "teacher").replace("/", "_")
+    return FileResponse(
+        target,
+        media_type="application/pdf",
+        filename=f"teacher_id_{safe_no}.pdf",
     )
 
 

@@ -63,6 +63,97 @@ class TeacherRepository {
     );
     return SectionRoll.fromJson(res.data ?? const {});
   }
+
+  Future<TeacherWeekTimetable> timetable() async {
+    final res = await _api.dio.get<Map<String, dynamic>>(
+      '/v1/teacher/timetable',
+    );
+    return TeacherWeekTimetable.fromJson(res.data ?? const {});
+  }
+
+  Future<String> downloadIdCard(String savePath) async {
+    await _api.dio.download('/v1/teacher/me/id-card.pdf', savePath);
+    return savePath;
+  }
+
+  // ---- Homework -----------------------------------------------------------
+
+  Future<List<TeacherHomework>> myHomework() async {
+    try {
+      final res = await _api.dio.get<List<dynamic>>('/v1/teacher/homework');
+      return (res.data ?? const [])
+          .map((e) => TeacherHomework.fromJson(e as Map<String, dynamic>))
+          .toList();
+    } on DioException {
+      return const [];
+    }
+  }
+
+  Future<List<HomeworkSubmissionRow>> submissionsFor(int homeworkId) async {
+    try {
+      final res = await _api.dio.get<List<dynamic>>(
+        '/v1/teacher/homework/$homeworkId/submissions',
+      );
+      return (res.data ?? const [])
+          .map((e) => HomeworkSubmissionRow.fromJson(e as Map<String, dynamic>))
+          .toList();
+    } on DioException {
+      return const [];
+    }
+  }
+
+  Future<HomeworkStatusReport> homeworkReport(int homeworkId) async {
+    final res = await _api.dio.get<Map<String, dynamic>>(
+      '/v1/teacher/homework/$homeworkId/report',
+    );
+    return HomeworkStatusReport.fromJson(res.data ?? const {});
+  }
+
+  Future<HomeworkSubmissionRow> gradeSubmission({
+    required int submissionId,
+    required double marks,
+    String? feedback,
+  }) async {
+    final res = await _api.dio.post<Map<String, dynamic>>(
+      '/v1/teacher/homework/submissions/$submissionId/grade',
+      data: {
+        'marks': marks,
+        if (feedback != null && feedback.isNotEmpty) 'feedback': feedback,
+      },
+    );
+    return HomeworkSubmissionRow.fromJson(res.data ?? const {});
+  }
+
+  // ---- Leaves -------------------------------------------------------------
+
+  Future<List<LeaveRowForTeacher>> pendingLeaves({bool onlyPending = true}) async {
+    try {
+      final res = await _api.dio.get<List<dynamic>>(
+        '/v1/teacher/leaves',
+        queryParameters: {'only_pending': onlyPending},
+      );
+      return (res.data ?? const [])
+          .map((e) => LeaveRowForTeacher.fromJson(e as Map<String, dynamic>))
+          .toList();
+    } on DioException {
+      return const [];
+    }
+  }
+
+  Future<LeaveRowForTeacher> decideLeave({
+    required int leaveId,
+    required String status, // approved / rejected
+    String? note,
+  }) async {
+    final res = await _api.dio.post<Map<String, dynamic>>(
+      '/v1/teacher/leaves/$leaveId/decide',
+      data: {
+        'status': status,
+        if (note != null && note.isNotEmpty) 'decision_note': note,
+      },
+    );
+    return LeaveRowForTeacher.fromJson(res.data ?? const {});
+  }
 }
 
 // ---- Models --------------------------------------------------------------
@@ -310,4 +401,256 @@ class MarkEntry {
         'status': status,
         if (remarks != null && remarks!.isNotEmpty) 'remarks': remarks,
       };
+}
+
+// ---- Weekly timetable ----------------------------------------------------
+
+class WeekPeriod {
+  const WeekPeriod({
+    required this.dayOfWeek,
+    required this.periodNumber,
+    required this.startsAt,
+    required this.endsAt,
+    required this.sectionId,
+    required this.sectionLabel,
+    required this.subjectId,
+    required this.subjectName,
+    required this.room,
+    required this.isBreak,
+  });
+
+  final int dayOfWeek;
+  final int periodNumber;
+  final String? startsAt;
+  final String? endsAt;
+  final int? sectionId;
+  final String? sectionLabel;
+  final int? subjectId;
+  final String? subjectName;
+  final String? room;
+  final bool isBreak;
+
+  factory WeekPeriod.fromJson(Map<String, dynamic> j) => WeekPeriod(
+        dayOfWeek: (j['day_of_week'] as num).toInt(),
+        periodNumber: (j['period_number'] as num).toInt(),
+        startsAt: j['starts_at'] as String?,
+        endsAt: j['ends_at'] as String?,
+        sectionId: (j['section_id'] as num?)?.toInt(),
+        sectionLabel: j['section_label'] as String?,
+        subjectId: (j['subject_id'] as num?)?.toInt(),
+        subjectName: j['subject_name'] as String?,
+        room: j['room'] as String?,
+        isBreak: (j['is_break'] as bool?) ?? false,
+      );
+}
+
+class TeacherWeekTimetable {
+  const TeacherWeekTimetable({required this.days, required this.rows});
+  final List<int> days;
+  final List<WeekPeriod> rows;
+
+  factory TeacherWeekTimetable.fromJson(Map<String, dynamic> j) =>
+      TeacherWeekTimetable(
+        days: ((j['days'] as List<dynamic>?) ?? const [])
+            .map((e) => (e as num).toInt())
+            .toList(),
+        rows: ((j['rows'] as List<dynamic>?) ?? const [])
+            .map((e) => WeekPeriod.fromJson(e as Map<String, dynamic>))
+            .toList(),
+      );
+}
+
+// ---- Homework grading ----------------------------------------------------
+
+double? _toDoubleOrNull(dynamic v) {
+  if (v == null) return null;
+  if (v is num) return v.toDouble();
+  if (v is String) return double.tryParse(v);
+  return null;
+}
+
+class TeacherHomework {
+  const TeacherHomework({
+    required this.id,
+    required this.sectionId,
+    required this.subjectId,
+    required this.title,
+    required this.description,
+    required this.assignedOn,
+    required this.dueDate,
+    required this.maxMarks,
+    required this.attachments,
+  });
+
+  final int id;
+  final int sectionId;
+  final int? subjectId;
+  final String title;
+  final String? description;
+  final String assignedOn;
+  final String dueDate;
+  final double maxMarks;
+  final List<String> attachments;
+
+  factory TeacherHomework.fromJson(Map<String, dynamic> j) => TeacherHomework(
+        id: (j['id'] as num).toInt(),
+        sectionId: (j['section_id'] as num).toInt(),
+        subjectId: (j['subject_id'] as num?)?.toInt(),
+        title: (j['title'] as String?) ?? '',
+        description: j['description'] as String?,
+        assignedOn: (j['assigned_on'] as String?) ?? '',
+        dueDate: (j['due_date'] as String?) ?? '',
+        maxMarks: _toDoubleOrNull(j['max_marks']) ?? 0,
+        attachments: ((j['attachments'] as List<dynamic>?) ?? const [])
+            .map((e) => e.toString())
+            .toList(),
+      );
+}
+
+class HomeworkSubmissionRow {
+  const HomeworkSubmissionRow({
+    required this.id,
+    required this.homeworkId,
+    required this.studentId,
+    required this.submittedAt,
+    required this.content,
+    required this.attachments,
+    required this.status,
+    required this.marks,
+    required this.feedback,
+  });
+
+  final int id;
+  final int homeworkId;
+  final int studentId;
+  final String? submittedAt;
+  final String? content;
+  final List<String> attachments;
+  /// submitted / graded / late / missing
+  final String status;
+  final double? marks;
+  final String? feedback;
+
+  bool get isGraded => status == 'graded';
+
+  factory HomeworkSubmissionRow.fromJson(Map<String, dynamic> j) =>
+      HomeworkSubmissionRow(
+        id: (j['id'] as num).toInt(),
+        homeworkId: (j['homework_id'] as num).toInt(),
+        studentId: (j['student_id'] as num).toInt(),
+        submittedAt: j['submitted_at'] as String?,
+        content: j['content'] as String?,
+        attachments: ((j['attachments'] as List<dynamic>?) ?? const [])
+            .map((e) => e.toString())
+            .toList(),
+        status: (j['status'] as String?) ?? 'submitted',
+        marks: _toDoubleOrNull(j['marks']),
+        feedback: j['feedback'] as String?,
+      );
+}
+
+class HomeworkStatusReport {
+  const HomeworkStatusReport({
+    required this.homeworkId,
+    required this.title,
+    required this.dueDate,
+    required this.maxMarks,
+    required this.totalStudents,
+    required this.submittedCount,
+    required this.rows,
+  });
+
+  final int homeworkId;
+  final String title;
+  final String dueDate;
+  final double maxMarks;
+  final int totalStudents;
+  final int submittedCount;
+  final List<StudentStatusRow> rows;
+
+  factory HomeworkStatusReport.fromJson(Map<String, dynamic> j) =>
+      HomeworkStatusReport(
+        homeworkId: (j['homework_id'] as num?)?.toInt() ?? 0,
+        title: (j['title'] as String?) ?? '',
+        dueDate: (j['due_date'] as String?) ?? '',
+        maxMarks: _toDoubleOrNull(j['max_marks']) ?? 0,
+        totalStudents: (j['total_students'] as num?)?.toInt() ?? 0,
+        submittedCount: (j['submitted_count'] as num?)?.toInt() ?? 0,
+        rows: ((j['rows'] as List<dynamic>?) ?? const [])
+            .map((e) => StudentStatusRow.fromJson(e as Map<String, dynamic>))
+            .toList(),
+      );
+}
+
+class StudentStatusRow {
+  const StudentStatusRow({
+    required this.studentId,
+    required this.fullName,
+    required this.admissionNumber,
+    required this.submitted,
+    required this.submittedAt,
+    required this.status,
+    required this.marks,
+  });
+
+  final int studentId;
+  final String fullName;
+  final String admissionNumber;
+  final bool submitted;
+  final String? submittedAt;
+  final String? status;
+  final double? marks;
+
+  factory StudentStatusRow.fromJson(Map<String, dynamic> j) => StudentStatusRow(
+        studentId: (j['student_id'] as num).toInt(),
+        fullName: (j['full_name'] as String?) ?? '',
+        admissionNumber: (j['admission_number'] as String?) ?? '',
+        submitted: (j['submitted'] as bool?) ?? false,
+        submittedAt: j['submitted_at'] as String?,
+        status: j['status'] as String?,
+        marks: _toDoubleOrNull(j['marks']),
+      );
+}
+
+// ---- Leaves --------------------------------------------------------------
+
+class LeaveRowForTeacher {
+  const LeaveRowForTeacher({
+    required this.id,
+    required this.studentId,
+    required this.startDate,
+    required this.endDate,
+    required this.reason,
+    required this.status,
+    required this.appliedByUserId,
+    required this.createdAt,
+    required this.studentName,
+  });
+
+  final int id;
+  final int studentId;
+  final String startDate;
+  final String endDate;
+  final String reason;
+  /// pending / approved / rejected
+  final String status;
+  final int? appliedByUserId;
+  final String createdAt;
+  // Optional — backend may or may not populate, depending on schema.
+  final String? studentName;
+
+  bool get isPending => status == 'pending';
+
+  factory LeaveRowForTeacher.fromJson(Map<String, dynamic> j) =>
+      LeaveRowForTeacher(
+        id: (j['id'] as num).toInt(),
+        studentId: (j['student_id'] as num).toInt(),
+        startDate: (j['start_date'] as String?) ?? '',
+        endDate: (j['end_date'] as String?) ?? '',
+        reason: (j['reason'] as String?) ?? '',
+        status: (j['status'] as String?) ?? 'pending',
+        appliedByUserId: (j['applied_by_user_id'] as num?)?.toInt(),
+        createdAt: (j['created_at'] as String?) ?? '',
+        studentName: j['student_name'] as String?,
+      );
 }

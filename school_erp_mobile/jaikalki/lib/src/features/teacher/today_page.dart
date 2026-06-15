@@ -1,9 +1,13 @@
 import 'package:flutter/material.dart';
+import 'package:open_filex/open_filex.dart';
+import 'package:path_provider/path_provider.dart';
 
 import '../../api/teacher_repository.dart';
 import '../../core/service_locator.dart';
 import '../../theme/brand.dart';
 import 'take_attendance_page.dart';
+import 'teacher_id_card_preview.dart';
+import 'weekly_timetable.dart';
 
 class TodayPage extends StatefulWidget {
   const TodayPage({super.key});
@@ -15,20 +19,25 @@ class TodayPage extends StatefulWidget {
 class _TodayPageState extends State<TodayPage> {
   late Future<TeacherToday> _future;
   late Future<TeacherMe> _me;
+  late Future<TeacherWeekTimetable> _tt;
 
   @override
   void initState() {
     super.initState();
-    _future = locator<TeacherRepository>().today();
-    _me = locator<TeacherRepository>().me();
+    final repo = locator<TeacherRepository>();
+    _future = repo.today();
+    _me = repo.me();
+    _tt = repo.timetable();
   }
 
   Future<void> _reload() async {
+    final repo = locator<TeacherRepository>();
     setState(() {
-      _future = locator<TeacherRepository>().today();
-      _me = locator<TeacherRepository>().me();
+      _future = repo.today();
+      _me = repo.me();
+      _tt = repo.timetable();
     });
-    await Future.wait([_future, _me]);
+    await Future.wait<dynamic>([_future, _me, _tt]);
   }
 
   @override
@@ -60,20 +69,21 @@ class _TodayPageState extends State<TodayPage> {
               children: [
                 FutureBuilder<TeacherMe>(
                   future: _me,
-                  builder: (_, meSnap) => _Greeting(profile: meSnap.data?.profile),
+                  builder: (_, meSnap) =>
+                      _Greeting(profile: meSnap.data?.profile),
                 ),
                 const SizedBox(height: 12),
                 _CountStrip(today: today),
                 const SizedBox(height: 16),
-                const Text(
-                  'Schedule',
-                  style: TextStyle(
-                    fontSize: 12,
-                    fontWeight: FontWeight.w700,
-                    letterSpacing: 0.6,
-                    color: JaikalkiBrand.textSecondary,
-                  ),
+                FutureBuilder<TeacherMe>(
+                  future: _me,
+                  builder: (_, meSnap) {
+                    if (meSnap.data == null) return const SizedBox.shrink();
+                    return _IdCardTile(profile: meSnap.data!.profile);
+                  },
                 ),
+                const SizedBox(height: 16),
+                const _SectionLabel('Today'),
                 const SizedBox(height: 8),
                 if (today.periods.isEmpty)
                   const Padding(
@@ -90,6 +100,37 @@ class _TodayPageState extends State<TodayPage> {
                         padding: const EdgeInsets.only(bottom: 8),
                         child: _PeriodCard(period: p),
                       )),
+                const SizedBox(height: 16),
+                const _SectionLabel('Weekly timetable'),
+                const SizedBox(height: 8),
+                FutureBuilder<TeacherWeekTimetable>(
+                  future: _tt,
+                  builder: (_, ttSnap) {
+                    if (ttSnap.connectionState != ConnectionState.done) {
+                      return const Padding(
+                        padding: EdgeInsets.symmetric(vertical: 24),
+                        child: Center(child: CircularProgressIndicator()),
+                      );
+                    }
+                    final tt = ttSnap.data ??
+                        const TeacherWeekTimetable(days: [], rows: []);
+                    return WeeklyTimetable(
+                      tt: tt,
+                      onTapPeriod: (p) {
+                        if (p.sectionId != null) {
+                          Navigator.of(context).push(
+                            MaterialPageRoute(
+                              builder: (_) => TakeAttendancePage(
+                                sectionId: p.sectionId!,
+                                sectionLabel: p.sectionLabel ?? 'Section',
+                              ),
+                            ),
+                          );
+                        }
+                      },
+                    );
+                  },
+                ),
               ],
             );
           },
@@ -225,6 +266,185 @@ class _CountTile extends StatelessWidget {
                 )),
           ],
         ),
+      ),
+    );
+  }
+}
+
+class _SectionLabel extends StatelessWidget {
+  const _SectionLabel(this.text);
+  final String text;
+  @override
+  Widget build(BuildContext context) => Text(
+        text.toUpperCase(),
+        style: const TextStyle(
+          fontSize: 12,
+          fontWeight: FontWeight.w700,
+          letterSpacing: 0.6,
+          color: JaikalkiBrand.textSecondary,
+        ),
+      );
+}
+
+class _IdCardTile extends StatefulWidget {
+  const _IdCardTile({required this.profile});
+  final TeacherProfile profile;
+
+  @override
+  State<_IdCardTile> createState() => _IdCardTileState();
+}
+
+class _IdCardTileState extends State<_IdCardTile> {
+  bool _downloading = false;
+
+  Future<void> _download() async {
+    setState(() => _downloading = true);
+    final messenger = ScaffoldMessenger.of(context);
+    try {
+      final dir = await getTemporaryDirectory();
+      final safe = widget.profile.employeeNo
+          .replaceAll(RegExp(r'[^A-Za-z0-9_-]'), '_');
+      final path = '${dir.path}/teacher_id_$safe.pdf';
+      await locator<TeacherRepository>().downloadIdCard(path);
+      await OpenFilex.open(path);
+    } catch (e) {
+      messenger.showSnackBar(
+        SnackBar(content: Text('Could not open ID card: $e')),
+      );
+    } finally {
+      if (mounted) setState(() => _downloading = false);
+    }
+  }
+
+  void _preview() {
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => Scaffold(
+          appBar: AppBar(title: const Text('ID card')),
+          body: TeacherIdCardPreview(
+            profile: widget.profile,
+            schoolName:
+                widget.profile.designation != null ? 'Jaikalki' : 'Jaikalki',
+          ),
+        ),
+      ),
+    );
+  }
+
+  String _initials(String name) {
+    final parts = name.trim().split(RegExp(r'\s+'));
+    if (parts.isEmpty || parts[0].isEmpty) return '?';
+    if (parts.length == 1) return parts[0][0].toUpperCase();
+    return '${parts.first[0]}${parts.last[0]}'.toUpperCase();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final p = widget.profile;
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        gradient: const LinearGradient(
+          colors: [JaikalkiBrand.tealDark, Color(0xFF0B5C57)],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: JaikalkiBrand.tealDark.withOpacity(0.18),
+            blurRadius: 12, offset: const Offset(0, 6),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              CircleAvatar(
+                radius: 26,
+                backgroundColor: Colors.white.withOpacity(0.18),
+                foregroundColor: Colors.white,
+                child: Text(
+                  _initials(p.fullName),
+                  style: const TextStyle(
+                    fontSize: 16, fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(p.fullName,
+                        maxLines: 1, overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 15, fontWeight: FontWeight.w700,
+                        )),
+                    Text(
+                      [p.designation, p.employeeNo]
+                          .where((s) => s != null && s!.isNotEmpty)
+                          .join(' · '),
+                      maxLines: 1, overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        color: Colors.white.withOpacity(0.85),
+                        fontSize: 12,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const Icon(Icons.badge_outlined,
+                  color: Colors.white, size: 22),
+            ],
+          ),
+          const SizedBox(height: 12),
+          Row(
+            children: [
+              Expanded(
+                child: OutlinedButton.icon(
+                  onPressed: _preview,
+                  icon: const Icon(Icons.visibility_outlined),
+                  label: const Text('Preview'),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: Colors.white,
+                    side: BorderSide(color: Colors.white.withOpacity(0.6)),
+                    padding: const EdgeInsets.symmetric(vertical: 10),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: ElevatedButton.icon(
+                  onPressed: _downloading ? null : _download,
+                  icon: _downloading
+                      ? const SizedBox(
+                          width: 14, height: 14,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2, color: JaikalkiBrand.tealDark,
+                          ),
+                        )
+                      : const Icon(Icons.download_outlined),
+                  label: const Text('Download PDF'),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.white,
+                    foregroundColor: JaikalkiBrand.tealDark,
+                    padding: const EdgeInsets.symmetric(vertical: 10),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ],
       ),
     );
   }

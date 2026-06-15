@@ -5,6 +5,8 @@ import '../../core/auth_cubit.dart';
 import '../../theme/brand.dart';
 import '../notifications/notifications_page.dart';
 import '../settings/settings_page.dart';
+import 'homework_list_page.dart';
+import 'leaves_page.dart';
 
 /// More menu for the teacher shell — homework grading, leave approvals,
 /// settings, sign-out. Each row pushes a new full-screen page (with its
@@ -21,14 +23,16 @@ class TeacherMorePage extends StatelessWidget {
           _Tile(
             icon: Icons.assignment_outlined,
             label: 'Homework grading',
-            subtitle: 'Coming soon',
-            onTap: () {},
+            onTap: () => Navigator.of(context).push(
+              MaterialPageRoute(builder: (_) => const HomeworkListPage()),
+            ),
           ),
           _Tile(
             icon: Icons.mail_outline,
             label: 'Leave approvals',
-            subtitle: 'Coming soon',
-            onTap: () {},
+            onTap: () => Navigator.of(context).push(
+              MaterialPageRoute(builder: (_) => const LeavesPage()),
+            ),
           ),
           _Tile(
             icon: Icons.notifications_outlined,
