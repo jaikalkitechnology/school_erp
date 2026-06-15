@@ -1,7 +1,7 @@
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { ArrowLeft, BookOpenCheck, Briefcase, ClipboardList, Sparkles } from "lucide-react";
+import { ArrowLeft, BookOpenCheck, Briefcase, Camera, ClipboardList, Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -9,6 +9,7 @@ import { Label } from "@/components/ui/label";
 import { cn } from "@/lib/utils";
 import { listSections, listSubjects } from "@/features/setup/api";
 import { listSectionSubjects } from "@/features/curriculum/api";
+import { StudentAvatar } from "@/features/students/StudentAvatar";
 import {
   assignClassTeacher,
   assignSectionSubject,
@@ -18,6 +19,8 @@ import {
   listAttendance,
   listQualifiedSubjects,
   setQualifiedSubjects,
+  updateTeacher,
+  uploadTeacherPhoto,
   upsertAttendance,
   type AttendanceStatus,
 } from "./api";
@@ -30,6 +33,7 @@ export function TeacherDetailPage() {
   const tid = Number(id);
   const navigate = useNavigate();
 
+  const qc = useQueryClient();
   const teacher = useQuery({
     queryKey: ["teacher", tid],
     queryFn: () => getTeacher(tid),
@@ -37,6 +41,31 @@ export function TeacherDetailPage() {
   });
 
   const [tab, setTab] = useState<Tab>("Profile");
+  const [photoUploading, setPhotoUploading] = useState(false);
+  const [photoError, setPhotoError] = useState<string | null>(null);
+  const fileRef = useRef<HTMLInputElement>(null);
+
+  const photoMut = useMutation({
+    mutationFn: (photo_url: string | null) =>
+      updateTeacher(tid, { photo_url: photo_url ?? "" } as any),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["teacher", tid] }),
+  });
+
+  const onPhotoPicked = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setPhotoUploading(true);
+    setPhotoError(null);
+    try {
+      const path = await uploadTeacherPhoto(file);
+      await photoMut.mutateAsync(path);
+    } catch (err: any) {
+      setPhotoError(err?.response?.data?.detail ?? "Photo upload failed");
+    } finally {
+      setPhotoUploading(false);
+      if (fileRef.current) fileRef.current.value = "";
+    }
+  };
 
   if (teacher.isLoading) return <p className="text-sm text-muted-foreground">Loading…</p>;
   if (teacher.isError || !teacher.data) {
@@ -59,13 +88,51 @@ export function TeacherDetailPage() {
         </Button>
       </div>
 
-      <header>
-        <p className="font-mono text-xs uppercase tracking-[0.3em] text-saffron-dark">{t.employee_no}</p>
-        <h1 className="mt-1 font-display text-4xl text-indigo-dark">{t.full_name}</h1>
-        <p className="mt-2 max-w-xl text-sm text-muted-foreground">
-          {t.designation ?? "—"} · {(t.qualifications || []).join(", ") || "no qualifications listed"} ·{" "}
-          <span className="font-medium uppercase">{t.employment_status.replace(/_/g, " ")}</span>
-        </p>
+      <header className="flex items-start gap-5">
+        <div className="flex flex-col items-center gap-1">
+          <StudentAvatar photoUrl={t.photo_url} name={t.full_name} size={96} />
+          <input
+            ref={fileRef}
+            type="file"
+            accept="image/jpeg,image/png"
+            className="hidden"
+            onChange={onPhotoPicked}
+          />
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            disabled={photoUploading || photoMut.isPending}
+            onClick={() => fileRef.current?.click()}
+          >
+            <Camera className="h-3 w-3" />
+            {photoUploading
+              ? "Uploading…"
+              : t.photo_url
+                ? "Replace"
+                : "Add photo"}
+          </Button>
+          {t.photo_url && (
+            <button
+              type="button"
+              onClick={() => photoMut.mutate(null)}
+              className="text-[10px] text-destructive hover:underline"
+            >
+              Remove
+            </button>
+          )}
+          {photoError && (
+            <p className="max-w-[120px] text-[10px] text-destructive">{photoError}</p>
+          )}
+        </div>
+        <div className="flex-1">
+          <p className="font-mono text-xs uppercase tracking-[0.3em] text-saffron-dark">{t.employee_no}</p>
+          <h1 className="mt-1 font-display text-4xl text-indigo-dark">{t.full_name}</h1>
+          <p className="mt-2 max-w-xl text-sm text-muted-foreground">
+            {t.designation ?? "—"} · {(t.qualifications || []).join(", ") || "no qualifications listed"} ·{" "}
+            <span className="font-medium uppercase">{t.employment_status.replace(/_/g, " ")}</span>
+          </p>
+        </div>
       </header>
 
       <nav className="flex gap-1 border-b border-saffron-pale">
