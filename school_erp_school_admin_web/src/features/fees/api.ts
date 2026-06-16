@@ -1,5 +1,34 @@
 import { api } from "@/lib/api";
 
+/** Pydantic v2 serialises Decimal as a JSON *string* (e.g. "1500.00") to
+ *  preserve precision. TypeScript declares these fields as `number` and
+ *  React components call `.toFixed()` on them — which throws on strings.
+ *  Coerce at the edge so the rest of the app keeps treating them as
+ *  numbers. Returns 0 on null / undefined / NaN. */
+const n = (v: unknown): number => {
+  if (typeof v === "number") return v;
+  if (typeof v === "string") {
+    const parsed = Number(v);
+    return Number.isFinite(parsed) ? parsed : 0;
+  }
+  return 0;
+};
+
+const numMap = (m: Record<string, unknown> | null | undefined): Record<string, number> => {
+  const out: Record<string, number> = {};
+  for (const [k, v] of Object.entries(m ?? {})) out[k] = n(v);
+  return out;
+};
+
+const coerceInvoice = (i: FeeInvoice): FeeInvoice => ({
+  ...i,
+  base_amount: n(i.base_amount),
+  discount_amount: n(i.discount_amount),
+  late_fee_amount: n(i.late_fee_amount),
+  total_amount: n(i.total_amount),
+  paid_amount: n(i.paid_amount),
+});
+
 export type FeePeriod = "one_time" | "monthly" | "quarterly" | "annual";
 export type InvoiceStatus = "pending" | "partial" | "paid" | "overdue" | "waived" | "cancelled";
 export type PaymentMethod = "cash" | "upi" | "card" | "netbanking" | "cheque" | "bank_transfer";
@@ -94,8 +123,15 @@ export const generateInvoices = async (
   },
 ) => (await api.post<{ created: number; skipped: number; structure_id: number }>(`${base}/structures/${structureId}/generate`, payload)).data;
 
-export const studentFees = async (studentId: number) =>
-  (await api.get<StudentFeeView>(`${base}/students/${studentId}`)).data;
+export const studentFees = async (studentId: number) => {
+  const v = (await api.get<StudentFeeView>(`${base}/students/${studentId}`)).data;
+  return {
+    ...v,
+    total_due: n(v.total_due),
+    total_paid: n(v.total_paid),
+    invoices: (v.invoices ?? []).map(coerceInvoice),
+  };
+};
 
 export const collect = async (payload: {
   invoice_id: number;
@@ -104,7 +140,28 @@ export const collect = async (payload: {
   reference?: string;
 }) => (await api.post(`${base}/collect`, payload)).data;
 
-export const collectionSummary = async (start: string, end: string) =>
-  (await api.get<CollectionSummary>(`${base}/reports/collection`, { params: { start, end } })).data;
-export const defaulterReport = async () =>
-  (await api.get<DefaulterRow[]>(`${base}/reports/defaulters`)).data;
+export const collectionSummary = async (start: string, end: string) => {
+  const s = (await api.get<CollectionSummary>(`${base}/reports/collection`, { params: { start, end } })).data;
+  return {
+    ...s,
+    total_collected: n(s.total_collected),
+    total_pending: n(s.total_pending),
+    overdue_amount: n(s.overdue_amount),
+    daily: (s.daily ?? []).map((d) => ({
+      ...d,
+      payments: n(d.payments),
+      amount: n(d.amount),
+    })),
+    by_method: numMap(s.by_method),
+    by_category: numMap(s.by_category),
+  };
+};
+
+export const defaulterReport = async () => {
+  const rows = (await api.get<DefaulterRow[]>(`${base}/reports/defaulters`)).data;
+  return rows.map((d) => ({
+    ...d,
+    invoices_overdue: n(d.invoices_overdue),
+    amount_overdue: n(d.amount_overdue),
+  }));
+};
