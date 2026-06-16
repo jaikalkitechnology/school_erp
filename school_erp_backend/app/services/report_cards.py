@@ -8,7 +8,9 @@ plus a rendered PDF on disk, and exposes parent-side download.
 from __future__ import annotations
 
 import io
+import logging
 import secrets
+import traceback
 import uuid
 from datetime import datetime, timezone
 from decimal import Decimal
@@ -27,7 +29,14 @@ from reportlab.platypus import (
     Table,
     TableStyle,
 )
-from sqlalchemy import select
+from sqlalchemy import func as _func, select
+
+
+log = logging.getLogger(__name__)
+
+
+def _count(col):
+    return _func.count(col)
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import settings
@@ -407,7 +416,49 @@ async def generate(
     # Compute results once for the whole section.
     results = await section_results(session, exam_id=exam.id, section_id=section.id)
     if not results.students:
-        return GenerateResult(generated=0, skipped=0, skipped_reasons=["No students in section"])
+        # section_results returns students=[] for two distinct cases:
+        # (a) the section really has no active students, or
+        # (b) the exam has no subjects mapped to this section's class.
+        # Distinguish so the admin can fix the right thing.
+        from app.models.exams import ExamSubject
+
+        sub_count = int(
+            (
+                await session.execute(
+                    select(_count(ExamSubject.id)).where(
+                        ExamSubject.exam_id == exam.id,
+                        ExamSubject.class_def_id == section.class_def_id,
+                    )
+                )
+            ).scalar_one()
+        )
+        student_count = int(
+            (
+                await session.execute(
+                    select(_count(Student.id)).where(
+                        Student.section_id == section.id,
+                        Student.is_active.is_(True),
+                    )
+                )
+            ).scalar_one()
+        )
+        if sub_count == 0:
+            return GenerateResult(
+                generated=0, skipped=0,
+                skipped_reasons=[
+                    f"This exam has no subjects mapped to class "
+                    f"{section.class_def_id}. Add subjects to the exam first.",
+                ],
+            )
+        if student_count == 0:
+            return GenerateResult(
+                generated=0, skipped=0,
+                skipped_reasons=["No active students in this section."],
+            )
+        return GenerateResult(
+            generated=0, skipped=0,
+            skipped_reasons=["No results to render (unknown reason)."],
+        )
 
     # Subject name map.
     subj_ids: set[int] = set()
@@ -502,8 +553,16 @@ async def generate(
         try:
             pdf_path = _render_pdf(snapshot, tenant_id)
         except Exception as exc:  # pragma: no cover - safety net
+            log.exception(
+                "report card render failed for student %s in tenant %s",
+                sr.student_id, tenant_id,
+            )
             skipped += 1
-            reasons.append(f"{sr.full_name}: render failed ({exc})")
+            # Truncate so the JSON response stays reasonable even when
+            # the cause is a multi-line stack-trace dump.
+            tb = traceback.format_exc().splitlines()
+            last = tb[-1] if tb else str(exc)
+            reasons.append(f"{sr.full_name}: render failed — {last[:200]}")
             continue
 
         rc = existing.get(sr.student_id)
