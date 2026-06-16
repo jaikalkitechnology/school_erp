@@ -5,6 +5,7 @@ from __future__ import annotations
 from typing import Optional
 
 from fastapi import APIRouter, Depends, Query, status
+from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.auth_deps import AuthPrincipal, get_current_principal, require_roles
@@ -23,6 +24,7 @@ from app.schemas.comms import (
 )
 from app.services.comms import (
     create_announcement,
+    delete_announcement,
     inbox_for,
     list_announcements,
     list_notifications_for,
@@ -91,6 +93,57 @@ async def create_announcement_route(
         session, principal.tenant_id, principal.user_id, payload
     )
     return PublishResult(announcement_id=obj.id, fanned_out_to=fanned)
+
+
+@sa_router.delete(
+    "/announcements/{announcement_id}", status_code=status.HTTP_200_OK,
+)
+async def delete_announcement_route(
+    announcement_id: int,
+    principal: AuthPrincipal = Depends(_school_admin),
+    session: AsyncSession = Depends(tenant_scoped_session),
+):
+    """Delete one announcement + every notification it fan-out'd."""
+    notifs_removed = await delete_announcement(
+        session,
+        tenant_id=principal.tenant_id,
+        announcement_id=announcement_id,
+    )
+    return {"deleted": announcement_id, "notifications_removed": notifs_removed}
+
+
+class _BulkDeleteBody(BaseModel):
+    ids: list[int]
+
+
+@sa_router.post("/announcements/bulk-delete")
+async def bulk_delete_announcements_route(
+    payload: _BulkDeleteBody,
+    principal: AuthPrincipal = Depends(_school_admin),
+    session: AsyncSession = Depends(tenant_scoped_session),
+):
+    """Tick-and-delete from the list. Skips IDs that aren't this
+    tenant's. Returns per-id success + cumulative notification cleanup
+    count."""
+    deleted: list[int] = []
+    skipped: list[int] = []
+    total_notifs = 0
+    for aid in payload.ids:
+        try:
+            n = await delete_announcement(
+                session,
+                tenant_id=principal.tenant_id,
+                announcement_id=aid,
+            )
+            deleted.append(aid)
+            total_notifs += n
+        except Exception:
+            skipped.append(aid)
+    return {
+        "deleted": deleted,
+        "skipped": skipped,
+        "notifications_removed": total_notifs,
+    }
 
 
 @sa_router.get("/outbox", response_model=list[NotificationOutboxRead])

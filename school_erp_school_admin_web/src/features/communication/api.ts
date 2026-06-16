@@ -68,6 +68,16 @@ export const listAnnouncements = async () =>
   (await api.get<Announcement[]>(`${base}/announcements`)).data;
 export const createAnnouncement = async (payload: AnnouncementWrite) =>
   (await api.post<PublishResult>(`${base}/announcements`, payload)).data;
+export const deleteAnnouncement = async (id: number) =>
+  (await api.delete<{ deleted: number; notifications_removed: number }>(
+    `${base}/announcements/${id}`,
+  )).data;
+export const bulkDeleteAnnouncements = async (ids: number[]) =>
+  (await api.post<{
+    deleted: number[];
+    skipped: number[];
+    notifications_removed: number;
+  }>(`${base}/announcements/bulk-delete`, { ids })).data;
 
 export const listOutbox = async (status?: DeliveryStatus) =>
   (await api.get<OutboxRow[]>(`${base}/outbox`, { params: status ? { status } : undefined })).data;
