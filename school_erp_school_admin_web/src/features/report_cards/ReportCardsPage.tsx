@@ -414,8 +414,19 @@ function GeneratePanel() {
         publish,
       }),
     onSuccess: (res) => {
-      setFlash(`Generated ${res.generated}, skipped ${res.skipped}`);
+      const reasons =
+        res.skipped_reasons && res.skipped_reasons.length > 0
+          ? ` — ${res.skipped_reasons.slice(0, 3).join(" · ")}`
+          : "";
+      setFlash(
+        `Generated ${res.generated}, skipped ${res.skipped}${reasons}`,
+      );
       qc.invalidateQueries({ queryKey: ["section-cards"] });
+    },
+    onError: (e: any) => {
+      // Backend 4xx/5xx — surface the detail so the admin can act.
+      const detail = e?.response?.data?.detail ?? e?.message ?? "Generation failed";
+      setFlash(`Error: ${detail}`);
     },
   });
 
