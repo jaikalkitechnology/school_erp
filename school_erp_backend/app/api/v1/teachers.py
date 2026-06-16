@@ -121,6 +121,34 @@ async def patch_teacher(
     return await update_teacher(session, teacher, payload)
 
 
+@router.delete("/{teacher_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_teacher_route(
+    teacher_id: int,
+    principal: AuthPrincipal = Depends(_school_admin),
+    session: AsyncSession = Depends(tenant_scoped_session),
+):
+    """Hard-delete a teacher row + the linked User login.
+
+    Cascading FKs handle TeacherSubject + TeacherAttendance. SectionSubject
+    + Section.in_charge_user_id are SET NULL, so any sections this teacher
+    was covering become "unassigned" rather than getting orphaned. For
+    teachers with history you actually care about (attendance, marks
+    entered), set employment_status='resigned' via PATCH instead — this
+    DELETE is for data-entry mistakes."""
+    from app.models.auth import User
+
+    teacher = await _get_teacher(session, teacher_id)
+    user_id = teacher.user_id
+    await session.delete(teacher)
+    if user_id:
+        user = (
+            await session.execute(select(User).where(User.id == user_id))
+        ).scalar_one_or_none()
+        if user is not None:
+            await session.delete(user)
+    await session.commit()
+
+
 # ---- Subject qualifications -------------------------------------------------
 
 

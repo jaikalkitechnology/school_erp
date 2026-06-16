@@ -1,14 +1,20 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
-import { useQuery } from "@tanstack/react-query";
-import { Plus, Search, Users } from "lucide-react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { Pencil, Plus, Search, Trash2, Users } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 import { listDepartments } from "@/features/setup/api";
 import { StudentAvatar } from "@/features/students/StudentAvatar";
-import { listTeachers, type EmploymentStatus } from "./api";
+import { EditTeacherDialog } from "./EditTeacherDialog";
+import {
+  deleteTeacher,
+  listTeachers,
+  type EmploymentStatus,
+  type Teacher,
+} from "./api";
 
 const STATUS_TONE: Record<EmploymentStatus, string> = {
   active: "bg-teal-pale text-teal-dark",
@@ -36,6 +42,30 @@ export function TeachersPage() {
 
   const total = list.data?.total ?? 0;
   const showingTo = Math.min(offset + limit, total);
+
+  const qc = useQueryClient();
+  const [editing, setEditing] = useState<Teacher | null>(null);
+  const [actionError, setActionError] = useState<string | null>(null);
+  const removeMut = useMutation({
+    mutationFn: (id: number) => deleteTeacher(id),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["teachers"] });
+      setActionError(null);
+    },
+    onError: (e: any) =>
+      setActionError(e?.response?.data?.detail ?? "Could not delete"),
+  });
+
+  const onDelete = (t: Teacher) => {
+    setActionError(null);
+    const ok = window.confirm(
+      `Delete ${t.full_name} (${t.employee_no})?\n\n` +
+        "This permanently removes the teacher row AND the linked login. " +
+        "If they have attendance / marks history you want to keep, set " +
+        "their status to 'Resigned' via Edit instead.",
+    );
+    if (ok) removeMut.mutate(t.id);
+  };
 
   return (
     <div className="space-y-6">
@@ -122,6 +152,7 @@ export function TeachersPage() {
                     <th className="px-4 py-3">Designation</th>
                     <th className="px-4 py-3">Contact</th>
                     <th className="px-4 py-3">Status</th>
+                    <th className="px-4 py-3 text-right">Actions</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -162,10 +193,36 @@ export function TeachersPage() {
                           {t.employment_status.replace(/_/g, " ")}
                         </span>
                       </td>
+                      <td className="px-4 py-3">
+                        <div className="flex items-center justify-end gap-1">
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            title="Edit"
+                            onClick={() => setEditing(t)}
+                          >
+                            <Pencil className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            title="Delete"
+                            disabled={removeMut.isPending}
+                            onClick={() => onDelete(t)}
+                          >
+                            <Trash2 className="h-4 w-4 text-destructive" />
+                          </Button>
+                        </div>
+                      </td>
                     </tr>
                   ))}
                 </tbody>
               </table>
+              {actionError && (
+                <p className="border-t bg-destructive/10 px-6 py-2 text-xs text-destructive">
+                  {actionError}
+                </p>
+              )}
             </div>
           )}
         </CardContent>
@@ -180,6 +237,14 @@ export function TeachersPage() {
             Next
           </Button>
         </div>
+      )}
+
+      {editing && (
+        <EditTeacherDialog
+          teacher={editing}
+          open
+          onClose={() => setEditing(null)}
+        />
       )}
     </div>
   );

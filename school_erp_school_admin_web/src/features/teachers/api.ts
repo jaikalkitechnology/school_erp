@@ -117,6 +117,10 @@ export const updateTeacher = async (
   payload: Partial<TeacherCreatePayload> & { employment_status?: EmploymentStatus },
 ): Promise<Teacher> => (await api.patch<Teacher>(`${base}/${id}`, payload)).data;
 
+export const deleteTeacher = async (id: number): Promise<void> => {
+  await api.delete(`${base}/${id}`);
+};
+
 export const setQualifiedSubjects = async (
   id: number,
   subject_ids: number[],
