@@ -1,5 +1,7 @@
 """FastAPI entrypoint for the Jaikalki School ERP backend."""
 
+import asyncio
+import logging
 from contextlib import asynccontextmanager
 from typing import Any
 
@@ -18,10 +20,38 @@ from app.core.middleware import RequestContextMiddleware
 from app.core.tenant import TenantMiddleware
 
 
+log = logging.getLogger(__name__)
+
+
+async def _retention_loop() -> None:
+    """Background task: every 24h, delete notifications older than 30
+    days. Runs in-process — no Celery dependency. The first sweep
+    happens 60s after startup so app boot stays fast."""
+    await asyncio.sleep(60)
+    while True:
+        try:
+            from app.services.comms import sweep_old_notifications
+
+            removed = await sweep_old_notifications(days=30)
+            log.info("retention sweep: removed %s old notifications", removed)
+        except Exception:  # pragma: no cover - never let this kill the worker
+            log.exception("retention sweep failed")
+        await asyncio.sleep(24 * 60 * 60)
+
+
 @asynccontextmanager
 async def lifespan(_: FastAPI):
     setup_upload_directory()
-    yield
+    # Daily notification retention sweep — keeps the inbox tidy.
+    task = asyncio.create_task(_retention_loop())
+    try:
+        yield
+    finally:
+        task.cancel()
+        try:
+            await task
+        except (asyncio.CancelledError, Exception):
+            pass
 
 
 app = FastAPI(
