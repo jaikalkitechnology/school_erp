@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { ClipboardList, FileText, Paperclip, Plus, Star, Trash2 } from "lucide-react";
+import { ClipboardList, Eye, FileText, Paperclip, Plus, Star, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -169,18 +169,48 @@ export function HomeworkPage() {
                       )}
                       onClick={() => setActiveId(hw.id)}
                     >
-                      <div className="flex items-start justify-between">
-                        <div>
-                          <p className="font-medium text-indigo-dark">{hw.title}</p>
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="min-w-0 flex-1">
+                          <div className="flex items-center gap-2">
+                            <p className="truncate font-medium text-indigo-dark">{hw.title}</p>
+                            {(hw.attachments?.length ?? 0) > 0 && (
+                              <span
+                                className="inline-flex shrink-0 items-center gap-1 rounded-full bg-teal-pale px-2 py-0.5 text-[10px] font-semibold text-teal-dark"
+                                title={`${hw.attachments.length} worksheet attachment${hw.attachments.length === 1 ? "" : "s"}`}
+                              >
+                                <Paperclip className="h-2.5 w-2.5" />
+                                {hw.attachments.length}
+                              </span>
+                            )}
+                          </div>
                           <p className="text-xs text-muted-foreground">
                             Due {hw.due_date} · max {hw.max_marks}
                             {hw.subject_id && ` · ${subjectMap.get(hw.subject_id)?.code ?? ""}`}
                           </p>
-                          {hw.description && <p className="mt-1 text-xs text-muted-foreground">{hw.description}</p>}
+                          {hw.description && (
+                            <p className="mt-1 line-clamp-2 text-xs text-muted-foreground">
+                              {hw.description}
+                            </p>
+                          )}
                         </div>
-                        <Button variant="ghost" size="icon" onClick={(e) => { e.stopPropagation(); remove.mutate(hw.id); }}>
-                          <Trash2 className="h-4 w-4 text-destructive" />
-                        </Button>
+                        <div className="flex shrink-0 items-center gap-1">
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            title="View details"
+                            onClick={(e) => { e.stopPropagation(); setActiveId(hw.id); }}
+                          >
+                            <Eye className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            title="Delete"
+                            onClick={(e) => { e.stopPropagation(); remove.mutate(hw.id); }}
+                          >
+                            <Trash2 className="h-4 w-4 text-destructive" />
+                          </Button>
+                        </div>
                       </div>
                     </li>
                   ))}
@@ -191,12 +221,33 @@ export function HomeworkPage() {
         </div>
       )}
 
-      {activeId && <HomeworkDetail homeworkId={activeId} />}
+      {activeId && (() => {
+        const activeHw = list.data?.find((h) => h.id === activeId);
+        return (
+          <HomeworkDetail
+            homeworkId={activeId}
+            homework={activeHw}
+            subjectCode={
+              activeHw?.subject_id
+                ? subjectMap.get(activeHw.subject_id)?.code
+                : undefined
+            }
+          />
+        );
+      })()}
     </div>
   );
 }
 
-function HomeworkDetail({ homeworkId }: { homeworkId: number }) {
+function HomeworkDetail({
+  homeworkId,
+  homework,
+  subjectCode,
+}: {
+  homeworkId: number;
+  homework?: import("./api").Homework;
+  subjectCode?: string;
+}) {
   const qc = useQueryClient();
   const report = useQuery({
     queryKey: ["homework-report", homeworkId],
@@ -230,6 +281,8 @@ function HomeworkDetail({ homeworkId }: { homeworkId: number }) {
   }
 
   const maxMarks = Number(report.data.max_marks ?? 100) || 100;
+  const description = homework?.description ?? null;
+  const attachments = homework?.attachments ?? [];
 
   return (
     <Card>
@@ -239,9 +292,40 @@ function HomeworkDetail({ homeworkId }: { homeworkId: number }) {
         </CardTitle>
         <CardDescription>
           {report.data.submitted_count} / {report.data.total_students} submitted · due {report.data.due_date} · max {maxMarks}
+          {subjectCode && ` · ${subjectCode}`}
         </CardDescription>
       </CardHeader>
+      {(description || attachments.length > 0) && (
+        <div className="border-t bg-saffron-pale/30 px-6 py-4">
+          {description && (
+            <div className="mb-3">
+              <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+                Instructions
+              </p>
+              <p className="mt-1 whitespace-pre-wrap text-sm text-indigo-dark">{description}</p>
+            </div>
+          )}
+          {attachments.length > 0 && (
+            <div>
+              <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+                Worksheet attachments ({attachments.length})
+              </p>
+              <div className="mt-2 flex flex-wrap gap-2">
+                {attachments.map((p) => (
+                  <AttachmentChip key={p} path={p} />
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
       <CardContent className="p-0">
+        {report.data.rows.length === 0 && (
+          <p className="border-y bg-muted/30 px-6 py-4 text-sm text-muted-foreground">
+            No students in this section yet — admit students or move them
+            into the section before submissions can come in.
+          </p>
+        )}
         <table className="w-full text-sm">
           <thead className="border-y bg-muted/30 text-left text-xs uppercase tracking-wider text-muted-foreground">
             <tr>
