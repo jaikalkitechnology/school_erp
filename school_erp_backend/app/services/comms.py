@@ -552,6 +552,48 @@ async def list_outbox(
 # ---- Retention sweep ------------------------------------------------------
 
 
+async def delete_announcement(
+    session: AsyncSession, *, tenant_id: int, announcement_id: int,
+) -> int:
+    """Hard-delete an announcement and every notification it
+    fan-out'd. Returns the count of in-app notifications removed so
+    the caller can show "Removed N inbox entries".
+
+    Outbox rows (SMS / email / WhatsApp delivery records) keep their
+    audit trail because notifications.id is referenced with
+    ondelete=SET NULL — the delivery log stays, the link just becomes
+    NULL. We don't touch outbox rows themselves on purpose: schools
+    often need the delivery log for billing reconciliation."""
+    from sqlalchemy import delete
+
+    ann = (
+        await session.execute(
+            select(Announcement).where(
+                Announcement.id == announcement_id,
+                Announcement.tenant_id == tenant_id,
+            )
+        )
+    ).scalar_one_or_none()
+    if ann is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Announcement not found",
+        )
+
+    # Wipe the fan-out notifications first.
+    result = await session.execute(
+        delete(Notification).where(
+            Notification.tenant_id == tenant_id,
+            Notification.source_type == "announcement",
+            Notification.source_id == announcement_id,
+        )
+    )
+    notifs_removed = int(result.rowcount or 0)
+
+    await session.delete(ann)
+    await session.commit()
+    return notifs_removed
+
+
 async def sweep_old_notifications(*, days: int = 30) -> int:
     """Delete every Notification whose created_at is older than `days`.
 

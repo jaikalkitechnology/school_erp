@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Megaphone, Inbox, FileSliders } from "lucide-react";
+import { Megaphone, Inbox, FileSliders, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -8,7 +8,9 @@ import { Label } from "@/components/ui/label";
 import { cn } from "@/lib/utils";
 import { listClasses, listSections } from "@/features/setup/api";
 import {
+  bulkDeleteAnnouncements,
   createAnnouncement,
+  deleteAnnouncement,
   listAnnouncements,
   listOutbox,
   listTemplates,
@@ -86,6 +88,76 @@ function AnnouncementsPanel() {
   const [pinned, setPinned] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [lastResult, setLastResult] = useState<string | null>(null);
+  // Per-row ticks for bulk delete. Cleared after each successful mutation.
+  const [selected, setSelected] = useState<Set<number>>(new Set());
+  const [deleteError, setDeleteError] = useState<string | null>(null);
+
+  const removeOne = useMutation({
+    mutationFn: (id: number) => deleteAnnouncement(id),
+    onSuccess: (res) => {
+      setDeleteError(null);
+      setSelected((s) => {
+        const next = new Set(s);
+        next.delete(res.deleted);
+        return next;
+      });
+      setLastResult(
+        `Deleted #${res.deleted} — cleared ${res.notifications_removed} inbox entries.`,
+      );
+      qc.invalidateQueries({ queryKey: ["announcements"] });
+    },
+    onError: (e: any) =>
+      setDeleteError(e?.response?.data?.detail ?? "Could not delete"),
+  });
+
+  const removeBulk = useMutation({
+    mutationFn: (ids: number[]) => bulkDeleteAnnouncements(ids),
+    onSuccess: (res) => {
+      setDeleteError(null);
+      setSelected(new Set());
+      setLastResult(
+        `Deleted ${res.deleted.length} announcements — cleared ${res.notifications_removed} inbox entries${
+          res.skipped.length ? ` (skipped ${res.skipped.length})` : ""
+        }.`,
+      );
+      qc.invalidateQueries({ queryKey: ["announcements"] });
+    },
+    onError: (e: any) =>
+      setDeleteError(e?.response?.data?.detail ?? "Could not bulk delete"),
+  });
+
+  const onTickRow = (id: number, checked: boolean) =>
+    setSelected((s) => {
+      const next = new Set(s);
+      if (checked) next.add(id); else next.delete(id);
+      return next;
+    });
+
+  const onTickAll = (checked: boolean) => {
+    if (!checked) return setSelected(new Set());
+    setSelected(new Set((list.data ?? []).map((a) => a.id)));
+  };
+
+  const onBulkDelete = () => {
+    if (selected.size === 0) return;
+    setDeleteError(null);
+    const n = selected.size;
+    const ok = window.confirm(
+      `Delete ${n} selected announcement${n === 1 ? "" : "s"}?\n\n` +
+        "Removes the notice from the bulletin AND wipes the in-app inbox entries " +
+        "for every recipient. Outbox / SMS / email audit log is preserved.",
+    );
+    if (ok) removeBulk.mutate(Array.from(selected));
+  };
+
+  const onDeleteOne = (id: number, title: string) => {
+    setDeleteError(null);
+    const ok = window.confirm(
+      `Delete "${title}"?\n\n` +
+        "Removes the notice and every inbox entry for it.",
+    );
+    if (ok) removeOne.mutate(id);
+  };
 
   const create = useMutation({
     mutationFn: () =>
@@ -152,29 +224,89 @@ function AnnouncementsPanel() {
       </Card>
 
       <Card>
-        <CardHeader>
-          <CardTitle>Recent announcements</CardTitle>
+        <CardHeader className="flex flex-row items-center justify-between space-y-0">
+          <div>
+            <CardTitle>Recent announcements</CardTitle>
+            {selected.size > 0 && (
+              <CardDescription>{selected.size} selected</CardDescription>
+            )}
+          </div>
+          {selected.size > 0 && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={onBulkDelete}
+              disabled={removeBulk.isPending}
+            >
+              <Trash2 className="mr-1 h-4 w-4 text-destructive" />
+              Delete selected
+            </Button>
+          )}
         </CardHeader>
         <CardContent className="p-0">
           {!list.data?.length ? (
             <p className="px-6 py-4 text-sm text-muted-foreground">Nothing yet.</p>
           ) : (
-            <ul className="divide-y divide-saffron-pale">
-              {list.data.map((a) => (
-                <li key={a.id} className="px-6 py-3 text-sm">
-                  <p className="font-medium text-indigo-dark">
-                    {a.is_pinned && <span className="mr-2 text-saffron">★</span>}
-                    {a.title}
-                  </p>
-                  <p className="text-xs text-muted-foreground">{a.body}</p>
-                  <p className="mt-1 text-[11px] uppercase tracking-wider text-saffron-dark">
-                    {a.audience}
-                    {a.audience_id ? ` · #${a.audience_id}` : ""}
-                    {a.published_at ? ` · ${new Date(a.published_at).toLocaleString()}` : " · draft"}
-                  </p>
-                </li>
-              ))}
-            </ul>
+            <>
+              <label className="flex items-center gap-2 border-b border-saffron-pale px-6 py-2 text-xs text-muted-foreground">
+                <input
+                  type="checkbox"
+                  className="h-4 w-4 accent-saffron"
+                  checked={
+                    list.data.length > 0 &&
+                    selected.size === list.data.length
+                  }
+                  ref={(el) => {
+                    if (el) {
+                      el.indeterminate =
+                        selected.size > 0 && selected.size < list.data.length;
+                    }
+                  }}
+                  onChange={(e) => onTickAll(e.target.checked)}
+                />
+                Select all
+              </label>
+              <ul className="divide-y divide-saffron-pale">
+                {list.data.map((a) => (
+                  <li key={a.id} className="flex items-start gap-3 px-6 py-3 text-sm">
+                    <input
+                      type="checkbox"
+                      className="mt-1 h-4 w-4 accent-saffron"
+                      checked={selected.has(a.id)}
+                      onChange={(e) => onTickRow(a.id, e.target.checked)}
+                    />
+                    <div className="min-w-0 flex-1">
+                      <p className="font-medium text-indigo-dark">
+                        {a.is_pinned && <span className="mr-2 text-saffron">★</span>}
+                        {a.title}
+                      </p>
+                      <p className="text-xs text-muted-foreground">{a.body}</p>
+                      <p className="mt-1 text-[11px] uppercase tracking-wider text-saffron-dark">
+                        {a.audience}
+                        {a.audience_id ? ` · #${a.audience_id}` : ""}
+                        {a.published_at
+                          ? ` · ${new Date(a.published_at).toLocaleString()}`
+                          : " · draft"}
+                      </p>
+                    </div>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      title="Delete"
+                      disabled={removeOne.isPending}
+                      onClick={() => onDeleteOne(a.id, a.title)}
+                    >
+                      <Trash2 className="h-4 w-4 text-destructive" />
+                    </Button>
+                  </li>
+                ))}
+              </ul>
+              {deleteError && (
+                <p className="border-t bg-destructive/10 px-6 py-2 text-xs text-destructive">
+                  {deleteError}
+                </p>
+              )}
+            </>
           )}
         </CardContent>
       </Card>
