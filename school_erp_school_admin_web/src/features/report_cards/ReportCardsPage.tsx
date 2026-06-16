@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { api } from "@/lib/api";
 import { cn } from "@/lib/utils";
 import { listClasses, listSections } from "@/features/setup/api";
 import { listExams, examResults } from "@/features/exams/api";
@@ -13,7 +14,6 @@ import {
   listCoCurricular,
   listSectionCards,
   listTemplates,
-  pdfUrl,
   publishSection,
   upsertCoCurricular,
   upsertRemark,
@@ -431,6 +431,7 @@ function GeneratePanel() {
   });
 
   return (
+    <>
     <Card>
       <CardHeader>
         <CardTitle>Bulk generate</CardTitle>
@@ -510,10 +511,209 @@ function GeneratePanel() {
             <FileText className="mr-1 h-4 w-4" />
             Generate
           </Button>
-          {flash && <span className="ml-3 text-sm text-teal-dark">{flash}</span>}
+          {flash && (
+            <span
+              className={cn(
+                "ml-3 text-sm",
+                flash.startsWith("Error")
+                  ? "text-destructive"
+                  : "text-teal-dark",
+              )}
+            >
+              {flash}
+            </span>
+          )}
         </div>
       </CardContent>
     </Card>
+    <GenerateResultList examId={examId} sectionId={sectionId} />
+    </>
+  );
+}
+
+/** Lives inside the same GeneratePanel above — refactored so the list of
+ *  cards just generated shows up right under the Generate button instead
+ *  of forcing a tab switch. Splitting it out keeps the JSX shallow. */
+function GenerateResultList({
+  examId,
+  sectionId,
+}: {
+  examId: number | null;
+  sectionId: number | null;
+}) {
+  const qc = useQueryClient();
+  const enabled = examId !== null && sectionId !== null;
+  const { data: cards = [], isFetching } = useQuery({
+    queryKey: ["section-cards", examId, sectionId],
+    queryFn: () => listSectionCards(examId!, sectionId!),
+    enabled,
+  });
+  const publish = useMutation({
+    mutationFn: () => publishSection(examId!, sectionId!),
+    onSuccess: () =>
+      qc.invalidateQueries({ queryKey: ["section-cards", examId, sectionId] }),
+  });
+
+  if (!enabled) return null;
+
+  const publishedCount = cards.filter((c) => c.status === "published").length;
+  const unpublished = cards.length - publishedCount;
+
+  return (
+    <Card className="mt-4">
+      <CardHeader className="flex flex-row items-center justify-between space-y-0">
+        <div>
+          <CardTitle>Generated cards</CardTitle>
+          <CardDescription>
+            {isFetching && cards.length === 0
+              ? "Loading…"
+              : `${cards.length} card${cards.length === 1 ? "" : "s"} — ${publishedCount} published, ${unpublished} draft`}
+          </CardDescription>
+        </div>
+        {unpublished > 0 && (
+          <Button
+            onClick={() => publish.mutate()}
+            disabled={publish.isPending}
+            variant="outline"
+          >
+            <Send className="mr-1 h-4 w-4" />
+            Publish all
+          </Button>
+        )}
+      </CardHeader>
+      <CardContent className="p-0">
+        {cards.length === 0 ? (
+          <p className="px-6 py-4 text-sm text-muted-foreground">
+            No cards yet. Click Generate above.
+          </p>
+        ) : (
+          <table className="w-full text-sm">
+            <thead className="border-y bg-muted/30 text-left text-xs uppercase tracking-wider text-muted-foreground">
+              <tr>
+                <th className="px-4 py-2">Student</th>
+                <th className="px-4 py-2">%</th>
+                <th className="px-4 py-2">Grade</th>
+                <th className="px-4 py-2">Rank</th>
+                <th className="px-4 py-2">Status</th>
+                <th className="px-4 py-2 text-right">PDF</th>
+              </tr>
+            </thead>
+            <tbody>
+              {cards.map((rc) => (
+                <tr key={rc.id} className="border-b last:border-b-0">
+                  <td className="px-4 py-2 font-medium text-indigo-dark">
+                    {rc.snapshot?.student?.full_name ?? `Student ${rc.student_id}`}
+                  </td>
+                  <td className="px-4 py-2 font-mono">{rc.percentage ?? "—"}</td>
+                  <td className="px-4 py-2">
+                    <span className="inline-flex items-center gap-1">
+                      <Award className="h-3 w-3 text-saffron-dark" />
+                      {rc.overall_grade ?? "—"}
+                    </span>
+                  </td>
+                  <td className="px-4 py-2 font-mono">
+                    {rc.rank_in_section ?? "—"}
+                  </td>
+                  <td className="px-4 py-2">
+                    <span
+                      className={cn(
+                        "rounded-full px-2 py-0.5 text-[11px] font-medium uppercase tracking-wider",
+                        STATUS_TONE[rc.status],
+                      )}
+                    >
+                      {rc.status}
+                    </span>
+                  </td>
+                  <td className="px-4 py-2 text-right">
+                    <AuthedPdfDownload
+                      cardId={rc.id}
+                      filename={`report_card_${rc.snapshot?.student?.full_name ?? rc.id}.pdf`}
+                      blocked={rc.status !== "published"}
+                    />
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
+/** Replaces the old <a href> direct link.
+ *
+ *  GET /v1/parent/report-cards/{id}/pdf requires the Authorization header
+ *  the axios interceptor adds — a plain <a> doesn't carry it and 401s.
+ *  Fetch via axios as a blob, then open in a new tab. The admin uses the
+ *  /v1/school-admin/report-cards/{id}/pdf endpoint which has the same
+ *  auth pattern. */
+function AuthedPdfDownload({
+  cardId,
+  filename,
+  blocked,
+}: {
+  cardId: number;
+  filename: string;
+  blocked: boolean;
+}) {
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const open = async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const res = await api.get<Blob>(
+        `/v1/school-admin/report-cards/${cardId}/pdf`,
+        { responseType: "blob" },
+      );
+      const url = URL.createObjectURL(res.data);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 60_000);
+    } catch (e: any) {
+      // For Blob responses Axios puts the error JSON in e.response.data
+      // as a Blob too — read it back to a string for a sane message.
+      const blob = e?.response?.data;
+      let detail = e?.message ?? "Could not download";
+      if (blob instanceof Blob) {
+        try {
+          const text = await blob.text();
+          try { detail = JSON.parse(text)?.detail ?? text; } catch { detail = text; }
+        } catch { /* keep fallback */ }
+      }
+      setError(`${e?.response?.status ?? ""} ${detail}`.trim());
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div className="inline-flex flex-col items-end gap-0.5">
+      <Button
+        variant="ghost"
+        size="sm"
+        onClick={open}
+        disabled={loading || blocked}
+        title={blocked ? "Publish first" : "Download PDF"}
+      >
+        <Download className="mr-1 h-3 w-3" />
+        {loading ? "…" : blocked ? "Draft" : "PDF"}
+      </Button>
+      {error && (
+        <span
+          className="max-w-[220px] truncate text-[10px] text-destructive"
+          title={error}
+        >
+          {error}
+        </span>
+      )}
+    </div>
   );
 }
 
@@ -542,8 +742,6 @@ function CardsPanel() {
     mutationFn: () => publishSection(examId!, sectionId!),
     onSuccess: () => qc.invalidateQueries({ queryKey: ["section-cards", examId, sectionId] }),
   });
-
-  const apiBase = import.meta.env.VITE_API_BASE_URL ?? "https://api.campus.jaikalki.in";
 
   return (
     <div className="space-y-4">
@@ -643,15 +841,11 @@ function CardsPanel() {
                         </span>
                       </td>
                       <td className="text-right">
-                        <a
-                          className="inline-flex items-center gap-1 text-teal-dark hover:underline"
-                          href={`${apiBase}${pdfUrl(rc.id)}`}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                        >
-                          <Download className="h-3 w-3" />
-                          PDF
-                        </a>
+                        <AuthedPdfDownload
+                          cardId={rc.id}
+                          filename={`report_card_${rc.snapshot?.student?.full_name ?? rc.id}.pdf`}
+                          blocked={rc.status !== "published"}
+                        />
                       </td>
                     </tr>
                   ))}
