@@ -306,7 +306,7 @@ function CollectionPanel() {
                     <div>
                       <p className="font-medium text-indigo-dark">{inv.invoice_number}</p>
                       <p className="text-xs text-muted-foreground">
-                        Due {inv.due_date} · ₹{inv.total_amount} (paid ₹{inv.paid_amount})
+                        Due {inv.due_date} · ₹{inv.total_amount.toFixed(0)} (paid ₹{inv.paid_amount.toFixed(0)})
                       </p>
                     </div>
                     <span className={cn("rounded-full px-2 py-0.5 text-[11px] uppercase tracking-wider", STATUS_TONE[inv.status])}>
