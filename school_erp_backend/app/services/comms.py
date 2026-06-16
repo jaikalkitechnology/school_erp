@@ -547,3 +547,29 @@ async def list_outbox(
     if status_filter is not None:
         stmt = stmt.where(NotificationOutbox.status == status_filter.value)
     return list((await session.execute(stmt)).scalars().all())
+
+
+# ---- Retention sweep ------------------------------------------------------
+
+
+async def sweep_old_notifications(*, days: int = 30) -> int:
+    """Delete every Notification whose created_at is older than `days`.
+
+    Tenant-agnostic: the lifespan loop calls this once a day across
+    every tenant in the shared DB. Outbox rows (SMS/email/WhatsApp
+    delivery records) cascade via ondelete=SET NULL → the row stays
+    for the audit log but loses its in-app pointer. Returns the
+    number of rows actually removed."""
+    from datetime import timedelta
+
+    from sqlalchemy import delete
+
+    from app.database import AsyncSessionLocal
+
+    cutoff = datetime.now(timezone.utc).replace(tzinfo=None) - timedelta(days=days)
+    async with AsyncSessionLocal() as session:
+        result = await session.execute(
+            delete(Notification).where(Notification.created_at < cutoff)
+        )
+        await session.commit()
+        return int(result.rowcount or 0)

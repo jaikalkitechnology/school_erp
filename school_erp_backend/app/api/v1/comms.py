@@ -102,6 +102,19 @@ async def list_outbox_route(
     return await list_outbox(session, status_filter=status_filter, limit=limit)
 
 
+@sa_router.post("/notifications/sweep")
+async def sweep_notifications_route(
+    days: int = Query(default=30, ge=1, le=365),
+):
+    """Force a retention sweep right now. The lifespan task runs this
+    every 24 hours automatically; this endpoint exists so the admin
+    can clear out old notifications on demand."""
+    from app.services.comms import sweep_old_notifications
+
+    removed = await sweep_old_notifications(days=days)
+    return {"removed": removed, "older_than_days": days}
+
+
 # ---- Public announcements feed (any authenticated user) -------------------
 
 
@@ -113,11 +126,83 @@ async def feed(
     principal: AuthPrincipal = Depends(get_current_principal),
     session: AsyncSession = Depends(platform_session),
 ):
-    """Anyone in the tenant gets the published announcements they're targeted by.
-    The fan-out already filtered into Notification rows; this endpoint gives the
-    school's own bulletin-board view."""
+    """Bulletin-board view of the announcements *this user is actually
+    targeted by*.
+
+    Previously this endpoint returned every published announcement on
+    the tenant — so a parent picking ``Audience: Parents`` for a notice
+    would still find their staff-only notices listed because the
+    bulletin feed didn't filter. The fan-out already wrote per-user
+    Notification rows; mirror the same audience logic here so the feed
+    matches what they actually got pushed."""
     from sqlalchemy import select
-    from app.models.comms import Announcement
+    from app.models.comms import Announcement, AnnouncementAudience
+    from app.models.auth import Role, UserRole
+    from app.models.parent import ParentChildMapping, Parent, Student
+
+    # Resolve the caller's role codes + (if a parent) the linked
+    # children's class + section ids. We compute these once and use
+    # them to decide which announcement rows to surface.
+    role_codes = set(principal.roles or [])
+
+    student_class_ids: set[int] = set()
+    student_section_ids: set[int] = set()
+    if "parent" in role_codes:
+        parent = (
+            await session.execute(
+                select(Parent).where(
+                    Parent.tenant_id == principal.tenant_id,
+                    Parent.user_id == principal.user_id,
+                )
+            )
+        ).scalar_one_or_none()
+        if parent is not None:
+            kids = list(
+                (
+                    await session.execute(
+                        select(Student)
+                        .join(
+                            ParentChildMapping,
+                            ParentChildMapping.student_id == Student.id,
+                        )
+                        .where(
+                            ParentChildMapping.tenant_id == principal.tenant_id,
+                            ParentChildMapping.parent_id == parent.id,
+                        )
+                    )
+                ).scalars().all()
+            )
+            for k in kids:
+                if k.class_def_id is not None:
+                    student_class_ids.add(k.class_def_id)
+                if k.section_id is not None:
+                    student_section_ids.add(k.section_id)
+
+    # If the caller is the student themselves, surface their own
+    # class/section too.
+    if "student" in role_codes:
+        me = (
+            await session.execute(
+                select(Student).where(
+                    Student.tenant_id == principal.tenant_id,
+                    Student.user_id == principal.user_id,
+                )
+            )
+        ).scalar_one_or_none()
+        if me is not None:
+            if me.class_def_id is not None:
+                student_class_ids.add(me.class_def_id)
+            if me.section_id is not None:
+                student_section_ids.add(me.section_id)
+
+    staff_role_codes = {
+        "school_admin", "principal", "vice_principal", "coordinator",
+        "class_teacher", "subject_teacher", "office_staff", "accountant",
+        "librarian", "transport_manager", "hostel_warden",
+    }
+    is_staff = bool(role_codes & staff_role_codes)
+    is_parent = "parent" in role_codes
+    is_student = "student" in role_codes
 
     rows = list(
         (
@@ -127,12 +212,43 @@ async def feed(
                     Announcement.tenant_id == principal.tenant_id,
                     Announcement.published_at.is_not(None),
                 )
-                .order_by(Announcement.is_pinned.desc(), Announcement.published_at.desc())
-                .limit(50)
+                .order_by(
+                    Announcement.is_pinned.desc(),
+                    Announcement.published_at.desc(),
+                )
+                .limit(200)
             )
         ).scalars().all()
     )
-    return rows
+
+    def visible(a: Announcement) -> bool:
+        aud = a.audience
+        if aud == AnnouncementAudience.ALL.value:
+            return True
+        if aud == AnnouncementAudience.STAFF.value:
+            return is_staff
+        if aud == AnnouncementAudience.PARENTS.value:
+            return is_parent
+        if aud == AnnouncementAudience.STUDENTS.value:
+            return is_student
+        if aud == AnnouncementAudience.CLASS.value:
+            # Class-scoped notice → parents of students in that class
+            # or the student themselves. Staff don't see class notices
+            # unless they're also class teacher of a section in that
+            # class — keeping it simple: only parents + students see
+            # class notices.
+            return (
+                a.audience_id is not None
+                and a.audience_id in student_class_ids
+            )
+        if aud == AnnouncementAudience.SECTION.value:
+            return (
+                a.audience_id is not None
+                and a.audience_id in student_section_ids
+            )
+        return False
+
+    return [a for a in rows if visible(a)][:50]
 
 
 # ---- Direct messaging ------------------------------------------------------
