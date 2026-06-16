@@ -6,8 +6,11 @@ from datetime import date, datetime, timezone
 from decimal import Decimal
 from typing import Optional
 
+import logging
+
 from fastapi import HTTPException, status
 from sqlalchemy import func, select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.hostel import (
@@ -369,6 +372,43 @@ async def add_disciplinary(
     hostel_id: int,
     payload: DisciplinaryWrite,
 ) -> DisciplinaryRecord:
+    # Validate ownership/existence up-front so the FK doesn't blow up
+    # mid-flush with an opaque IntegrityError that surfaces as 500.
+    hostel = (
+        await session.execute(
+            select(Hostel).where(
+                Hostel.id == hostel_id, Hostel.tenant_id == tenant_id,
+            )
+        )
+    ).scalar_one_or_none()
+    if hostel is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Hostel not found",
+        )
+    if payload.student_id is None or payload.student_id <= 0:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="student_id is required",
+        )
+    student = (
+        await session.execute(
+            select(Student).where(
+                Student.id == payload.student_id,
+                Student.tenant_id == tenant_id,
+            )
+        )
+    ).scalar_one_or_none()
+    if student is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Student {payload.student_id} not found in this school",
+        )
+    if not (payload.title or "").strip():
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="title is required",
+        )
+
     obj = DisciplinaryRecord(
         tenant_id=tenant_id,
         hostel_id=hostel_id,
@@ -381,7 +421,15 @@ async def add_disciplinary(
         recorded_by_user_id=user_id,
     )
     session.add(obj)
-    await session.commit()
+    try:
+        await session.commit()
+    except IntegrityError as e:
+        await session.rollback()
+        logging.getLogger(__name__).exception("add_disciplinary IntegrityError")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Could not save disciplinary record: {getattr(e, 'orig', e)}",
+        )
     await session.refresh(obj)
     return obj
 
@@ -409,6 +457,41 @@ async def apply_leave(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="to_date must be on or after from_date",
         )
+    hostel = (
+        await session.execute(
+            select(Hostel).where(
+                Hostel.id == hostel_id, Hostel.tenant_id == tenant_id,
+            )
+        )
+    ).scalar_one_or_none()
+    if hostel is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Hostel not found",
+        )
+    if payload.student_id is None or payload.student_id <= 0:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="student_id is required",
+        )
+    student = (
+        await session.execute(
+            select(Student).where(
+                Student.id == payload.student_id,
+                Student.tenant_id == tenant_id,
+            )
+        )
+    ).scalar_one_or_none()
+    if student is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Student {payload.student_id} not found in this school",
+        )
+    if not (payload.reason or "").strip():
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="reason is required",
+        )
+
     obj = HostelLeave(
         tenant_id=tenant_id,
         hostel_id=hostel_id,
@@ -420,7 +503,15 @@ async def apply_leave(
         status=HostelLeaveStatus.PENDING.value,
     )
     session.add(obj)
-    await session.commit()
+    try:
+        await session.commit()
+    except IntegrityError as e:
+        await session.rollback()
+        logging.getLogger(__name__).exception("apply_leave IntegrityError")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Could not save leave: {getattr(e, 'orig', e)}",
+        )
     await session.refresh(obj)
     return obj
 
