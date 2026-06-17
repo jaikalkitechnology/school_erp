@@ -88,15 +88,34 @@ async def list_categories(session: AsyncSession) -> list[FeeCategory]:
 async def create_category(
     session: AsyncSession, tenant_id: int, payload: FeeCategoryWrite
 ) -> FeeCategory:
+    from sqlalchemy.exc import IntegrityError
+
+    # Pre-flight uniqueness check so we return a specific 409 instead of
+    # letting the IntegrityError bubble up later.
+    existing = (
+        await session.execute(
+            select(FeeCategory).where(
+                FeeCategory.tenant_id == tenant_id,
+                FeeCategory.code == payload.code,
+            )
+        )
+    ).scalar_one_or_none()
+    if existing is not None:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=f"Category code '{payload.code}' already exists in this school",
+        )
+
     obj = FeeCategory(tenant_id=tenant_id, **payload.model_dump())
     session.add(obj)
     try:
         await session.commit()
-    except Exception:
+    except IntegrityError as e:
         await session.rollback()
+        # Race with another concurrent create.
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
-            detail="Category code already exists in this school",
+            detail=f"Category code already exists ({getattr(e, 'orig', e)})",
         )
     await session.refresh(obj)
     return obj
@@ -132,15 +151,70 @@ async def list_structures(
 async def create_structure(
     session: AsyncSession, tenant_id: int, payload: FeeStructureWrite
 ) -> FeeStructure:
+    from sqlalchemy.exc import IntegrityError
+
+    from app.models.academic import ClassDef
+
+    # Validate referenced FKs so we return precise 404/400 instead of an
+    # opaque "already exists" when the real cause is a missing class /
+    # category.
+    cls = (
+        await session.execute(
+            select(ClassDef).where(
+                ClassDef.id == payload.class_def_id,
+                ClassDef.tenant_id == tenant_id,
+            )
+        )
+    ).scalar_one_or_none()
+    if cls is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Class #{payload.class_def_id} not found in this school",
+        )
+    cat = (
+        await session.execute(
+            select(FeeCategory).where(
+                FeeCategory.id == payload.category_id,
+                FeeCategory.tenant_id == tenant_id,
+            )
+        )
+    ).scalar_one_or_none()
+    if cat is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Fee category #{payload.category_id} not found",
+        )
+
+    # Same race-safe uniqueness check as create_category.
+    existing = (
+        await session.execute(
+            select(FeeStructure).where(
+                FeeStructure.tenant_id == tenant_id,
+                FeeStructure.class_def_id == payload.class_def_id,
+                FeeStructure.category_id == payload.category_id,
+                FeeStructure.period == payload.period.value,
+            )
+        )
+    ).scalar_one_or_none()
+    if existing is not None:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=(
+                f"A {payload.period.value} structure for "
+                f"'{cat.name}' in '{cls.name}' already exists. "
+                "Edit the existing one instead."
+            ),
+        )
+
     obj = FeeStructure(tenant_id=tenant_id, **payload.model_dump())
     session.add(obj)
     try:
         await session.commit()
-    except Exception:
+    except IntegrityError as e:
         await session.rollback()
         raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT,
-            detail="A structure for this class + category + period already exists",
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Could not save structure: {getattr(e, 'orig', e)}",
         )
     await session.refresh(obj)
     return obj
