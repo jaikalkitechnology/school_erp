@@ -89,7 +89,7 @@ class _FeesPageState extends State<FeesPage> {
                         ? _Error(message: state.message)
                         : state is FeesLoaded
                             ? _FeesBody(view: state.view, s: s)
-                            : const SizedBox.shrink(),
+                            : const _EmptyOrLoading(),
               );
             },
           ),
@@ -406,9 +406,103 @@ class _Error extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Padding(
+    return ListView(
       padding: const EdgeInsets.all(16),
-      child: Text(message, style: const TextStyle(color: Color(0xFFD32F2F))),
+      children: [
+        const SizedBox(height: 40),
+        const Icon(Icons.error_outline,
+            color: Color(0xFFD32F2F), size: 36),
+        const SizedBox(height: 8),
+        const Center(
+          child: Text(
+            'Could not load fees',
+            style: TextStyle(
+              color: Color(0xFFD32F2F),
+              fontWeight: FontWeight.w700,
+              fontSize: 15,
+            ),
+          ),
+        ),
+        const SizedBox(height: 4),
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 24),
+          child: Text(
+            message,
+            textAlign: TextAlign.center,
+            style: const TextStyle(
+              color: JaikalkiBrand.textSecondary, fontSize: 12,
+            ),
+          ),
+        ),
+        const SizedBox(height: 16),
+        Center(
+          child: OutlinedButton.icon(
+            onPressed: () {
+              final children = context.read<ChildrenCubit>().state;
+              if (children is ChildrenLoaded &&
+                  children.selectedId != null) {
+                context.read<FeesCubit>().refresh(children.selectedId!);
+              }
+            },
+            icon: const Icon(Icons.refresh),
+            label: const Text('Retry'),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+/// Placeholder shown while ChildrenCubit is still figuring out which
+/// child is selected (or surfacing 0-children parents). Before this,
+/// FeesInitial fell through to SizedBox.shrink() → the user saw a
+/// blank Fees tab and reported it as broken.
+class _EmptyOrLoading extends StatelessWidget {
+  const _EmptyOrLoading();
+
+  @override
+  Widget build(BuildContext context) {
+    return BlocBuilder<ChildrenCubit, ChildrenState>(
+      builder: (context, c) {
+        if (c is ChildrenLoaded && c.children.isEmpty) {
+          return ListView(
+            children: const [
+              SizedBox(height: 80),
+              Padding(
+                padding: EdgeInsets.all(24),
+                child: Center(
+                  child: Text(
+                    'No children linked to this account yet.\n'
+                    'Ask the school admin to link your child.',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(color: JaikalkiBrand.textSecondary),
+                  ),
+                ),
+              ),
+            ],
+          );
+        }
+        if (c is ChildrenLoaded && c.selectedId == null) {
+          return ListView(
+            children: const [
+              SizedBox(height: 80),
+              Padding(
+                padding: EdgeInsets.all(24),
+                child: Center(
+                  child: Text(
+                    'Pick a child on the dashboard to view their fees.',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(color: JaikalkiBrand.textSecondary),
+                  ),
+                ),
+              ),
+            ],
+          );
+        }
+        // Still bootstrapping or transient — show a spinner so the
+        // user knows the page is alive.
+        return const Center(child: CircularProgressIndicator());
+      },
     );
   }
 }
