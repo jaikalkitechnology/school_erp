@@ -24,9 +24,9 @@ export function DashboardPage() {
         { label: "Classes", value: `${dashboard.data.classes_count} · ${dashboard.data.sections_count} sec`, icon: Layers, hint: "Across all stages" },
         {
           label: "Storage",
-          value: `${dashboard.data.storage_used_mb.toFixed(0)} MB`,
+          value: `${Number(dashboard.data.storage_used_mb).toFixed(0)} MB`,
           icon: ShieldAlert,
-          hint: `of ${(dashboard.data.storage_limit_mb / 1024).toFixed(0)}GB plan`,
+          hint: `of ${(Number(dashboard.data.storage_limit_mb) / 1024).toFixed(0)}GB plan`,
         },
       ]
     : Array.from({ length: 4 }, (_, i) => ({

@@ -404,6 +404,8 @@ function GeneratePanel() {
   const [templateId, setTemplateId] = useState<number | null>(null);
   const [publish, setPublish] = useState(false);
   const [flash, setFlash] = useState<string | null>(null);
+  const [skipDetail, setSkipDetail] = useState<string[]>([]);
+  const [showSkipModal, setShowSkipModal] = useState(false);
 
   const run = useMutation({
     mutationFn: () =>
@@ -414,18 +416,19 @@ function GeneratePanel() {
         publish,
       }),
     onSuccess: (res) => {
-      const reasons =
-        res.skipped_reasons && res.skipped_reasons.length > 0
-          ? ` — ${res.skipped_reasons.slice(0, 3).join(" · ")}`
-          : "";
+      const reasons = res.skipped_reasons ?? [];
+      setSkipDetail(reasons);
+      const preview =
+        reasons.length > 0 ? ` — ${reasons.slice(0, 2).join(" · ")}` : "";
       setFlash(
-        `Generated ${res.generated}, skipped ${res.skipped}${reasons}`,
+        `Generated ${res.generated}, skipped ${res.skipped}${preview}`,
       );
       qc.invalidateQueries({ queryKey: ["section-cards"] });
     },
     onError: (e: any) => {
       // Backend 4xx/5xx — surface the detail so the admin can act.
       const detail = e?.response?.data?.detail ?? e?.message ?? "Generation failed";
+      setSkipDetail([detail]);
       setFlash(`Error: ${detail}`);
     },
   });
@@ -521,12 +524,53 @@ function GeneratePanel() {
               )}
             >
               {flash}
+              {skipDetail.length > 2 && (
+                <button
+                  type="button"
+                  onClick={() => setShowSkipModal(true)}
+                  className="ml-2 underline hover:no-underline"
+                >
+                  View all {skipDetail.length} skipped
+                </button>
+              )}
             </span>
           )}
         </div>
       </CardContent>
     </Card>
     <GenerateResultList examId={examId} sectionId={sectionId} />
+    {showSkipModal && (
+      <div
+        className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
+        onClick={(e) => {
+          if (e.target === e.currentTarget) setShowSkipModal(false);
+        }}
+      >
+        <div className="w-full max-w-lg max-h-[80vh] overflow-y-auto rounded-xl bg-background p-6 shadow-2xl">
+          <h2 className="font-display text-xl text-indigo-dark">
+            Skipped during generation
+          </h2>
+          <p className="mt-1 text-xs text-muted-foreground">
+            {skipDetail.length} entr{skipDetail.length === 1 ? "y" : "ies"}.
+          </p>
+          <ul className="mt-3 space-y-2">
+            {skipDetail.map((r, i) => (
+              <li
+                key={i}
+                className="rounded-md border border-destructive/30 bg-destructive/5 px-3 py-2 text-xs text-destructive"
+              >
+                {r}
+              </li>
+            ))}
+          </ul>
+          <div className="mt-4 flex justify-end">
+            <Button variant="outline" onClick={() => setShowSkipModal(false)}>
+              Close
+            </Button>
+          </div>
+        </div>
+      </div>
+    )}
     </>
   );
 }

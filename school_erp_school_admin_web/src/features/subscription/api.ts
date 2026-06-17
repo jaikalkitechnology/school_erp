@@ -1,4 +1,5 @@
 import { api } from "@/lib/api";
+import { n, nOrNull } from "@/lib/coerce";
 
 export type InvoiceStatus = "draft" | "pending" | "partial" | "paid" | "void" | "refunded";
 
@@ -32,5 +33,23 @@ export interface Subscription {
   invoices: SubscriptionInvoice[];
 }
 
-export const mySubscription = async () =>
-  (await api.get<Subscription>("/v1/school-admin/subscription")).data;
+const coerceInvoice = (i: SubscriptionInvoice): SubscriptionInvoice => ({
+  ...i,
+  subtotal: n(i.subtotal),
+  discount_amount: n(i.discount_amount),
+  tax_amount: n(i.tax_amount),
+  cgst_amount: n(i.cgst_amount),
+  sgst_amount: n(i.sgst_amount),
+  igst_amount: n(i.igst_amount),
+  total_amount: n(i.total_amount),
+  paid_amount: n(i.paid_amount),
+});
+
+export const mySubscription = async () => {
+  const data = (await api.get<Subscription>("/v1/school-admin/subscription")).data;
+  return {
+    ...data,
+    monthly_price: nOrNull(data.monthly_price),
+    invoices: (data.invoices ?? []).map(coerceInvoice),
+  };
+};

@@ -3,6 +3,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Building, ChefHat, ClipboardList, DoorOpen, FileWarning, Plus, UserCheck, UserMinus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { StudentPicker } from "@/components/StudentPicker";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { cn } from "@/lib/utils";
@@ -285,8 +286,8 @@ function AllocationsPanel({ hostelId }: { hostelId: number }) {
       </CardHeader>
       <CardContent className="grid grid-cols-3 gap-3">
         <div>
-          <Label>Student ID</Label>
-          <Input value={studentId} onChange={(e) => setStudentId(e.target.value)} />
+          <Label>Student</Label>
+          <StudentPicker value={studentId} onChange={(v) => setStudentId(v)} />
         </div>
         <div>
           <Label>Room</Label>
@@ -415,7 +416,7 @@ function VisitorsPanel({ hostelId }: { hostelId: number }) {
           <CardTitle>Check in</CardTitle>
         </CardHeader>
         <CardContent className="grid grid-cols-5 gap-2">
-          <Input placeholder="Student ID" value={studentId} onChange={(e) => setStudentId(e.target.value)} />
+          <StudentPicker value={studentId} onChange={(v) => setStudentId(v)} />
           <Input placeholder="Name" value={name} onChange={(e) => setName(e.target.value)} />
           <Input placeholder="Phone" value={phone} onChange={(e) => setPhone(e.target.value)} />
           <Input placeholder="Relation" value={relation} onChange={(e) => setRelation(e.target.value)} />
@@ -505,7 +506,7 @@ function DisciplinePanel({ hostelId }: { hostelId: number }) {
           <CardTitle>Log incident</CardTitle>
         </CardHeader>
         <CardContent className="grid grid-cols-5 gap-2">
-          <Input placeholder="Student ID" value={studentId} onChange={(e) => setStudentId(e.target.value)} />
+          <StudentPicker value={studentId} onChange={(v) => setStudentId(v)} />
           <Input placeholder="Title" value={title} onChange={(e) => setTitle(e.target.value)} />
           <select
             className="h-9 rounded border border-input bg-transparent px-2 text-sm"
@@ -588,7 +589,7 @@ function LeavesPanel({ hostelId }: { hostelId: number }) {
           <CardTitle>File leave</CardTitle>
         </CardHeader>
         <CardContent className="grid grid-cols-5 gap-2">
-          <Input placeholder="Student ID" value={studentId} onChange={(e) => setStudentId(e.target.value)} />
+          <StudentPicker value={studentId} onChange={(v) => setStudentId(v)} />
           <Input value={from} onChange={(e) => setFrom(e.target.value)} />
           <Input value={to} onChange={(e) => setTo(e.target.value)} />
           <Input placeholder="Reason" value={reason} onChange={(e) => setReason(e.target.value)} />

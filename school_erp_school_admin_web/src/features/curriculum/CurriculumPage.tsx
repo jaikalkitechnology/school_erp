@@ -499,7 +499,7 @@ function SyllabusRow({ syllabus, onDelete }: { syllabus: Syllabus; onDelete: () 
             <CardTitle>{syllabus.title}</CardTitle>
             <CardDescription>
               {syllabus.chapters.length} chapter{syllabus.chapters.length !== 1 && "s"} ·{" "}
-              <span className="font-mono text-saffron-dark">{syllabus.overall_completion_pct.toFixed(1)}%</span>
+              <span className="font-mono text-saffron-dark">{Number(syllabus.overall_completion_pct).toFixed(1)}%</span>
               {" "}complete
             </CardDescription>
           </div>
