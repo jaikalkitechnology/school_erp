@@ -78,12 +78,15 @@ function CategoriesPanel() {
   const [code, setCode] = useState("");
   const [name, setName] = useState("");
   const [recurring, setRecurring] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const create = useMutation({
     mutationFn: () => createCategory({ code, name, is_recurring: recurring }),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["fee-categories"] });
-      setCode(""); setName("");
+      setCode(""); setName(""); setError(null);
     },
+    onError: (e: any) =>
+      setError(e?.response?.data?.detail ?? "Could not add category"),
   });
   return (
     <div className="grid gap-4 lg:grid-cols-[2fr_1fr]">
@@ -121,8 +124,9 @@ function CategoriesPanel() {
             <input type="checkbox" checked={recurring} onChange={(e) => setRecurring(e.target.checked)} className="h-4 w-4 accent-saffron" />
             Recurring (monthly / quarterly / annual)
           </label>
-          <Button onClick={() => create.mutate()} disabled={!code || !name || create.isPending}>
-            <Plus className="h-4 w-4" /> Add
+          {error && <p className="text-sm text-destructive">{error}</p>}
+          <Button onClick={() => { setError(null); create.mutate(); }} disabled={!code || !name || create.isPending}>
+            <Plus className="h-4 w-4" /> {create.isPending ? "Adding…" : "Add"}
           </Button>
         </CardContent>
       </Card>
@@ -148,6 +152,7 @@ function StructuresPanel() {
   const [periodEnd, setPeriodEnd] = useState("");
   const [siblingPct, setSiblingPct] = useState(10);
 
+  const [structureError, setStructureError] = useState<string | null>(null);
   const create = useMutation({
     mutationFn: () =>
       createStructure({
@@ -157,7 +162,12 @@ function StructuresPanel() {
         amount,
         due_day_of_month: dueDay,
       }),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ["fee-structures"] }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["fee-structures"] });
+      setStructureError(null);
+    },
+    onError: (e: any) =>
+      setStructureError(e?.response?.data?.detail ?? "Could not add structure"),
   });
 
   const generate = useMutation({
@@ -195,9 +205,16 @@ function StructuresPanel() {
           ]} />
           <FieldNum label="Amount (₹)" value={amount} onChange={setAmount} />
           <FieldNum label="Due day" value={dueDay} onChange={setDueDay} />
+          {structureError && (
+            <p className="col-span-5 text-sm text-destructive">{structureError}</p>
+          )}
           <div className="col-span-5 flex justify-end">
-            <Button disabled={classDefId === "" || categoryId === "" || amount <= 0 || create.isPending} onClick={() => create.mutate()}>
-              <Plus className="h-4 w-4" /> Add structure
+            <Button
+              disabled={classDefId === "" || categoryId === "" || amount <= 0 || create.isPending}
+              onClick={() => { setStructureError(null); create.mutate(); }}
+            >
+              <Plus className="h-4 w-4" />
+              {create.isPending ? "Adding…" : "Add structure"}
             </Button>
           </div>
         </CardContent>
