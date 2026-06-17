@@ -5,7 +5,12 @@ from __future__ import annotations
 from datetime import date
 from typing import Optional
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+import csv
+import io
+import logging
+
+from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile, status
+from pydantic import BaseModel
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -187,6 +192,91 @@ async def transfer_certificate(
         last_class_label=student.current_class_label,
         reason=student.remarks,
     )
+
+
+class BulkImportRow(BaseModel):
+    row: int
+    admission_number: str | None = None
+    full_name: str | None = None
+    error: str
+
+
+class BulkImportResult(BaseModel):
+    imported: int
+    skipped: int
+    errors: list[BulkImportRow]
+
+
+@router.post("/bulk-import", response_model=BulkImportResult)
+async def bulk_import_students_route(
+    file: UploadFile = File(...),
+    principal: AuthPrincipal = Depends(_school_admin),
+    session: AsyncSession = Depends(tenant_scoped_session),
+):
+    """Bulk-admit students from a CSV. Columns (header row required):
+
+    full_name (required), first_name, last_name, date_of_birth (YYYY-MM-DD),
+    gender, blood_group, admission_number (optional, auto-generated when
+    blank), roll_no, class_def_id, section_id, address, phone, email,
+    father_name, mother_name, parent_phone, parent_email.
+
+    Returns per-row results so the admin can fix the failing rows and
+    re-upload only those — successful rows aren't reverted."""
+    if not file.filename or not file.filename.lower().endswith((".csv", ".txt")):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Upload a .csv file",
+        )
+    raw = (await file.read()).decode("utf-8", errors="replace")
+    reader = csv.DictReader(io.StringIO(raw))
+    errors: list[BulkImportRow] = []
+    imported = 0
+    skipped = 0
+    log = logging.getLogger(__name__)
+    for idx, row in enumerate(reader, start=2):  # row 1 is the header
+        full_name = (row.get("full_name") or "").strip()
+        if not full_name:
+            skipped += 1
+            errors.append(BulkImportRow(
+                row=idx, error="full_name is required",
+            ))
+            continue
+        try:
+            payload = StudentCreate(
+                full_name=full_name,
+                first_name=(row.get("first_name") or "").strip() or None,
+                last_name=(row.get("last_name") or "").strip() or None,
+                date_of_birth=(row.get("date_of_birth") or "").strip() or None,
+                gender=(row.get("gender") or "").strip() or None,
+                blood_group=(row.get("blood_group") or "").strip() or None,
+                admission_number=(row.get("admission_number") or "").strip() or None,
+                roll_no=(row.get("roll_no") or "").strip() or None,
+                class_def_id=int(row["class_def_id"]) if row.get("class_def_id") else None,
+                section_id=int(row["section_id"]) if row.get("section_id") else None,
+                address=(row.get("address") or "").strip() or None,
+                phone=(row.get("phone") or "").strip() or None,
+                email=(row.get("email") or "").strip() or None,
+                father_name=(row.get("father_name") or "").strip() or None,
+                mother_name=(row.get("mother_name") or "").strip() or None,
+                parent_phone=(row.get("parent_phone") or "").strip() or None,
+                parent_email=(row.get("parent_email") or "").strip() or None,
+            )
+            await admit_student(session, principal.tenant_id, payload)
+            imported += 1
+        except HTTPException as e:
+            skipped += 1
+            errors.append(BulkImportRow(
+                row=idx, admission_number=row.get("admission_number"),
+                full_name=full_name, error=str(e.detail),
+            ))
+        except Exception as e:
+            log.exception("bulk-import row %s failed", idx)
+            skipped += 1
+            errors.append(BulkImportRow(
+                row=idx, admission_number=row.get("admission_number"),
+                full_name=full_name, error=str(e)[:200],
+            ))
+    return BulkImportResult(imported=imported, skipped=skipped, errors=errors)
 
 
 @router.post("/promote", response_model=PromotionResult)

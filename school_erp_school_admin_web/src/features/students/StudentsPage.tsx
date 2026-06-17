@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Pencil, Plus, Search, Trash2 } from "lucide-react";
+import { Pencil, Plus, Search, Trash2, Upload } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -13,6 +13,7 @@ import {
   type Student,
   type StudentStatus,
 } from "./api";
+import { BulkImportDialog } from "./BulkImportDialog";
 import { EditStudentDialog } from "./EditStudentDialog";
 import { StudentAvatar } from "./StudentAvatar";
 
@@ -54,6 +55,7 @@ export function StudentsPage() {
 
   const qc = useQueryClient();
   const [editing, setEditing] = useState<Student | null>(null);
+  const [importing, setImporting] = useState(false);
   const [deleteError, setDeleteError] = useState<string | null>(null);
   const removeMut = useMutation({
     mutationFn: (id: number) => deleteStudent(id),
@@ -88,12 +90,18 @@ export function StudentsPage() {
             Search by name, admission number, or parent contact. Drill in for the full record.
           </p>
         </div>
-        <Button asChild>
-          <Link to="/students/admit">
-            <Plus className="h-4 w-4" />
-            Admit student
-          </Link>
-        </Button>
+        <div className="flex gap-2">
+          <Button variant="outline" onClick={() => setImporting(true)}>
+            <Upload className="h-4 w-4" />
+            Bulk import (CSV)
+          </Button>
+          <Button asChild>
+            <Link to="/students/admit">
+              <Plus className="h-4 w-4" />
+              Admit student
+            </Link>
+          </Button>
+        </div>
       </header>
 
       <Card>
@@ -274,6 +282,7 @@ export function StudentsPage() {
           onClose={() => setEditing(null)}
         />
       )}
+      {importing && <BulkImportDialog onClose={() => setImporting(false)} />}
     </div>
   );
 }

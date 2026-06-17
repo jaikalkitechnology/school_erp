@@ -187,3 +187,25 @@ export const updateAdmissionStage = async (id: number, stage: AdmissionStage): P
 
 export const admitFromAdmission = async (id: number): Promise<Student> =>
   (await api.post<Student>(`${admBase}/${id}/admit`)).data;
+
+export interface BulkImportRowError {
+  row: number;
+  admission_number: string | null;
+  full_name: string | null;
+  error: string;
+}
+
+export interface BulkImportResult {
+  imported: number;
+  skipped: number;
+  errors: BulkImportRowError[];
+}
+
+export const bulkImportStudents = async (file: File): Promise<BulkImportResult> => {
+  const form = new FormData();
+  form.append("file", file);
+  const res = await api.post<BulkImportResult>(`${base}/bulk-import`, form, {
+    headers: { "Content-Type": "multipart/form-data" },
+  });
+  return res.data;
+};

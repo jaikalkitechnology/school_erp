@@ -411,7 +411,7 @@ function ResultsPanel() {
       {results.data && (
         <Card>
           <CardHeader>
-            <CardTitle>Class average: {results.data.section_average_pct.toFixed(2)}%</CardTitle>
+            <CardTitle>Class average: {Number(results.data.section_average_pct).toFixed(2)}%</CardTitle>
           </CardHeader>
           <CardContent className="p-0">
             <table className="w-full text-sm">
