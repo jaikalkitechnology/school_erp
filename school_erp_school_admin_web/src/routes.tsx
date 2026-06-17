@@ -24,6 +24,7 @@ import { StudentsPage } from "@/features/students/StudentsPage";
 import { OnboardTeacherPage } from "@/features/teachers/OnboardTeacherPage";
 import { TeacherDetailPage } from "@/features/teachers/TeacherDetailPage";
 import { TeachersPage } from "@/features/teachers/TeachersPage";
+import { StaffPage } from "@/features/staff/StaffPage";
 import { UsersPage } from "@/features/users/UsersPage";
 import { useAuth } from "@/stores/auth";
 
@@ -55,6 +56,7 @@ export const routes: RouteObject[] = [
       { path: "teachers", element: <TeachersPage /> },
       { path: "teachers/onboard", element: <OnboardTeacherPage /> },
       { path: "teachers/:id", element: <TeacherDetailPage /> },
+      { path: "staff", element: <StaffPage /> },
       { path: "users", element: <UsersPage /> },
       { path: "attendance", element: <AttendancePage /> },
       { path: "timetable", element: <TimetablePage /> },
