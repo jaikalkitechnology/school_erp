@@ -23,22 +23,35 @@ from app.core.security import hash_password
 from app.models.auth import Role, User, UserRole
 
 # Roles the school admin is allowed to create / manage through this UI.
-# Platform-level roles (super_admin) and student rows are deliberately
+#
+# Platform-level roles (super_admin) and students are deliberately
 # excluded — students don't log in via this surface, and super_admin is
 # created by the platform owner only.
+#
+# These roles are also intentionally NOT assignable here:
+#   * school_admin    — bootstrapped once at tenant onboarding; you don't
+#                       create a second one via this generic users panel.
+#   * principal       — high-trust role, onboarded via Teachers → Onboard
+#                       with role_codes=["principal"] so the Teacher row
+#                       lands too.
+#   * subject_teacher — Teachers → Onboard (creates User + Teacher pair).
+#   * office_staff    — onboarded via Teachers → Onboard.
+#   * parent          — auto-created on student admission; passwords are
+#                       set from Students → Family panel ("Set password"),
+#                       not from a generic Add-user form.
+#
+# Everything else (vice_principal, coordinator, class_teacher, accountant,
+# librarian, transport_manager, hostel_warden, bus_staff, supervisor,
+# visitor_desk) genuinely belongs on this screen — these are pure-login
+# users with no separate domain row.
 ASSIGNABLE_ROLES: set[str] = {
-    "school_admin",
-    "principal",
     "vice_principal",
     "coordinator",
     "class_teacher",
-    "subject_teacher",
     "accountant",
     "librarian",
     "transport_manager",
     "hostel_warden",
-    "office_staff",
-    "parent",
     "bus_staff",
     "supervisor",
     "visitor_desk",
