@@ -81,9 +81,13 @@ export function UsersPage() {
           <p className="font-mono text-xs uppercase tracking-[0.3em] text-saffron-dark">Logins</p>
           <h1 className="mt-1 font-display text-4xl text-indigo-dark">Users &amp; credentials</h1>
           <p className="mt-2 max-w-2xl text-sm text-muted-foreground">
-            Manage logins across every role — principal, teachers, parents, bus staff,
-            area supervisors, visitor desk and more. Create accounts, reset passwords,
-            activate or deactivate.
+            Manage logins for support staff — vice principal, coordinators,
+            class teachers, accountants, librarians, transport managers,
+            hostel wardens, bus staff, area supervisors and visitor-desk
+            operators. Teachers and parents are onboarded from the Teachers
+            and Students screens; principal and office staff via Teachers
+            &rarr; Onboard. Create accounts, reset passwords, activate or
+            deactivate.
           </p>
         </div>
         <Button onClick={() => setCreating(true)}>

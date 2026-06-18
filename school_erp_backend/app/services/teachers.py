@@ -437,6 +437,52 @@ async def bulk_attendance(
     return written
 
 
+async def attendance_roll(
+    session: AsyncSession, *, tenant_id: int, target_date,
+) -> list[dict]:
+    """All active teachers + the attendance row for `target_date` (if
+    any). Returned shape feeds the admin's staff-roll page directly —
+    one row per teacher with their current mark so the form can pre-
+    populate. Teachers whose `employment_status` isn't active are
+    excluded (they shouldn't be marked at all)."""
+    teachers = list(
+        (
+            await session.execute(
+                select(Teacher).where(
+                    Teacher.tenant_id == tenant_id,
+                    Teacher.employment_status == EmploymentStatus.ACTIVE.value,
+                ).order_by(Teacher.full_name)
+            )
+        ).scalars().all()
+    )
+    if not teachers:
+        return []
+    rows = {
+        r.teacher_id: r
+        for r in (
+            await session.execute(
+                select(TeacherAttendance).where(
+                    TeacherAttendance.tenant_id == tenant_id,
+                    TeacherAttendance.date == target_date,
+                )
+            )
+        ).scalars().all()
+    }
+    out: list[dict] = []
+    for t in teachers:
+        row = rows.get(t.id)
+        out.append({
+            "teacher_id": t.id,
+            "employee_no": t.employee_no,
+            "full_name": t.full_name,
+            "photo_url": t.photo_url,
+            "designation": t.designation,
+            "status": row.status if row else None,
+            "remarks": row.remarks if row else None,
+        })
+    return out
+
+
 async def attendance_for_teacher(
     session: AsyncSession,
     teacher: Teacher,

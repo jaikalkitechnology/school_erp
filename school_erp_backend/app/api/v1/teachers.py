@@ -256,5 +256,94 @@ async def bulk_attendance_route(
     return {"written": written}
 
 
+@router.get("/attendance/roll")
+async def attendance_roll_route(
+    target_date: Optional[_date] = Query(default=None, alias="date"),
+    principal: AuthPrincipal = Depends(_school_admin),
+    session: AsyncSession = Depends(tenant_scoped_session),
+):
+    """One row per active teacher with their attendance for the date
+    (defaults to today). Powers the admin Staff → roll-call screen."""
+    from app.services.teachers import attendance_roll
+    from datetime import datetime, timezone
+
+    target = target_date or datetime.now(timezone.utc).date()
+    rows = await attendance_roll(
+        session, tenant_id=principal.tenant_id, target_date=target,
+    )
+    return {"date": target.isoformat(), "rows": rows}
+
+
+# ---- Staff leaves (admin queue) -------------------------------------------
+
+
+@router.get("/staff-leaves")
+async def list_staff_leaves_route(
+    status_filter: Optional[str] = Query(default=None, alias="status"),
+    principal: AuthPrincipal = Depends(_school_admin),
+    session: AsyncSession = Depends(tenant_scoped_session),
+):
+    """Admin view of every teacher's leave application (pending +
+    history). Status filter accepts pending / approved / rejected /
+    cancelled. Returns each row with the applicant's name + employee
+    no joined in so the queue UI doesn't need extra calls."""
+    from app.models.auth import User
+    from app.models.staff_extras import StaffLeave
+
+    stmt = select(StaffLeave, User, Teacher).join(
+        User, User.id == StaffLeave.user_id,
+    ).outerjoin(
+        Teacher, Teacher.user_id == StaffLeave.user_id,
+    ).where(StaffLeave.tenant_id == principal.tenant_id)
+    if status_filter:
+        stmt = stmt.where(StaffLeave.status == status_filter)
+    stmt = stmt.order_by(StaffLeave.id.desc())
+
+    rows = list((await session.execute(stmt)).all())
+    return [
+        {
+            "id": leave.id,
+            "user_id": leave.user_id,
+            "full_name": (teacher.full_name if teacher else user.full_name),
+            "employee_no": (teacher.employee_no if teacher else None),
+            "designation": (teacher.designation if teacher else None),
+            "start_date": leave.start_date.isoformat() if leave.start_date else None,
+            "end_date": leave.end_date.isoformat() if leave.end_date else None,
+            "reason": leave.reason,
+            "kind": leave.kind,
+            "status": leave.status,
+            "decision_remarks": leave.decision_remarks,
+            "decided_at": (
+                leave.decided_at.isoformat() if leave.decided_at else None
+            ),
+        }
+        for leave, user, teacher in rows
+    ]
+
+
+@router.post("/staff-leaves/{leave_id}/decide")
+async def decide_staff_leave_route(
+    leave_id: int,
+    payload: dict,
+    principal: AuthPrincipal = Depends(_school_admin),
+    session: AsyncSession = Depends(tenant_scoped_session),
+):
+    """Approve or reject a teacher's leave application from the admin
+    queue. Mirrors the /v1/teacher version but admin-gated."""
+    from app.services.teacher_app import StaffLeaveDecide, decide_staff_leave
+
+    decision = StaffLeaveDecide(
+        status=str(payload.get("status") or ""),
+        decision_remarks=payload.get("decision_remarks"),
+    )
+    result = await decide_staff_leave(
+        session,
+        leave_id=leave_id,
+        decided_by_user_id=principal.user_id,
+        payload=decision,
+    )
+    return result
+
+
 # ---- Substitution pool route is declared at the top of the file so it
 # matches before /{teacher_id}.
