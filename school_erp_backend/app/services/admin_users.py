@@ -72,6 +72,7 @@ class UserRow(BaseModel):
     last_login_at: Optional[datetime] = None
     avatar_url: Optional[str] = None
     role_codes: list[str] = Field(default_factory=list)
+    granted_admin_pages: list[str] = Field(default_factory=list)
 
 
 class UserCreate(BaseModel):
@@ -80,6 +81,7 @@ class UserCreate(BaseModel):
     phone: Optional[str] = Field(default=None, max_length=20)
     password: str = Field(min_length=6, max_length=128)
     role_codes: list[str] = Field(min_length=1)
+    granted_admin_pages: Optional[list[str]] = None
 
 
 class UserUpdate(BaseModel):
@@ -87,6 +89,7 @@ class UserUpdate(BaseModel):
     email: Optional[EmailStr] = None
     phone: Optional[str] = Field(default=None, max_length=20)
     role_codes: Optional[list[str]] = None
+    granted_admin_pages: Optional[list[str]] = None
 
 
 class SetPassword(BaseModel):
@@ -151,6 +154,7 @@ def _as_row(user: User) -> UserRow:
         last_login_at=user.last_login_at,
         avatar_url=user.avatar_url,
         role_codes=[ur.role.code for ur in (user.role_assignments or [])],
+        granted_admin_pages=list(user.granted_admin_pages or []),
     )
 
 
@@ -229,6 +233,18 @@ async def create_user(
                 detail=f"Email already in use (user #{clash})",
             )
 
+    # Default page set from the role catalogue if the admin didn't
+    # send one. The Users panel UI pre-populates this from the same
+    # mapping so the client and server stay aligned, but defending
+    # the default here means a curl POST gets sane behaviour too.
+    from app.core.admin_pages import default_pages_for_roles, sanitize_pages
+
+    pages: list[str]
+    if payload.granted_admin_pages is None:
+        pages = default_pages_for_roles(codes)
+    else:
+        pages = sanitize_pages(payload.granted_admin_pages)
+
     user = User(
         tenant_id=tenant_id,
         full_name=payload.full_name,
@@ -237,6 +253,7 @@ async def create_user(
         password_hash=hash_password(payload.password),
         is_active=True,
         is_email_verified=True,
+        granted_admin_pages=pages,
     )
     session.add(user)
     await session.flush()
@@ -277,9 +294,15 @@ async def update_user(
     user_id: int,
     payload: UserUpdate,
 ) -> UserRow:
+    from app.core.admin_pages import sanitize_pages
+
     user = await _get(session, tenant_id, user_id)
     data = payload.model_dump(exclude_unset=True)
     new_codes = data.pop("role_codes", None)
+    new_pages = data.pop("granted_admin_pages", None)
+    if new_pages is not None:
+        # Filter typos / removed pages before they hit the JSON column.
+        user.granted_admin_pages = sanitize_pages(new_pages)
 
     if "email" in data and data["email"] and data["email"] != user.email:
         clash = (

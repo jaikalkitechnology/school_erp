@@ -10,6 +10,18 @@ export interface UserRow {
   last_login_at: string | null;
   avatar_url: string | null;
   role_codes: string[];
+  granted_admin_pages: string[];
+}
+
+export interface AdminPageOption {
+  slug: string;
+  label: string;
+  group: string;
+}
+
+export interface PagesCatalogue {
+  pages: AdminPageOption[];
+  defaults_by_role: Record<string, string[]>;
 }
 
 export interface UserListPage {
@@ -29,6 +41,9 @@ const base = "/v1/school-admin/users";
 export const listAssignableRoles = async (): Promise<RoleOption[]> =>
   (await api.get<RoleOption[]>(`${base}/_roles`)).data;
 
+export const listAdminPages = async (): Promise<PagesCatalogue> =>
+  (await api.get<PagesCatalogue>(`${base}/_pages`)).data;
+
 export const listAdminUsers = async (params: {
   q?: string;
   role_code?: string;
@@ -44,11 +59,18 @@ export const createAdminUser = async (payload: {
   phone?: string;
   password: string;
   role_codes: string[];
+  granted_admin_pages?: string[];
 }): Promise<UserRow> => (await api.post<UserRow>(base, payload)).data;
 
 export const updateAdminUser = async (
   id: number,
-  payload: { full_name?: string; email?: string; phone?: string; role_codes?: string[] },
+  payload: {
+    full_name?: string;
+    email?: string;
+    phone?: string;
+    role_codes?: string[];
+    granted_admin_pages?: string[];
+  },
 ): Promise<UserRow> => (await api.patch<UserRow>(`${base}/${id}`, payload)).data;
 
 export const setUserPassword = async (id: number, new_password: string): Promise<void> => {

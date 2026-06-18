@@ -116,6 +116,7 @@ async def build_current_user(
         roles=role_codes,
         permissions=perms,
         primary_role=primary,
+        granted_admin_pages=list(user.granted_admin_pages or []),
     )
 
 
