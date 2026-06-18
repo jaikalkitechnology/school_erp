@@ -56,6 +56,12 @@ class CurrentUser(BaseModel):
     roles: List[str]
     permissions: List[str]
     primary_role: Optional[str] = None
+    # Empty list ⇒ no admin web access. The sidebar is filtered against
+    # this on every render so non-admin users (parents, app-only staff)
+    # can't accidentally land on /students etc. Implicitly considered
+    # "all pages" when the user is a school_admin / principal — that
+    # check lives client-side because those roles bypass page gating.
+    granted_admin_pages: List[str] = []
 
 
 class LoginResponse(BaseModel):

@@ -49,11 +49,35 @@ const nav = [
   { to: "/settings", label: "Settings", icon: Settings },
 ];
 
+/**
+ * Filter the static nav by the granted_admin_pages list on the auth
+ * user. school_admin and principal bypass the gate (full access);
+ * everyone else only sees the entries the school-admin granted them
+ * via the Users & credentials → Page access checklist.
+ *
+ * Returning [] for a user with zero granted pages means the sidebar
+ * collapses to just Sign out — they'll land on /access-denied via the
+ * fallback route. UX-wise that tells the user "you can't use the
+ * admin web; please use the mobile app instead".
+ */
+function useFilteredNav(roles: string[], granted: string[]) {
+  const bypass = roles.includes("school_admin") || roles.includes("principal");
+  if (bypass) return nav;
+  const granted_slugs = new Set(
+    granted.map((s) => (s.startsWith("/") ? s.slice(1) : s)),
+  );
+  return nav.filter((n) => granted_slugs.has(n.to.replace(/^\//, "")));
+}
+
 export function SchoolAdminLayout() {
   const user = useAuth((s) => s.user);
   const tokens = useAuth((s) => s.tokens);
   const clear = useAuth((s) => s.clear);
   const navigate = useNavigate();
+  const visibleNav = useFilteredNav(
+    user?.roles ?? [],
+    user?.granted_admin_pages ?? [],
+  );
 
   const onLogout = async () => {
     try {
@@ -78,7 +102,13 @@ export function SchoolAdminLayout() {
         </div>
 
         <nav className="flex flex-1 flex-col gap-1 overflow-y-auto">
-          {nav.map(({ to, label, icon: Icon }) => (
+          {visibleNav.length === 0 && (
+            <p className="rounded-md bg-marigold-pale/40 px-3 py-2 text-xs text-marigold-dark">
+              You don't have any admin pages assigned yet. Please use the
+              mobile app, or ask your school admin to grant page access.
+            </p>
+          )}
+          {visibleNav.map(({ to, label, icon: Icon }) => (
             <NavLink
               key={to}
               to={to}

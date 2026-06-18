@@ -48,6 +48,36 @@ class RoleOption(BaseModel):
     name: str
 
 
+class AdminPageOption(BaseModel):
+    slug: str
+    label: str
+    group: str
+
+
+class PagesCatalogue(BaseModel):
+    pages: list[AdminPageOption]
+    defaults_by_role: dict[str, list[str]]
+
+
+@router.get("/_pages", response_model=PagesCatalogue)
+async def admin_pages_catalogue_route():
+    """Static catalogue + per-role default page sets. The Add/Edit
+    user dialog uses this to render the page checklist and pre-tick
+    boxes when the admin picks a role."""
+    from app.core.admin_pages import (
+        ADMIN_PAGES,
+        DEFAULT_PAGES_BY_ROLE,
+    )
+
+    return PagesCatalogue(
+        pages=[
+            AdminPageOption(slug=s, label=l, group=g)
+            for s, l, g in ADMIN_PAGES
+        ],
+        defaults_by_role={k: list(v) for k, v in DEFAULT_PAGES_BY_ROLE.items()},
+    )
+
+
 @router.get("/_roles", response_model=list[RoleOption])
 async def assignable_roles_route(
     session: AsyncSession = Depends(tenant_scoped_session),

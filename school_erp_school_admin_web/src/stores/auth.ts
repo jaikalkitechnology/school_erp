@@ -25,6 +25,10 @@ export interface AuthUser {
   roles: Role[];
   permissions: string[];
   primary_role: Role | null;
+  /** Page slugs (matching React route paths) this user can see on the
+   *  admin web. school_admin / principal bypass this gate; for
+   *  everyone else, the sidebar + route guard filter by this list. */
+  granted_admin_pages?: string[];
 }
 
 interface Tokens {

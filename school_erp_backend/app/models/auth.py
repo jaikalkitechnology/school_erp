@@ -13,6 +13,7 @@ from __future__ import annotations
 import enum
 
 from sqlalchemy import (
+    JSON,
     Boolean,
     Column,
     DateTime,
@@ -61,6 +62,15 @@ class User(TenantBase):
 
     # Convenience link for the staff side. Phase 6/7 will model students/teachers properly.
     avatar_url = Column(String(500), nullable=True)
+
+    # Per-user admin web access. Empty list ⇒ no admin web access at
+    # all (the user can still log into the mobile app if their role
+    # has app-side permissions). Populated by the Users & credentials
+    # panel when an admin creates / edits a sub-admin login. Stored as
+    # JSON because the page list is fluid (we add admin features
+    # often) and putting each page in its own table is heavier than
+    # the data warrants.
+    granted_admin_pages = Column(JSON, nullable=False, default=list)
 
     role_assignments = relationship("UserRole", back_populates="user", cascade="all, delete-orphan")
 

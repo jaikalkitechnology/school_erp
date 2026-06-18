@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   KeyRound, Pencil, Plus, Power, Search, Trash2, UserCheck, UserX,
@@ -13,6 +13,7 @@ import {
   createAdminUser,
   deactivateUser,
   deleteAdminUser,
+  listAdminPages,
   listAdminUsers,
   listAssignableRoles,
   setUserPassword,
@@ -302,7 +303,40 @@ function CreateOrEditDialog({
   const [phone, setPhone] = useState(user?.phone ?? "");
   const [password, setPassword] = useState("");
   const [selectedRoles, setSelectedRoles] = useState<string[]>(user?.role_codes ?? []);
+  const [selectedPages, setSelectedPages] = useState<string[]>(
+    user?.granted_admin_pages ?? [],
+  );
   const [error, setError] = useState<string | null>(null);
+
+  const pages = useQuery({
+    queryKey: ["admin-pages"],
+    queryFn: listAdminPages,
+    staleTime: 5 * 60 * 1000,
+  });
+
+  // When the admin (re-)picks roles in create mode, pre-fill the
+  // page checklist with the union of each role's default page set.
+  // In edit mode we keep whatever the user already has so the admin
+  // doesn't lose a hand-tuned config by toggling a role.
+  const previousRolesRef = useRef<string[]>(selectedRoles);
+  useEffect(() => {
+    if (mode === "edit") return;
+    if (!pages.data) return;
+    // Only auto-fill when the role set actually changed.
+    const prev = previousRolesRef.current;
+    const same =
+      prev.length === selectedRoles.length &&
+      prev.every((r) => selectedRoles.includes(r));
+    if (same) return;
+    previousRolesRef.current = selectedRoles;
+    const defaults = new Set<string>();
+    for (const code of selectedRoles) {
+      for (const slug of pages.data.defaults_by_role[code] ?? []) {
+        defaults.add(slug);
+      }
+    }
+    setSelectedPages(Array.from(defaults));
+  }, [selectedRoles, mode, pages.data]);
 
   const create = useMutation({
     mutationFn: () => createAdminUser({
@@ -311,6 +345,7 @@ function CreateOrEditDialog({
       phone: phone || undefined,
       password,
       role_codes: selectedRoles,
+      granted_admin_pages: selectedPages,
     }),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["admin-users"] });
@@ -325,6 +360,7 @@ function CreateOrEditDialog({
       email: email || undefined,
       phone: phone || undefined,
       role_codes: selectedRoles,
+      granted_admin_pages: selectedPages,
     }),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["admin-users"] });
@@ -383,6 +419,78 @@ function CreateOrEditDialog({
                 );
               })}
             </div>
+          </div>
+
+          {/* ---- Admin page access -------------------------------------- */}
+          <div className="space-y-1.5">
+            <div className="flex items-center justify-between">
+              <Label>Admin page access</Label>
+              {pages.data && (
+                <div className="flex gap-1 text-[11px]">
+                  <button
+                    type="button"
+                    className="text-saffron-dark hover:underline"
+                    onClick={() =>
+                      setSelectedPages(pages.data!.pages.map((p) => p.slug))
+                    }
+                  >
+                    Select all
+                  </button>
+                  <span className="text-muted-foreground">·</span>
+                  <button
+                    type="button"
+                    className="text-saffron-dark hover:underline"
+                    onClick={() => setSelectedPages([])}
+                  >
+                    None
+                  </button>
+                </div>
+              )}
+            </div>
+            <p className="text-[11px] text-muted-foreground">
+              Pages this user sees in the admin sidebar. Leave empty for
+              "mobile app only — no admin web access". The picker
+              auto-fills sensible defaults from the role(s) you tick,
+              but you can override per page below.
+            </p>
+            <div className="grid max-h-56 grid-cols-2 gap-1 overflow-y-auto rounded-md border border-input p-2">
+              {!pages.data ? (
+                <p className="col-span-2 px-2 py-1 text-xs text-muted-foreground">
+                  Loading pages…
+                </p>
+              ) : (
+                pages.data.pages.map((p) => {
+                  const on = selectedPages.includes(p.slug);
+                  return (
+                    <label
+                      key={p.slug}
+                      className={cn(
+                        "flex cursor-pointer items-center gap-2 rounded-md px-2 py-1 text-sm hover:bg-saffron-pale/40",
+                        on && "bg-saffron-pale/60",
+                      )}
+                    >
+                      <input
+                        type="checkbox"
+                        checked={on}
+                        onChange={(e) =>
+                          setSelectedPages((s) =>
+                            e.target.checked
+                              ? [...s, p.slug]
+                              : s.filter((slug) => slug !== p.slug),
+                          )
+                        }
+                      />
+                      <span className="truncate">{p.label}</span>
+                    </label>
+                  );
+                })
+              )}
+            </div>
+            {selectedPages.length === 0 && (
+              <p className="text-[11px] text-marigold-dark">
+                No pages ticked → user gets mobile-app access only.
+              </p>
+            )}
           </div>
         </div>
 
