@@ -145,6 +145,7 @@ function CategoriesPanel() {
           ) : !list.data?.length ? (
             <p className="px-6 py-4 text-sm text-muted-foreground">Add your first category on the right.</p>
           ) : (
+            <>
             <ul className="divide-y divide-saffron-pale">
               {list.data.map((c) => {
                 const isEditing = editing?.id === c.id;
@@ -221,6 +222,7 @@ function CategoriesPanel() {
                 {opError}
               </p>
             )}
+            </>
           )}
         </CardContent>
       </Card>
