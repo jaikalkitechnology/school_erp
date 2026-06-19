@@ -97,6 +97,17 @@ async def update_category_route(
     return await update_category(session, category_id, payload)
 
 
+@router.delete("/categories/{category_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_category_route(
+    category_id: int,
+    principal: AuthPrincipal = Depends(_school_admin),
+    session: AsyncSession = Depends(tenant_scoped_session),
+):
+    from app.services.fees import delete_category
+
+    await delete_category(session, category_id)
+
+
 # ---- Structures ------------------------------------------------------------
 
 
@@ -125,6 +136,42 @@ async def update_structure_route(
     session: AsyncSession = Depends(tenant_scoped_session),
 ):
     return await update_structure(session, structure_id, payload)
+
+
+@router.delete("/structures/{structure_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_structure_route(
+    structure_id: int,
+    principal: AuthPrincipal = Depends(_school_admin),
+    session: AsyncSession = Depends(tenant_scoped_session),
+):
+    from app.services.fees import delete_structure
+
+    await delete_structure(session, structure_id)
+
+
+@router.post(
+    "/structures/{structure_id}/generate-for-student/{student_id}",
+    response_model=FeeInvoiceRead,
+)
+async def generate_for_single_student_route(
+    structure_id: int,
+    student_id: int,
+    payload: GenerateInvoicesRequest,
+    principal: AuthPrincipal = Depends(_school_admin),
+    session: AsyncSession = Depends(tenant_scoped_session),
+):
+    """Generate one invoice for one student off this structure. Useful
+    when a kid joined mid-year or owes a one-off fee outside their
+    class-wide structure."""
+    from app.services.fees import generate_invoice_for_student
+
+    return await generate_invoice_for_student(
+        session,
+        principal.tenant_id,
+        structure_id,
+        student_id,
+        payload,
+    )
 
 
 @router.post(

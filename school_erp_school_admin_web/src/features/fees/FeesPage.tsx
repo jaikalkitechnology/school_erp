@@ -1,11 +1,14 @@
 import { useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Calculator, Plus, Receipt, TrendingDown } from "lucide-react";
+import {
+  Calculator, Pencil, Plus, Receipt, TrendingDown, Trash2, UserPlus,
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { cn } from "@/lib/utils";
+import { StudentPicker } from "@/components/StudentPicker";
 import { listClasses } from "@/features/setup/api";
 import { listStudents } from "@/features/students/api";
 import {
@@ -14,10 +17,15 @@ import {
   createCategory,
   createStructure,
   defaulterReport,
+  deleteCategory,
+  deleteStructure,
+  generateInvoiceForStudent,
   generateInvoices,
   listCategories,
   listStructures,
   studentFees,
+  updateCategory,
+  updateStructure,
   type FeePeriod,
   type InvoiceStatus,
   type PaymentMethod,
@@ -79,6 +87,10 @@ function CategoriesPanel() {
   const [name, setName] = useState("");
   const [recurring, setRecurring] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [opError, setOpError] = useState<string | null>(null);
+  // null = not editing; row = editing this row
+  const [editing, setEditing] = useState<{ id: number; code: string; name: string; is_recurring: boolean } | null>(null);
+
   const create = useMutation({
     mutationFn: () => createCategory({ code, name, is_recurring: recurring }),
     onSuccess: () => {
@@ -88,6 +100,38 @@ function CategoriesPanel() {
     onError: (e: any) =>
       setError(e?.response?.data?.detail ?? "Could not add category"),
   });
+  const update = useMutation({
+    mutationFn: () =>
+      updateCategory(editing!.id, {
+        code: editing!.code,
+        name: editing!.name,
+        is_recurring: editing!.is_recurring,
+      }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["fee-categories"] });
+      setEditing(null);
+      setOpError(null);
+    },
+    onError: (e: any) =>
+      setOpError(e?.response?.data?.detail ?? "Could not update"),
+  });
+  const remove = useMutation({
+    mutationFn: (id: number) => deleteCategory(id),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["fee-categories"] });
+      setOpError(null);
+    },
+    onError: (e: any) =>
+      setOpError(e?.response?.data?.detail ?? "Could not delete"),
+  });
+
+  const onDelete = (c: any) => {
+    setOpError(null);
+    if (window.confirm(
+      `Delete category "${c.name}" (${c.code})?\n\n` +
+        "Refused by the server if any structures or invoices already use it.",
+    )) remove.mutate(c.id);
+  };
   return (
     <div className="grid gap-4 lg:grid-cols-[2fr_1fr]">
       <Card>
@@ -102,16 +146,81 @@ function CategoriesPanel() {
             <p className="px-6 py-4 text-sm text-muted-foreground">Add your first category on the right.</p>
           ) : (
             <ul className="divide-y divide-saffron-pale">
-              {list.data.map((c) => (
-                <li key={c.id} className="flex items-center justify-between px-6 py-3 text-sm">
-                  <div>
-                    <p className="font-medium text-indigo-dark">{c.name}</p>
-                    <p className="text-xs font-mono text-saffron-dark">{c.code}</p>
-                  </div>
-                  <span className="text-xs text-muted-foreground">{c.is_recurring ? "recurring" : "one-time"}</span>
-                </li>
-              ))}
+              {list.data.map((c) => {
+                const isEditing = editing?.id === c.id;
+                return (
+                  <li key={c.id} className="px-6 py-3 text-sm">
+                    {isEditing ? (
+                      <div className="grid gap-2 sm:grid-cols-[120px_1fr_auto_auto]">
+                        <Input
+                          value={editing!.code}
+                          onChange={(e) => setEditing({ ...editing!, code: e.target.value })}
+                          placeholder="Code"
+                        />
+                        <Input
+                          value={editing!.name}
+                          onChange={(e) => setEditing({ ...editing!, name: e.target.value })}
+                          placeholder="Name"
+                        />
+                        <label className="flex items-center gap-1 text-xs">
+                          <input
+                            type="checkbox"
+                            checked={editing!.is_recurring}
+                            onChange={(e) => setEditing({ ...editing!, is_recurring: e.target.checked })}
+                          />
+                          recurring
+                        </label>
+                        <div className="flex gap-1">
+                          <Button size="sm" onClick={() => update.mutate()} disabled={update.isPending}>
+                            Save
+                          </Button>
+                          <Button size="sm" variant="ghost" onClick={() => setEditing(null)}>
+                            Cancel
+                          </Button>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="flex items-center justify-between">
+                        <div className="min-w-0 flex-1">
+                          <p className="font-medium text-indigo-dark">{c.name}</p>
+                          <p className="text-xs font-mono text-saffron-dark">{c.code}</p>
+                        </div>
+                        <span className="mr-3 text-xs text-muted-foreground">
+                          {c.is_recurring ? "recurring" : "one-time"}
+                        </span>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          title="Edit"
+                          onClick={() => setEditing({
+                            id: c.id,
+                            code: c.code,
+                            name: c.name,
+                            is_recurring: c.is_recurring,
+                          })}
+                        >
+                          <Pencil className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          title="Delete"
+                          onClick={() => onDelete(c)}
+                          disabled={remove.isPending}
+                        >
+                          <Trash2 className="h-4 w-4 text-destructive" />
+                        </Button>
+                      </div>
+                    )}
+                  </li>
+                );
+              })}
             </ul>
+            {opError && (
+              <p className="border-t bg-destructive/10 px-6 py-2 text-xs text-destructive">
+                {opError}
+              </p>
+            )}
           )}
         </CardContent>
       </Card>
@@ -170,6 +279,7 @@ function StructuresPanel() {
       setStructureError(e?.response?.data?.detail ?? "Could not add structure"),
   });
 
+  const [genFlash, setGenFlash] = useState<string | null>(null);
   const generate = useMutation({
     mutationFn: (structureId: number) =>
       generateInvoices(structureId, {
@@ -178,8 +288,71 @@ function StructuresPanel() {
         sibling_discount_pct: siblingPct,
         apply_sibling_discount: true,
       }),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ["fee-structures"] }),
+    onSuccess: (res) => {
+      qc.invalidateQueries({ queryKey: ["fee-structures"] });
+      setGenFlash(`Created ${res.created}, skipped ${res.skipped}.`);
+    },
+    onError: (e: any) =>
+      setGenFlash(`Error: ${e?.response?.data?.detail ?? "Generation failed"}`),
   });
+
+  const remove = useMutation({
+    mutationFn: (id: number) => deleteStructure(id),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["fee-structures"] }),
+    onError: (e: any) =>
+      setGenFlash(`Error: ${e?.response?.data?.detail ?? "Delete failed"}`),
+  });
+
+  // Per-row edit state.
+  const [editingStruct, setEditingStruct] = useState<{
+    id: number; amount: number; due_day_of_month: number;
+  } | null>(null);
+  const updateMut = useMutation({
+    mutationFn: () => updateStructure(editingStruct!.id, {
+      amount: editingStruct!.amount,
+      due_day_of_month: editingStruct!.due_day_of_month,
+    }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["fee-structures"] });
+      setEditingStruct(null);
+    },
+    onError: (e: any) =>
+      setGenFlash(`Error: ${e?.response?.data?.detail ?? "Update failed"}`),
+  });
+
+  // Per-row single-student generate state.
+  const [singleStructId, setSingleStructId] = useState<number | null>(null);
+  const [singleStudentId, setSingleStudentId] = useState("");
+  const singleMut = useMutation({
+    mutationFn: () => generateInvoiceForStudent(
+      singleStructId!,
+      Number(singleStudentId),
+      {
+        period_start: periodStart,
+        period_end: periodEnd,
+        sibling_discount_pct: siblingPct,
+        apply_sibling_discount: true,
+      },
+    ),
+    onSuccess: (inv) => {
+      qc.invalidateQueries({ queryKey: ["fee-structures"] });
+      qc.invalidateQueries({ queryKey: ["student-fees"] });
+      setGenFlash(`Invoice ${inv.invoice_number} created.`);
+      setSingleStructId(null);
+      setSingleStudentId("");
+    },
+    onError: (e: any) =>
+      setGenFlash(`Error: ${e?.response?.data?.detail ?? "Could not generate"}`),
+  });
+
+  const onDeleteStruct = (s: any) => {
+    if (window.confirm(
+      `Delete this ${s.period} structure for ` +
+      `${classMap.get(s.class_def_id) ?? "Class"}` +
+      ` / ${catMap.get(s.category_id) ?? "category"}?\n\n` +
+      "Refused if any invoices already exist for it.",
+    )) remove.mutate(s.id);
+  };
 
   const classMap = useMemo(
     () => new Map((classes.data ?? []).map((c) => [c.id, c.name])),
@@ -223,13 +396,40 @@ function StructuresPanel() {
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2"><Calculator className="h-5 w-5" /> Generate invoices</CardTitle>
-          <CardDescription>Auto-applies a sibling discount when shared parent contact is detected.</CardDescription>
+          <CardDescription>
+            Pick the billing period below — these dates apply to every
+            <strong> Generate invoices</strong> button further down.
+            Auto-applies a sibling discount when shared parent contact
+            is detected.
+          </CardDescription>
         </CardHeader>
         <CardContent className="grid gap-3 lg:grid-cols-3">
-          <FieldDate label="Period start" value={periodStart} onChange={setPeriodStart} />
-          <FieldDate label="Period end" value={periodEnd} onChange={setPeriodEnd} />
+          <FieldDate label="Period start *" value={periodStart} onChange={setPeriodStart} />
+          <FieldDate label="Period end *" value={periodEnd} onChange={setPeriodEnd} />
           <FieldNum label="Sibling discount %" value={siblingPct} onChange={setSiblingPct} />
         </CardContent>
+        {(!periodStart || !periodEnd) && (
+          <CardContent className="pt-0">
+            <p className="rounded-md bg-marigold-pale/40 px-3 py-2 text-xs text-marigold-dark">
+              Generate buttons stay disabled until <strong>Period start</strong>
+              {" "}and <strong>Period end</strong> are both set above.
+            </p>
+          </CardContent>
+        )}
+        {genFlash && (
+          <CardContent className="pt-0">
+            <p
+              className={cn(
+                "text-sm",
+                genFlash.startsWith("Error")
+                  ? "text-destructive"
+                  : "text-teal-dark",
+              )}
+            >
+              {genFlash}
+            </p>
+          </CardContent>
+        )}
       </Card>
 
       <Card>
@@ -239,21 +439,135 @@ function StructuresPanel() {
             <p className="px-6 py-4 text-sm text-muted-foreground">Nothing yet.</p>
           ) : (
             <ul className="divide-y divide-saffron-pale">
-              {list.data.map((s) => (
-                <li key={s.id} className="flex items-center justify-between px-6 py-3 text-sm">
-                  <div>
-                    <p className="font-medium text-indigo-dark">
-                      {classMap.get(s.class_def_id) ?? `Class ${s.class_def_id}`} · {catMap.get(s.category_id) ?? `Cat ${s.category_id}`}
-                    </p>
-                    <p className="text-xs text-muted-foreground">
-                      {s.period} · ₹{s.amount} · due {s.due_day_of_month}th
-                    </p>
-                  </div>
-                  <Button size="sm" variant="outline" onClick={() => generate.mutate(s.id)} disabled={!periodStart || !periodEnd || generate.isPending}>
-                    Generate invoices
-                  </Button>
-                </li>
-              ))}
+              {list.data.map((s) => {
+                const editing = editingStruct?.id === s.id;
+                const opening = singleStructId === s.id;
+                return (
+                  <li key={s.id} className="px-6 py-3 text-sm">
+                    {editing ? (
+                      <div className="grid gap-2 sm:grid-cols-[1fr_auto_auto_auto]">
+                        <p className="font-medium text-indigo-dark">
+                          {classMap.get(s.class_def_id) ?? `Class ${s.class_def_id}`} ·{" "}
+                          {catMap.get(s.category_id) ?? `Cat ${s.category_id}`} · {s.period}
+                        </p>
+                        <Input
+                          type="number"
+                          value={editingStruct!.amount}
+                          onChange={(e) => setEditingStruct({
+                            ...editingStruct!,
+                            amount: Number(e.target.value) || 0,
+                          })}
+                          className="w-28"
+                          placeholder="Amount"
+                        />
+                        <Input
+                          type="number"
+                          value={editingStruct!.due_day_of_month}
+                          onChange={(e) => setEditingStruct({
+                            ...editingStruct!,
+                            due_day_of_month: Math.max(1, Math.min(28, Number(e.target.value) || 10)),
+                          })}
+                          className="w-20"
+                          placeholder="Due day"
+                        />
+                        <div className="flex gap-1">
+                          <Button size="sm" onClick={() => updateMut.mutate()} disabled={updateMut.isPending}>
+                            Save
+                          </Button>
+                          <Button size="sm" variant="ghost" onClick={() => setEditingStruct(null)}>
+                            Cancel
+                          </Button>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="flex flex-wrap items-center justify-between gap-3">
+                        <div className="min-w-0 flex-1">
+                          <p className="font-medium text-indigo-dark">
+                            {classMap.get(s.class_def_id) ?? `Class ${s.class_def_id}`} ·{" "}
+                            {catMap.get(s.category_id) ?? `Cat ${s.category_id}`}
+                          </p>
+                          <p className="text-xs text-muted-foreground">
+                            {s.period} · ₹{Number(s.amount).toFixed(0)} · due {s.due_day_of_month}th
+                          </p>
+                        </div>
+                        <div className="flex flex-wrap items-center gap-1">
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => generate.mutate(s.id)}
+                            disabled={!periodStart || !periodEnd || generate.isPending}
+                            title={!periodStart || !periodEnd ? "Set the period dates above first" : ""}
+                          >
+                            Generate (all in class)
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => setSingleStructId(opening ? null : s.id)}
+                            disabled={!periodStart || !periodEnd}
+                            title={!periodStart || !periodEnd ? "Set the period dates above first" : ""}
+                          >
+                            <UserPlus className="mr-1 h-3 w-3" />
+                            Single student
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            title="Edit"
+                            onClick={() => setEditingStruct({
+                              id: s.id,
+                              amount: Number(s.amount) || 0,
+                              due_day_of_month: s.due_day_of_month,
+                            })}
+                          >
+                            <Pencil className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            title="Delete"
+                            onClick={() => onDeleteStruct(s)}
+                            disabled={remove.isPending}
+                          >
+                            <Trash2 className="h-4 w-4 text-destructive" />
+                          </Button>
+                        </div>
+                      </div>
+                    )}
+
+                    {opening && (
+                      <div className="mt-3 rounded-md border border-saffron-pale bg-saffron-pale/20 p-3">
+                        <p className="mb-2 text-xs font-medium text-indigo-dark">
+                          Generate one invoice for a specific student
+                        </p>
+                        <div className="grid gap-2 sm:grid-cols-[1fr_auto_auto]">
+                          <StudentPicker
+                            value={singleStudentId}
+                            onChange={(v) => setSingleStudentId(v)}
+                          />
+                          <Button
+                            size="sm"
+                            onClick={() => singleMut.mutate()}
+                            disabled={!singleStudentId || singleMut.isPending}
+                          >
+                            {singleMut.isPending ? "Generating…" : "Create invoice"}
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            onClick={() => {
+                              setSingleStructId(null);
+                              setSingleStudentId("");
+                            }}
+                          >
+                            Cancel
+                          </Button>
+                        </div>
+                      </div>
+                    )}
+                  </li>
+                );
+              })}
             </ul>
           )}
         </CardContent>

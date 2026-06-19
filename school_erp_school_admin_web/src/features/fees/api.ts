@@ -108,11 +108,35 @@ const base = "/v1/school-admin/fees";
 export const listCategories = async () => (await api.get<FeeCategory[]>(`${base}/categories`)).data;
 export const createCategory = async (p: Partial<FeeCategory>) =>
   (await api.post<FeeCategory>(`${base}/categories`, p)).data;
+export const updateCategory = async (id: number, p: Partial<FeeCategory>) =>
+  (await api.patch<FeeCategory>(`${base}/categories/${id}`, p)).data;
+export const deleteCategory = async (id: number) => {
+  await api.delete(`${base}/categories/${id}`);
+};
 
 export const listStructures = async (class_def_id?: number) =>
   (await api.get<FeeStructure[]>(`${base}/structures`, { params: class_def_id ? { class_def_id } : undefined })).data;
 export const createStructure = async (p: Partial<FeeStructure>) =>
   (await api.post<FeeStructure>(`${base}/structures`, p)).data;
+export const updateStructure = async (id: number, p: Partial<FeeStructure>) =>
+  (await api.patch<FeeStructure>(`${base}/structures/${id}`, p)).data;
+export const deleteStructure = async (id: number) => {
+  await api.delete(`${base}/structures/${id}`);
+};
+
+export const generateInvoiceForStudent = async (
+  structureId: number,
+  studentId: number,
+  payload: {
+    period_start: string;
+    period_end: string;
+    sibling_discount_pct?: number;
+    apply_sibling_discount?: boolean;
+  },
+) => (await api.post<FeeInvoice>(
+  `${base}/structures/${structureId}/generate-for-student/${studentId}`,
+  payload,
+)).data;
 export const generateInvoices = async (
   structureId: number,
   payload: {

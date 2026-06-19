@@ -235,6 +235,83 @@ async def update_structure(
     return obj
 
 
+async def delete_category(session: AsyncSession, category_id: int) -> None:
+    """Hard-delete a fee category.
+
+    Refuses with 409 when any FeeStructure or FeeInvoice references it
+    — accidentally nuking a category mid-year would orphan invoices.
+    The admin's only recourse for an in-use category is to delete the
+    structures/invoices first, or rename the category."""
+    obj = (
+        await session.execute(
+            select(FeeCategory).where(FeeCategory.id == category_id)
+        )
+    ).scalar_one_or_none()
+    if obj is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Category not found",
+        )
+    in_use_structures = (
+        await session.execute(
+            select(func.count(FeeStructure.id)).where(
+                FeeStructure.category_id == category_id
+            )
+        )
+    ).scalar_one()
+    in_use_invoices = (
+        await session.execute(
+            select(func.count(FeeInvoice.id)).where(
+                FeeInvoice.category_id == category_id
+            )
+        )
+    ).scalar_one()
+    if in_use_structures or in_use_invoices:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=(
+                f"Category is in use ({in_use_structures} structures, "
+                f"{in_use_invoices} invoices). Delete those first or "
+                "rename the category instead."
+            ),
+        )
+    await session.delete(obj)
+    await session.commit()
+
+
+async def delete_structure(session: AsyncSession, structure_id: int) -> None:
+    """Hard-delete a fee structure.
+
+    Same protection: if any invoices were generated from this
+    structure, refuse with 409. Forces the admin to clear (or migrate)
+    the invoices first."""
+    obj = (
+        await session.execute(
+            select(FeeStructure).where(FeeStructure.id == structure_id)
+        )
+    ).scalar_one_or_none()
+    if obj is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Structure not found",
+        )
+    in_use = (
+        await session.execute(
+            select(func.count(FeeInvoice.id)).where(
+                FeeInvoice.structure_id == structure_id
+            )
+        )
+    ).scalar_one()
+    if in_use:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=(
+                f"Structure has {in_use} invoices already generated. "
+                "Delete those invoices first."
+            ),
+        )
+    await session.delete(obj)
+    await session.commit()
+
+
 # ---- Sibling discount math + invoice generation ----------------------------
 
 
@@ -366,6 +443,96 @@ async def generate_invoices(
         created += 1
     await session.commit()
     return GenerateInvoicesResult(created=created, skipped=skipped, structure_id=structure.id)
+
+
+async def generate_invoice_for_student(
+    session: AsyncSession,
+    tenant_id: int,
+    structure_id: int,
+    student_id: int,
+    payload: GenerateInvoicesRequest,
+) -> FeeInvoice:
+    """Generate exactly one invoice for one student using a structure
+    they otherwise wouldn't be in (eg. a one-off lab fee for a single
+    transferred student, or a structure that doesn't match the
+    student's class). Returns the created invoice, or 409 if one
+    already exists for the same (student, structure, period_start)."""
+    structure = (
+        await session.execute(
+            select(FeeStructure).where(FeeStructure.id == structure_id)
+        )
+    ).scalar_one_or_none()
+    if structure is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Structure not found",
+        )
+    student = (
+        await session.execute(select(Student).where(Student.id == student_id))
+    ).scalar_one_or_none()
+    if student is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Student not found",
+        )
+    if payload.period_end < payload.period_start:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="period_end must be on or after period_start",
+        )
+
+    existing = (
+        await session.execute(
+            select(FeeInvoice).where(
+                FeeInvoice.student_id == student.id,
+                FeeInvoice.structure_id == structure.id,
+                FeeInvoice.period_start == payload.period_start,
+            )
+        )
+    ).scalar_one_or_none()
+    if existing is not None:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=(
+                f"Invoice already exists for {student.full_name} "
+                f"({existing.invoice_number}). Edit or delete it first."
+            ),
+        )
+
+    base_amount = _D(structure.amount)
+    explicit_discount = await _resolve_explicit_discount(
+        session, student.id, payload.period_start, base_amount
+    )
+    sibling_discount = Decimal("0")
+    if payload.apply_sibling_discount:
+        sibling_count = await _sibling_count_in_tenant(session, student)
+        if sibling_count >= 1:
+            sibling_discount = (
+                base_amount * _D(payload.sibling_discount_pct) / Decimal("100")
+            )
+    discount = (explicit_discount + sibling_discount).quantize(Decimal("0.01"))
+    if discount > base_amount:
+        discount = base_amount
+    total = (base_amount - discount).quantize(Decimal("0.01"))
+
+    invoice = FeeInvoice(
+        tenant_id=tenant_id,
+        student_id=student.id,
+        structure_id=structure.id,
+        category_id=structure.category_id,
+        invoice_number=_next_invoice_number(tenant_id),
+        period_start=payload.period_start,
+        period_end=payload.period_end,
+        due_date=_structure_due_date(structure, payload.period_start),
+        base_amount=base_amount,
+        discount_amount=discount,
+        late_fee_amount=Decimal("0"),
+        total_amount=total,
+        paid_amount=Decimal("0"),
+        status=FeeInvoiceStatus.PENDING.value,
+    )
+    session.add(invoice)
+    await session.commit()
+    await session.refresh(invoice)
+    return invoice
 
 
 # ---- Discount CRUD ---------------------------------------------------------
