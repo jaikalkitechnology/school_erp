@@ -35,19 +35,20 @@ from app.models.auth import Role, User, UserRole
 #                       with role_codes=["principal"] so the Teacher row
 #                       lands too.
 #   * subject_teacher — Teachers → Onboard (creates User + Teacher pair).
+#   * class_teacher   — Teachers → Onboard (creates User + Teacher pair).
 #   * office_staff    — onboarded via Teachers → Onboard.
 #   * parent          — auto-created on student admission; passwords are
 #                       set from Students → Family panel ("Set password"),
 #                       not from a generic Add-user form.
 #
-# Everything else (vice_principal, coordinator, class_teacher, accountant,
-# librarian, transport_manager, hostel_warden, bus_staff, supervisor,
-# visitor_desk) genuinely belongs on this screen — these are pure-login
-# users with no separate domain row.
+# Everything else (vice_principal, coordinator, accountant, librarian,
+# transport_manager, hostel_warden, bus_staff, supervisor, visitor_desk)
+# genuinely belongs on this screen — these are pure-login users with no
+# separate domain row that the dedicated Teachers / Students flows
+# would otherwise create.
 ASSIGNABLE_ROLES: set[str] = {
     "vice_principal",
     "coordinator",
-    "class_teacher",
     "accountant",
     "librarian",
     "transport_manager",
