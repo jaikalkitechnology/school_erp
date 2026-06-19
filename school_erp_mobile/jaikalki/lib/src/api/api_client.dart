@@ -28,8 +28,14 @@ class ApiClient {
         dio = Dio(
           BaseOptions(
             baseUrl: baseUrl,
-            connectTimeout: const Duration(seconds: 10),
-            receiveTimeout: const Duration(seconds: 15),
+            // First-hit latency on cold backends + slow Indian 3G/4G
+            // means 15s receive was kicking off "save failed: receive
+            // timeout" on writes that the server was actually serving
+            // fine. Bumped to 45s — long enough that a sluggish DB
+            // round-trip + reportlab PDF render don't trip it, short
+            // enough that a real hung request still surfaces.
+            connectTimeout: const Duration(seconds: 20),
+            receiveTimeout: const Duration(seconds: 45),
             contentType: 'application/json',
           ),
         ) {
