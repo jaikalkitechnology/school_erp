@@ -110,16 +110,49 @@ class AuthRepository {
     }
   }
 
-  Future<AuthUser?> me() async {
+  /// Outcome of an attempted "who am I" check at app startup or
+  /// whenever the app comes back to the foreground.
+  ///
+  /// Drives the cubit's decision tree:
+  ///   * [user] non-null         → user is signed in.
+  ///   * [user] null +
+  ///     [sessionInvalid] true   → token is gone or the server returned
+  ///                               401/403; bounce to the login screen.
+  ///   * [user] null +
+  ///     [sessionInvalid] false  → network blip, 5xx, timeout, anything
+  ///                               transient — **keep the user signed
+  ///                               in** and try again later. This is
+  ///                               the whole point of the new path: a
+  ///                               flaky wi-fi shouldn't kick the
+  ///                               parent out of the app.
+  Future<({AuthUser? user, bool sessionInvalid})> tryMe() async {
     final token = await _storage.read(key: _kAccessKey);
-    if (token == null) return null;
+    if (token == null) {
+      // No credentials persisted — they're not signed in.
+      return (user: null, sessionInvalid: true);
+    }
     try {
       final res = await _api.dio.get<Map<String, dynamic>>('/v1/auth/me');
-      return AuthUser.fromJson(res.data!);
-    } on DioException {
-      return null;
+      return (user: AuthUser.fromJson(res.data!), sessionInvalid: false);
+    } on DioException catch (e) {
+      final code = e.response?.statusCode;
+      // 401/403 means the bearer token was definitively rejected
+      // (after the api client already tried to refresh once). 410
+      // means the tenant is gone. Either way, sign out cleanly.
+      if (code == 401 || code == 403 || code == 410) {
+        return (user: null, sessionInvalid: true);
+      }
+      // Anything else — connection error, timeout, 5xx — is transient.
+      // Hold the existing session so the user doesn't get bumped to the
+      // login form for an unrelated reason.
+      return (user: null, sessionInvalid: false);
     }
   }
+
+  /// Backwards-compatible shape: returns null on auth failure OR
+  /// transient errors. Prefer [tryMe] for new code so callers can
+  /// distinguish "session ended" from "couldn't reach the server".
+  Future<AuthUser?> me() async => (await tryMe()).user;
 
   Future<void> logout() async {
     final refresh = await _storage.read(key: _kRefreshKey);

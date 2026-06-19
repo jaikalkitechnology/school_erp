@@ -30,10 +30,21 @@ class AuthCubit extends Cubit<AuthState> {
   final AuthRepository _repo;
 
   Future<void> bootstrap() async {
-    final user = await _repo.me();
-    if (user != null) {
-      emit(AuthAuthenticated(user));
-    } else {
+    final result = await _repo.tryMe();
+    if (result.user != null) {
+      emit(AuthAuthenticated(result.user!));
+      return;
+    }
+    if (result.sessionInvalid) {
+      // Token was missing / rejected (401/403/410) — clean sign-out.
+      emit(const AuthInitial());
+      return;
+    }
+    // Transient failure (network, 5xx). If we already had an
+    // authenticated session, keep it — otherwise stay on the splash /
+    // initial state. The user explicitly hitting Sign out is now the
+    // only way to actually log out on bad connectivity.
+    if (state is! AuthAuthenticated) {
       emit(const AuthInitial());
     }
   }
