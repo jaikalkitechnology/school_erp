@@ -521,39 +521,65 @@ async def student_drill(
     # 30-day attendance %.
     from datetime import timedelta
 
-    from app.models.attendance import StudentAttendance
-
     today = datetime.now(timezone.utc).date()
     start = today - timedelta(days=30)
-    rows = list(
-        (
-            await session.execute(
-                select(StudentAttendance).where(
-                    StudentAttendance.student_id == student_id,
-                    StudentAttendance.date >= start,
-                    StudentAttendance.date <= today,
-                )
-            )
-        ).scalars().all()
-    )
     pct: Optional[float] = None
-    if rows:
-        present = sum(1 for r in rows if r.status in {"present", "late", "half_day"})
-        pct = round(100.0 * present / len(rows), 1)
+    try:
+        from app.models.attendance import StudentAttendance
+
+        rows = list(
+            (
+                await session.execute(
+                    select(StudentAttendance).where(
+                        StudentAttendance.student_id == student_id,
+                        StudentAttendance.date >= start,
+                        StudentAttendance.date <= today,
+                    )
+                )
+            ).scalars().all()
+        )
+        if rows:
+            present = sum(
+                1 for r in rows if r.status in {"present", "late", "half_day"}
+            )
+            pct = round(100.0 * present / len(rows), 1)
+    except Exception:
+        # Missing column / table on a partially-migrated DB shouldn't
+        # take the whole drill-down 500. Log it; surface profile +
+        # behaviour notes only.
+        import logging
+
+        logging.getLogger(__name__).exception(
+            "student_drill: attendance rollup failed for student %s", student_id,
+        )
 
     # Behaviour notes (latest first).
-    from app.models.staff_extras import BehaviourNote
+    notes: list = []
+    try:
+        from app.models.staff_extras import BehaviourNote
 
-    notes = list(
-        (
-            await session.execute(
-                select(BehaviourNote)
-                .where(BehaviourNote.student_id == student_id)
-                .order_by(BehaviourNote.occurred_on.desc(), BehaviourNote.id.desc())
-                .limit(20)
-            )
-        ).scalars().all()
-    )
+        notes = list(
+            (
+                await session.execute(
+                    select(BehaviourNote)
+                    .where(BehaviourNote.student_id == student_id)
+                    .order_by(
+                        BehaviourNote.occurred_on.desc(),
+                        BehaviourNote.id.desc(),
+                    )
+                    .limit(20)
+                )
+            ).scalars().all()
+        )
+    except Exception:
+        # behaviour_notes table missing on a partially-migrated DB →
+        # return [] so the screen still loads.
+        import logging
+
+        logging.getLogger(__name__).exception(
+            "student_drill: behaviour notes load failed for student %s",
+            student_id,
+        )
 
     return StudentDrill(
         student_id=student.id,

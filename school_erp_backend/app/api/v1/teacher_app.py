@@ -12,7 +12,7 @@ from __future__ import annotations
 from datetime import date as _date
 from typing import Optional
 
-from fastapi import APIRouter, Depends, Query, status
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from fastapi.responses import FileResponse
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -458,9 +458,28 @@ async def student_drill_route(
     principal: AuthPrincipal = Depends(_teacher),
     session: AsyncSession = Depends(tenant_scoped_session),
 ):
-    return await student_drill(
-        session, user_id=principal.user_id, student_id=student_id,
-    )
+    """The service already wraps the optional bits (attendance,
+    behaviour notes) in try/except so a partially-migrated DB doesn't
+    take the response 500. Anything we still see here is a real bug —
+    wrap once more so the FastAPI default 500 page gets replaced with
+    a JSON detail the mobile app can render in its error card."""
+    import logging
+
+    try:
+        return await student_drill(
+            session, user_id=principal.user_id, student_id=student_id,
+        )
+    except HTTPException:
+        raise
+    except Exception as e:
+        logging.getLogger(__name__).exception(
+            "student_drill_route failed (user=%s student=%s)",
+            principal.user_id, student_id,
+        )
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Could not load student profile: {type(e).__name__}: {e}",
+        )
 
 
 # ---- Behaviour notes ----------------------------------------------------
