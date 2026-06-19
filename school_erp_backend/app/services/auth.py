@@ -20,7 +20,7 @@ from datetime import datetime, timedelta, timezone
 from typing import Optional
 
 from fastapi import HTTPException, status
-from sqlalchemy import or_, select
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import joinedload, selectinload
 
@@ -67,12 +67,31 @@ async def _get_tenant_by_subdomain(session: AsyncSession, subdomain: str) -> Ten
 async def _resolve_user(
     session: AsyncSession, tenant_id: int, identifier: str
 ) -> Optional[User]:
-    stmt = (
-        select(User)
-        .options(joinedload(User.role_assignments).joinedload(UserRole.role))
-        .where(User.tenant_id == tenant_id)
-        .where(or_(User.email == identifier, User.phone == identifier))
-    )
+    """Look up a user by email or phone within a tenant.
+
+    The old query was ``WHERE email = :id OR phone = :id`` which is
+    elegant for "either is fine" but blows up with MultipleResultsFound
+    the moment two distinct users coincidentally share the string —
+    eg. user A's email is ``admin@demo.school`` and user B's phone
+    field accidentally holds the same value. UniqueConstraint stops a
+    single column from holding duplicates but not the cross-column
+    collision.
+
+    Now we branch on whether the identifier *looks like* an email
+    (contains ``@``) and only query the matching column, which removes
+    the ambiguity at the SQL level. Defense in depth: order_by id +
+    limit 1 in case duplicates within a single column ever materialise
+    (would be a unique-constraint violation in MySQL, but stranger
+    things have happened on legacy data).
+    """
+    base = select(User).options(
+        joinedload(User.role_assignments).joinedload(UserRole.role)
+    ).where(User.tenant_id == tenant_id)
+    if "@" in identifier:
+        stmt = base.where(User.email == identifier)
+    else:
+        stmt = base.where(User.phone == identifier)
+    stmt = stmt.order_by(User.id).limit(1)
     return (await session.execute(stmt)).unique().scalar_one_or_none()
 
 
