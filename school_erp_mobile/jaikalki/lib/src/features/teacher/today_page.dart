@@ -21,6 +21,8 @@ class _TodayPageState extends State<TodayPage> {
   late Future<TeacherToday> _future;
   late Future<TeacherMe> _me;
   late Future<TeacherWeekTimetable> _tt;
+  Future<MyAttendance>? _myAtt;
+  bool _markingMe = false;
 
   @override
   void initState() {
@@ -29,6 +31,26 @@ class _TodayPageState extends State<TodayPage> {
     _future = repo.today();
     _me = repo.me();
     _tt = repo.timetable();
+    _myAtt = repo.myAttendanceToday();
+  }
+
+  Future<void> _markPresent() async {
+    setState(() => _markingMe = true);
+    try {
+      final updated = await locator<TeacherRepository>().markMyAttendance();
+      if (!mounted) return;
+      setState(() => _myAtt = Future.value(updated));
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Marked present.')),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Could not mark: $e')),
+      );
+    } finally {
+      if (mounted) setState(() => _markingMe = false);
+    }
   }
 
   Future<void> _reload() async {
@@ -37,8 +59,9 @@ class _TodayPageState extends State<TodayPage> {
       _future = repo.today();
       _me = repo.me();
       _tt = repo.timetable();
+      _myAtt = repo.myAttendanceToday();
     });
-    await Future.wait<dynamic>([_future, _me, _tt]);
+    await Future.wait<dynamic>([_future, _me, _tt, _myAtt!]);
   }
 
   @override
@@ -75,6 +98,12 @@ class _TodayPageState extends State<TodayPage> {
                 ),
                 const SizedBox(height: 12),
                 _CountStrip(today: today),
+                const SizedBox(height: 12),
+                _MyAttendancePill(
+                  future: _myAtt,
+                  marking: _markingMe,
+                  onMark: _markPresent,
+                ),
                 const SizedBox(height: 16),
                 FutureBuilder<TeacherMe>(
                   future: _me,
@@ -536,6 +565,105 @@ class _PeriodCard extends StatelessWidget {
           ),
         ),
       ),
+    );
+  }
+}
+
+
+/// Pill at the top of Today: shows "Mark me present" when the teacher
+/// hasn't been marked yet, and a small "Marked present" confirmation
+/// once they have. The same row syncs into the admin's Staff
+/// attendance roll the moment it's tapped.
+class _MyAttendancePill extends StatelessWidget {
+  const _MyAttendancePill({
+    required this.future,
+    required this.marking,
+    required this.onMark,
+  });
+
+  final Future<MyAttendance>? future;
+  final bool marking;
+  final VoidCallback onMark;
+
+  @override
+  Widget build(BuildContext context) {
+    return FutureBuilder<MyAttendance>(
+      future: future,
+      builder: (context, snap) {
+        final att = snap.data;
+        final marked = att?.isMarked == true;
+        final tone =
+            marked ? JaikalkiBrand.teal : JaikalkiBrand.saffron;
+        return Container(
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+          decoration: BoxDecoration(
+            color: tone.withOpacity(0.10),
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: tone.withOpacity(0.4)),
+          ),
+          child: Row(
+            children: [
+              Icon(
+                marked
+                    ? Icons.check_circle_rounded
+                    : Icons.how_to_reg_outlined,
+                color: tone,
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      marked
+                          ? 'Marked ${att!.status} today'
+                          : 'Your attendance',
+                      style: const TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w700,
+                        color: JaikalkiBrand.indigoDark,
+                      ),
+                    ),
+                    Text(
+                      marked
+                          ? 'Visible to the school office.'
+                          : 'One tap to clock in for the day.',
+                      style: const TextStyle(
+                        fontSize: 11,
+                        color: JaikalkiBrand.textSecondary,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              if (!marked)
+                ElevatedButton(
+                  onPressed: marking ? null : onMark,
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: JaikalkiBrand.saffron,
+                    foregroundColor: Colors.white,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 14, vertical: 8),
+                  ),
+                  child: marking
+                      ? const SizedBox(
+                          width: 14, height: 14,
+                          child: CircularProgressIndicator(
+                            color: Colors.white, strokeWidth: 2,
+                          ),
+                        )
+                      : const Text(
+                          'Present',
+                          style: TextStyle(fontWeight: FontWeight.w700),
+                        ),
+                ),
+            ],
+          ),
+        );
+      },
     );
   }
 }

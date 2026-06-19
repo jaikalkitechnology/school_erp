@@ -107,6 +107,123 @@ async def today_route(
     )
 
 
+@router.get("/me/attendance/today")
+async def my_today_attendance_route(
+    principal: AuthPrincipal = Depends(_teacher),
+    session: AsyncSession = Depends(tenant_scoped_session),
+):
+    """Today's attendance row for the logged-in teacher, or null if
+    they haven't been marked yet. Powers the "Mark me present" tile
+    on the Today screen."""
+    from datetime import datetime, timezone
+
+    from sqlalchemy import select
+
+    from app.models.teacher import Teacher, TeacherAttendance
+
+    today = datetime.now(timezone.utc).date()
+    teacher = (
+        await session.execute(
+            select(Teacher).where(
+                Teacher.tenant_id == principal.tenant_id,
+                Teacher.user_id == principal.user_id,
+            )
+        )
+    ).scalar_one_or_none()
+    if teacher is None:
+        return {"date": today.isoformat(), "status": None, "teacher_id": None}
+    row = (
+        await session.execute(
+            select(TeacherAttendance).where(
+                TeacherAttendance.teacher_id == teacher.id,
+                TeacherAttendance.date == today,
+            )
+        )
+    ).scalar_one_or_none()
+    return {
+        "date": today.isoformat(),
+        "teacher_id": teacher.id,
+        "status": row.status if row else None,
+        "remarks": row.remarks if row else None,
+    }
+
+
+@router.post("/me/attendance/mark")
+async def mark_my_attendance_route(
+    principal: AuthPrincipal = Depends(_teacher),
+    session: AsyncSession = Depends(tenant_scoped_session),
+    payload: dict | None = None,
+):
+    """One-tap "mark me present" from the teacher Today screen.
+
+    Mirrors the admin's Staff attendance roll → the same row shows up
+    on /v1/school-admin/teachers/attendance/roll the moment this lands.
+    Defaults status to 'present'; pass {"status": "..."} to choose
+    something else (handy if the teacher is leaving early)."""
+    from datetime import datetime, timezone
+
+    from sqlalchemy import select
+
+    from app.models.teacher import Teacher, TeacherAttendance
+
+    payload = payload or {}
+    status_value = (payload.get("status") or "present").lower()
+    if status_value not in {"present", "absent", "leave", "half_day"}:
+        from fastapi import HTTPException
+
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="status must be present / absent / leave / half_day",
+        )
+
+    today = datetime.now(timezone.utc).date()
+    teacher = (
+        await session.execute(
+            select(Teacher).where(
+                Teacher.tenant_id == principal.tenant_id,
+                Teacher.user_id == principal.user_id,
+            )
+        )
+    ).scalar_one_or_none()
+    if teacher is None:
+        from fastapi import HTTPException
+
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="No teacher profile linked to this user.",
+        )
+
+    existing = (
+        await session.execute(
+            select(TeacherAttendance).where(
+                TeacherAttendance.teacher_id == teacher.id,
+                TeacherAttendance.date == today,
+            )
+        )
+    ).scalar_one_or_none()
+    if existing is None:
+        existing = TeacherAttendance(
+            tenant_id=principal.tenant_id,
+            teacher_id=teacher.id,
+            date=today,
+            status=status_value,
+            remarks=payload.get("remarks"),
+        )
+        session.add(existing)
+    else:
+        existing.status = status_value
+        if payload.get("remarks") is not None:
+            existing.remarks = payload.get("remarks")
+    await session.commit()
+    await session.refresh(existing)
+    return {
+        "date": today.isoformat(),
+        "teacher_id": teacher.id,
+        "status": existing.status,
+        "remarks": existing.remarks,
+    }
+
+
 @router.get("/timetable", response_model=TeacherTimetable)
 async def timetable_route(
     principal: AuthPrincipal = Depends(_teacher),

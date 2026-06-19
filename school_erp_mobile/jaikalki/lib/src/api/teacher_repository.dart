@@ -12,6 +12,24 @@ class TeacherRepository {
     return TeacherMe.fromJson(res.data ?? const {});
   }
 
+  /// Today's own-attendance row for the logged-in teacher (or null
+  /// status when nothing's marked yet). Powers the "Mark me present"
+  /// pill on the Today screen.
+  Future<MyAttendance> myAttendanceToday() async {
+    final res = await _api.dio.get<Map<String, dynamic>>(
+      '/v1/teacher/me/attendance/today',
+    );
+    return MyAttendance.fromJson(res.data ?? const {});
+  }
+
+  Future<MyAttendance> markMyAttendance({String status = 'present'}) async {
+    final res = await _api.dio.post<Map<String, dynamic>>(
+      '/v1/teacher/me/attendance/mark',
+      data: {'status': status},
+    );
+    return MyAttendance.fromJson(res.data ?? const {});
+  }
+
   Future<TeacherToday> today() async {
     final res = await _api.dio.get<Map<String, dynamic>>('/v1/teacher/today');
     return TeacherToday.fromJson(res.data ?? const {});
@@ -1035,3 +1053,29 @@ class SchoolEvent {
 }
 
 void _addProfileSchoolFields(TeacherProfile _) {}
+
+/// My own attendance row for today. Null status ⇒ not marked yet
+/// ⇒ Today page shows "Mark me present" button.
+class MyAttendance {
+  const MyAttendance({
+    required this.date,
+    required this.teacherId,
+    required this.status,
+    required this.remarks,
+  });
+
+  final String date;
+  final int? teacherId;
+  /// present / absent / leave / half_day / null (=unmarked)
+  final String? status;
+  final String? remarks;
+
+  bool get isMarked => status != null && status!.isNotEmpty;
+
+  factory MyAttendance.fromJson(Map<String, dynamic> j) => MyAttendance(
+        date: (j['date'] as String?) ?? '',
+        teacherId: (j['teacher_id'] as num?)?.toInt(),
+        status: j['status'] as String?,
+        remarks: j['remarks'] as String?,
+      );
+}
