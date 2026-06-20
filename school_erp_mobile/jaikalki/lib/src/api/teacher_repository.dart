@@ -376,6 +376,13 @@ class TeacherRepository {
     }
   }
 
+  Future<ExamTimetable> examTimetable(int examId) async {
+    final res = await _api.dio.get<Map<String, dynamic>>(
+      '/v1/teacher/exams/$examId/timetable',
+    );
+    return ExamTimetable.fromJson(res.data ?? const {});
+  }
+
   // ---- Create homework -------------------------------------------------
 
   Future<String> uploadFile({
@@ -1310,5 +1317,78 @@ class ExamCalendarRow {
         endDate: j['end_date'] as String?,
         status: (j['status'] as String?) ?? 'draft',
         notes: j['notes'] as String?,
+      );
+}
+
+/// Per-paper schedule for one exam — drives the "view timetable"
+/// screen reached by tapping a card on the Exams tab.
+class ExamTimetable {
+  const ExamTimetable({
+    required this.examId,
+    required this.examName,
+    required this.examKind,
+    required this.startDate,
+    required this.endDate,
+    required this.defaultMaxMarks,
+    required this.papers,
+  });
+
+  final int examId;
+  final String examName;
+  final String examKind;
+  final String? startDate;
+  final String? endDate;
+  final double? defaultMaxMarks;
+  final List<ExamPaper> papers;
+
+  factory ExamTimetable.fromJson(Map<String, dynamic> j) => ExamTimetable(
+        examId: (j['exam_id'] as num?)?.toInt() ?? 0,
+        examName: (j['exam_name'] as String?) ?? '',
+        examKind: (j['exam_kind'] as String?) ?? 'unit_test',
+        startDate: j['start_date'] as String?,
+        endDate: j['end_date'] as String?,
+        defaultMaxMarks: _toDoubleOrNull(j['default_max_marks']),
+        papers: ((j['papers'] as List<dynamic>?) ?? const [])
+            .map((e) => ExamPaper.fromJson(e as Map<String, dynamic>))
+            .toList(),
+      );
+}
+
+class ExamPaper {
+  const ExamPaper({
+    required this.id,
+    required this.subjectId,
+    required this.subjectName,
+    required this.classId,
+    required this.className,
+    required this.examDate,
+    required this.startsAt,
+    required this.endsAt,
+    required this.maxMarks,
+    required this.passingMarks,
+  });
+
+  final int id;
+  final int subjectId;
+  final String subjectName;
+  final int classId;
+  final String className;
+  final String? examDate;
+  final String? startsAt;
+  final String? endsAt;
+  final double? maxMarks;
+  final double? passingMarks;
+
+  factory ExamPaper.fromJson(Map<String, dynamic> j) => ExamPaper(
+        id: (j['id'] as num?)?.toInt() ?? 0,
+        subjectId: (j['subject_id'] as num?)?.toInt() ?? 0,
+        subjectName: (j['subject_name'] as String?) ?? '',
+        classId: (j['class_id'] as num?)?.toInt() ?? 0,
+        className: (j['class_name'] as String?) ?? '',
+        examDate: j['exam_date'] as String?,
+        startsAt: j['starts_at'] as String?,
+        endsAt: j['ends_at'] as String?,
+        maxMarks: _toDoubleOrNull(j['max_marks']),
+        passingMarks: _toDoubleOrNull(j['passing_marks']),
       );
 }
