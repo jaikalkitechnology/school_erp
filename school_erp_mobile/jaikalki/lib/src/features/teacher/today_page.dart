@@ -97,14 +97,6 @@ class _TodayPageState extends State<TodayPage> {
                       _Greeting(profile: meSnap.data?.profile),
                 ),
                 const SizedBox(height: 12),
-                _CountStrip(today: today),
-                const SizedBox(height: 12),
-                _MyAttendancePill(
-                  future: _myAtt,
-                  marking: _markingMe,
-                  onMark: _markPresent,
-                ),
-                const SizedBox(height: 16),
                 FutureBuilder<TeacherMe>(
                   future: _me,
                   builder: (_, meSnap) {
@@ -112,6 +104,14 @@ class _TodayPageState extends State<TodayPage> {
                     return _IdCardTile(profile: meSnap.data!.profile);
                   },
                 ),
+                const SizedBox(height: 12),
+                _MyAttendancePill(
+                  future: _myAtt,
+                  marking: _markingMe,
+                  onMark: _markPresent,
+                ),
+                const SizedBox(height: 16),
+                _CountStrip(today: today),
                 const SizedBox(height: 16),
                 const _SectionLabel('Today'),
                 const SizedBox(height: 8),
