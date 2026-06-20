@@ -112,6 +112,10 @@ class MessageRead(BaseModel):
     body: str
     read_at: Optional[datetime]
     created_at: datetime
+    # Optional, populated by the inbox/sent endpoints when they can
+    # cheaply join User. Lets the parent / admin UIs render the sender's
+    # display name without a second round-trip.
+    sender_name: Optional[str] = None
 
 
 class MessageSend(BaseModel):

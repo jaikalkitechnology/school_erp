@@ -1,6 +1,6 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Megaphone, Inbox, FileSliders, Trash2 } from "lucide-react";
+import { Megaphone, Inbox, FileSliders, MessageSquareText, Send, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -12,12 +12,17 @@ import {
   createAnnouncement,
   deleteAnnouncement,
   listAnnouncements,
+  listInboxMessages,
   listOutbox,
+  listSentMessages,
   listTemplates,
+  markMessageRead,
+  sendDirectMessage,
   upsertTemplate,
   type Audience,
   type Channel,
   type DeliveryStatus,
+  type DirectMessage,
 } from "./api";
 
 const AUDIENCES: { value: Audience; label: string }[] = [
@@ -36,7 +41,7 @@ const STATUS_TONE: Record<DeliveryStatus, string> = {
   skipped: "bg-muted text-muted-foreground",
 };
 
-const TABS = ["Announcements", "Templates", "Outbox"] as const;
+const TABS = ["Announcements", "Messages", "Templates", "Outbox"] as const;
 type Tab = (typeof TABS)[number];
 
 export function CommunicationPage() {
@@ -67,8 +72,224 @@ export function CommunicationPage() {
         ))}
       </nav>
       {tab === "Announcements" && <AnnouncementsPanel />}
+      {tab === "Messages" && <MessagesPanel />}
       {tab === "Templates" && <TemplatesPanel />}
       {tab === "Outbox" && <OutboxPanel />}
+    </div>
+  );
+}
+
+// ---- Messages: 1-on-1 inbox / sent / reply ------------------------------
+
+interface MessageThread {
+  peerUserId: number;
+  peerName: string;
+  lastBody: string;
+  lastAt: string;
+  unread: number;
+}
+
+function buildThreads(
+  inbox: DirectMessage[],
+  sent: DirectMessage[],
+): MessageThread[] {
+  const map = new Map<number, MessageThread>();
+  const upsert = (peer: number, name: string) => {
+    if (!map.has(peer)) {
+      map.set(peer, { peerUserId: peer, peerName: name, lastBody: "", lastAt: "", unread: 0 });
+    }
+    return map.get(peer)!;
+  };
+  for (const m of inbox) {
+    const peer = m.sender_user_id ?? 0;
+    if (!peer) continue;
+    const t = upsert(peer, m.sender_name || m.sender_full_name || `User #${peer}`);
+    if ((m.created_at ?? "") > t.lastAt) {
+      t.lastAt = m.created_at;
+      t.lastBody = m.body;
+    }
+    if (!m.read_at) t.unread += 1;
+  }
+  for (const m of sent) {
+    const peer = m.recipient_user_id;
+    const t = upsert(peer, `User #${peer}`);
+    if ((m.created_at ?? "") > t.lastAt) {
+      t.lastAt = m.created_at;
+      t.lastBody = `You: ${m.body}`;
+    }
+  }
+  return Array.from(map.values()).sort((a, b) => (b.lastAt || "").localeCompare(a.lastAt || ""));
+}
+
+function MessagesPanel() {
+  const qc = useQueryClient();
+  const inboxQ = useQuery({ queryKey: ["messages-inbox"], queryFn: listInboxMessages });
+  const sentQ = useQuery({ queryKey: ["messages-sent"], queryFn: listSentMessages });
+
+  const meUserIdRef = useRef<number>(0);
+  useEffect(() => {
+    // We don't import the auth store here — derive meUserId from sent
+    // messages instead: any row's sender_user_id is us.
+    if (sentQ.data && sentQ.data.length > 0 && sentQ.data[0].sender_user_id) {
+      meUserIdRef.current = sentQ.data[0].sender_user_id;
+    }
+  }, [sentQ.data]);
+
+  const threads = useMemo(
+    () => buildThreads(inboxQ.data ?? [], sentQ.data ?? []),
+    [inboxQ.data, sentQ.data],
+  );
+  const [activePeer, setActivePeer] = useState<MessageThread | null>(null);
+
+  useEffect(() => {
+    if (!activePeer && threads.length > 0) setActivePeer(threads[0]);
+  }, [activePeer, threads]);
+
+  const threadMessages = useMemo(() => {
+    if (!activePeer) return [] as DirectMessage[];
+    const peer = activePeer.peerUserId;
+    const all: DirectMessage[] = [
+      ...(inboxQ.data ?? []).filter((m) => m.sender_user_id === peer),
+      ...(sentQ.data ?? []).filter((m) => m.recipient_user_id === peer),
+    ];
+    all.sort((a, b) => (a.created_at || "").localeCompare(b.created_at || ""));
+    return all;
+  }, [activePeer, inboxQ.data, sentQ.data]);
+
+  const markRead = useMutation({
+    mutationFn: markMessageRead,
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["messages-inbox"] }),
+  });
+
+  useEffect(() => {
+    if (!activePeer) return;
+    for (const m of inboxQ.data ?? []) {
+      if (m.sender_user_id === activePeer.peerUserId && !m.read_at) {
+        markRead.mutate(m.id);
+      }
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activePeer?.peerUserId, inboxQ.data]);
+
+  const [reply, setReply] = useState("");
+  const send = useMutation({
+    mutationFn: (body: string) =>
+      sendDirectMessage({ recipient_user_id: activePeer!.peerUserId, body }),
+    onSuccess: () => {
+      setReply("");
+      qc.invalidateQueries({ queryKey: ["messages-sent"] });
+      qc.invalidateQueries({ queryKey: ["messages-inbox"] });
+    },
+  });
+
+  if (inboxQ.isLoading || sentQ.isLoading) {
+    return <p className="text-sm text-muted-foreground">Loading…</p>;
+  }
+  if (threads.length === 0) {
+    return (
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <MessageSquareText className="h-5 w-5" /> Inbox
+          </CardTitle>
+          <CardDescription>
+            1-on-1 messages from teachers and parents will appear here.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <p className="text-sm text-muted-foreground">No messages yet.</p>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  return (
+    <div className="grid gap-4 md:grid-cols-[280px_1fr]">
+      <Card>
+        <CardHeader className="pb-3">
+          <CardTitle className="flex items-center gap-2 text-base">
+            <MessageSquareText className="h-4 w-4" /> Conversations
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-1 p-2">
+          {threads.map((th) => {
+            const active = activePeer?.peerUserId === th.peerUserId;
+            return (
+              <button
+                key={th.peerUserId}
+                onClick={() => setActivePeer(th)}
+                className={cn(
+                  "w-full rounded-md px-3 py-2 text-left text-sm",
+                  active ? "bg-saffron-pale text-indigo-dark" : "hover:bg-muted",
+                )}
+              >
+                <div className="flex items-center justify-between gap-2">
+                  <span className={cn("truncate font-semibold", th.unread > 0 && "text-saffron-darker")}>
+                    {th.peerName}
+                  </span>
+                  {th.unread > 0 && (
+                    <span className="inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-saffron px-1.5 text-[10px] font-bold text-white">
+                      {th.unread}
+                    </span>
+                  )}
+                </div>
+                <p className="line-clamp-1 text-xs text-muted-foreground">{th.lastBody}</p>
+              </button>
+            );
+          })}
+        </CardContent>
+      </Card>
+
+      <Card className="flex min-h-[420px] flex-col">
+        <CardHeader className="border-b border-saffron-pale pb-3">
+          <CardTitle className="text-base">{activePeer?.peerName ?? "Select a conversation"}</CardTitle>
+        </CardHeader>
+        <CardContent className="flex-1 space-y-3 overflow-y-auto py-4">
+          {threadMessages.map((m) => {
+            const mine = m.sender_user_id === meUserIdRef.current;
+            return (
+              <div key={m.id} className={cn("flex", mine ? "justify-end" : "justify-start")}>
+                <div
+                  className={cn(
+                    "max-w-[72%] rounded-2xl px-3 py-2 text-sm",
+                    mine
+                      ? "rounded-br-sm bg-saffron text-white"
+                      : "rounded-bl-sm border border-saffron-pale bg-background text-indigo-dark",
+                  )}
+                >
+                  {m.subject && (
+                    <p className={cn("text-[10px] font-bold uppercase tracking-wide", mine ? "text-white/85" : "text-muted-foreground")}>
+                      {m.subject}
+                    </p>
+                  )}
+                  <p className="whitespace-pre-wrap">{m.body}</p>
+                  <p className={cn("mt-1 text-[10px]", mine ? "text-white/80" : "text-muted-foreground")}>
+                    {m.created_at ? new Date(m.created_at).toLocaleString() : ""}
+                  </p>
+                </div>
+              </div>
+            );
+          })}
+        </CardContent>
+        {activePeer && (
+          <div className="flex items-end gap-2 border-t border-saffron-pale p-3">
+            <textarea
+              value={reply}
+              onChange={(e) => setReply(e.target.value)}
+              rows={2}
+              placeholder="Type a reply…"
+              className="flex-1 resize-none rounded-md border border-input bg-background px-3 py-2 text-sm"
+            />
+            <Button
+              onClick={() => reply.trim() && send.mutate(reply.trim())}
+              disabled={!reply.trim() || send.isPending}
+              className="bg-saffron text-white hover:bg-saffron-dark"
+            >
+              <Send className="mr-1 h-4 w-4" /> Send
+            </Button>
+          </div>
+        )}
+      </Card>
     </div>
   );
 }

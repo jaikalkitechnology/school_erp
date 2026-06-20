@@ -365,6 +365,17 @@ class TeacherRepository {
     }
   }
 
+  Future<List<ExamCalendarRow>> exams() async {
+    try {
+      final res = await _api.dio.get<List<dynamic>>('/v1/teacher/exams');
+      return (res.data ?? const [])
+          .map((e) => ExamCalendarRow.fromJson(e as Map<String, dynamic>))
+          .toList();
+    } on DioException {
+      return const [];
+    }
+  }
+
   // ---- Create homework -------------------------------------------------
 
   Future<String> uploadFile({
@@ -1269,4 +1280,35 @@ double _toNumDouble(dynamic v) {
   if (v is num) return v.toDouble();
   if (v is String) return double.tryParse(v) ?? 0.0;
   return 0.0;
+}
+
+/// Published exam row for the teacher Calendar's Exams tab.
+class ExamCalendarRow {
+  const ExamCalendarRow({
+    required this.id,
+    required this.name,
+    required this.kind,
+    required this.startDate,
+    required this.endDate,
+    required this.status,
+    required this.notes,
+  });
+
+  final int id;
+  final String name;
+  final String kind;
+  final String? startDate;
+  final String? endDate;
+  final String status;
+  final String? notes;
+
+  factory ExamCalendarRow.fromJson(Map<String, dynamic> j) => ExamCalendarRow(
+        id: (j['id'] as num?)?.toInt() ?? 0,
+        name: (j['name'] as String?) ?? '',
+        kind: (j['kind'] as String?) ?? 'unit_test',
+        startDate: j['start_date'] as String?,
+        endDate: j['end_date'] as String?,
+        status: (j['status'] as String?) ?? 'draft',
+        notes: j['notes'] as String?,
+      );
 }

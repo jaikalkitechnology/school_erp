@@ -310,12 +310,52 @@ async def feed(
 messages_router = APIRouter(prefix="/messages", tags=["comms"])
 
 
+async def _attach_sender_names(
+    session: AsyncSession, rows: list, *, key: str,
+) -> list[MessageRead]:
+    """Decorate the inbox/sent rows with sender_name (or, for the sent
+    list, recipient_name) so the consumer UI can render the counterpart
+    in a single round trip."""
+    from sqlalchemy import select
+
+    from app.models.auth import User
+
+    ids = {getattr(r, key) for r in rows if getattr(r, key) is not None}
+    name_by_id: dict[int, str] = {}
+    if ids:
+        for u in (
+            (
+                await session.execute(
+                    select(User.id, User.full_name).where(User.id.in_(ids))
+                )
+            ).all()
+        ):
+            name_by_id[u.id] = u.full_name
+    out: list[MessageRead] = []
+    for r in rows:
+        peer_id = getattr(r, key)
+        out.append(
+            MessageRead(
+                id=r.id,
+                sender_user_id=r.sender_user_id,
+                recipient_user_id=r.recipient_user_id,
+                subject=r.subject,
+                body=r.body,
+                read_at=r.read_at,
+                created_at=r.created_at,
+                sender_name=name_by_id.get(peer_id) if peer_id else None,
+            )
+        )
+    return out
+
+
 @messages_router.get("", response_model=list[MessageRead])
 async def my_inbox(
     principal: AuthPrincipal = Depends(get_current_principal),
     session: AsyncSession = Depends(platform_session),
 ):
-    return await inbox_for(session, principal.user_id)
+    rows = await inbox_for(session, principal.user_id)
+    return await _attach_sender_names(session, rows, key="sender_user_id")
 
 
 @messages_router.get("/sent", response_model=list[MessageRead])
@@ -323,7 +363,10 @@ async def my_sent(
     principal: AuthPrincipal = Depends(get_current_principal),
     session: AsyncSession = Depends(platform_session),
 ):
-    return await sent_for(session, principal.user_id)
+    rows = await sent_for(session, principal.user_id)
+    # On the sent list, "sender_name" carries the *recipient* name so
+    # the same field is meaningful — i.e. "who am I talking to?".
+    return await _attach_sender_names(session, rows, key="recipient_user_id")
 
 
 @messages_router.post("", response_model=MessageRead, status_code=status.HTTP_201_CREATED)

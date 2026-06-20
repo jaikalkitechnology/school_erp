@@ -7,6 +7,7 @@ import '../../theme/brand.dart';
 import '../calendar/calendar_page.dart';
 import '../directory/directory_page.dart';
 import '../library/library_catalog_page.dart';
+import '../messages/messages_page.dart';
 import '../notifications/notifications_page.dart';
 import '../profile/student_profile_page.dart';
 import '../results/result_cards_page.dart';
@@ -51,6 +52,13 @@ class MorePage extends StatelessWidget {
             icon: Icons.contacts_outlined,
             label: 'Contact directory',
             onTap: () => _open(context, 'Teachers', const DirectoryPage()),
+          ),
+          _Tile(
+            icon: Icons.chat_bubble_outline,
+            label: 'Messages',
+            onTap: () => Navigator.of(context).push(
+              MaterialPageRoute(builder: (_) => const MessagesPage()),
+            ),
           ),
           _Tile(
             icon: Icons.notifications_outlined,
