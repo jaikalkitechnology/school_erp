@@ -296,6 +296,31 @@ class AuthRepository {
     }
   }
 
+  /// In-app password change for the signed-in user. Requires the
+  /// current password so a stolen / unlocked device can't silently
+  /// rotate the credential. Other sessions are server-side revoked on
+  /// success.
+  Future<void> changePassword({
+    required String currentPassword,
+    required String newPassword,
+  }) async {
+    try {
+      await _api.dio.post<dynamic>(
+        '/v1/auth/change-password',
+        data: {
+          'current_password': currentPassword,
+          'new_password': newPassword,
+        },
+      );
+    } on DioException catch (e) {
+      final detail =
+          e.response?.data is Map ? (e.response!.data as Map)['detail'] : null;
+      throw AuthException(
+        detail?.toString() ?? 'Could not change password.',
+      );
+    }
+  }
+
   /// Best-effort FCM token registration. Safe to call on every cold
   /// start — the server upserts on (user_id, fcm_token). Failures are
   /// swallowed: push notifications aren't critical to using the app.

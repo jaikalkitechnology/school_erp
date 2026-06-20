@@ -465,3 +465,60 @@ async def reset_password(
     user.password_hash = hash_password(new_password)
     user.failed_login_count = 0
     await session.commit()
+
+
+async def change_password(
+    session: AsyncSession,
+    *,
+    user_id: int,
+    current_password: str,
+    new_password: str,
+) -> None:
+    """In-app password rotation for the signed-in user.
+
+    Verifies the current password (the bearer token alone isn't enough —
+    a stolen device must not be able to silently change credentials),
+    sets the new hash, and revokes every active refresh token so other
+    sessions are forced to sign back in. The caller's current access
+    token keeps working until it expires (~120 min) which is fine — by
+    then the refresh on this device will mint a new pair under the new
+    password lineage.
+    """
+    if current_password == new_password:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="New password must be different from the current one",
+        )
+
+    user = (
+        await session.execute(select(User).where(User.id == user_id))
+    ).scalar_one_or_none()
+    if user is None or not user.password_hash:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="User not found",
+        )
+    if not verify_password(current_password, user.password_hash):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Current password is incorrect",
+        )
+
+    user.password_hash = hash_password(new_password)
+    user.failed_login_count = 0
+
+    # Boot every other session: any refresh token in flight on a
+    # different device / browser is now stale. Caller's own session
+    # continues until the access token naturally expires.
+    rows = (
+        await session.execute(
+            select(RefreshToken).where(
+                RefreshToken.user_id == user_id,
+                RefreshToken.revoked_at.is_(None),
+            )
+        )
+    ).scalars().all()
+    now = _now()
+    for rt in rows:
+        rt.revoked_at = now
+
+    await session.commit()

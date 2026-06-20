@@ -11,6 +11,7 @@ from app.core.auth_deps import AuthPrincipal, get_current_principal
 from app.core.tenant import TenantContext, get_tenant
 from app.core.tenant_session import platform_session
 from app.schemas.auth import (
+    ChangePasswordRequest,
     CurrentUser,
     DeviceRegisterRequest,
     DeviceUnregisterRequest,
@@ -28,6 +29,7 @@ from app.schemas.auth import (
 )
 from app.services.auth import (
     build_current_user,
+    change_password as change_password_service,
     list_children_of_user,
     login as login_service,
     logout as logout_service,
@@ -106,6 +108,28 @@ async def parent_select_child(
 ):
     student_id = await select_child(session, principal.user_id, principal.tenant_id, payload.student_id)
     return {"current_child_id": student_id}
+
+
+# ---- In-app password change (logged-in user) ------------------------------
+
+
+@router.post("/change-password", status_code=status.HTTP_204_NO_CONTENT)
+async def change_password_route(
+    payload: ChangePasswordRequest,
+    principal: AuthPrincipal = Depends(get_current_principal),
+    session: AsyncSession = Depends(platform_session),
+):
+    """Rotate the signed-in user's password. Requires the current
+    password so a stolen bearer token alone can't change credentials.
+    Active refresh tokens for the user are revoked on success so other
+    sessions (other devices / the web admin) are forced to sign back in
+    with the new password."""
+    await change_password_service(
+        session,
+        user_id=principal.user_id,
+        current_password=payload.current_password,
+        new_password=payload.new_password,
+    )
 
 
 # ---- Passwordless login via OTP -------------------------------------------
