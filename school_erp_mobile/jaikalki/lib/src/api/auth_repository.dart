@@ -166,6 +166,104 @@ class AuthRepository {
     }
   }
 
+  /// Step 1 of forgot-password: request that the server send a one-time
+  /// code to the identifier (email or phone). The body returned by the
+  /// server includes ``channel`` (sms/email) and, in dev builds only,
+  /// the actual ``dev_otp`` so testers can complete the flow without a
+  /// real SMS gateway.
+  Future<ForgotPasswordResult> requestPasswordResetOtp({
+    required String identifier,
+    required String subdomain,
+  }) async {
+    try {
+      final res = await _api.dio.post<Map<String, dynamic>>(
+        '/v1/auth/forgot-password',
+        data: {
+          'identifier': identifier.trim().toLowerCase(),
+          'subdomain': subdomain.trim().toLowerCase(),
+        },
+      );
+      final body = res.data ?? const {};
+      return ForgotPasswordResult(
+        channel: (body['channel'] as String?) ?? 'sms',
+        expiresInMinutes:
+            (body['expires_in_minutes'] as num?)?.toInt() ?? 10,
+        devOtp: body['dev_otp'] as String?,
+      );
+    } on DioException catch (e) {
+      final detail =
+          e.response?.data is Map ? (e.response!.data as Map)['detail'] : null;
+      throw AuthException(
+        detail?.toString() ?? 'Could not send a reset code. Try again.',
+      );
+    }
+  }
+
+  /// Step 2 of forgot-password: verify the OTP and set a new password.
+  /// On success the server returns 204; the caller should send the user
+  /// back to the login screen.
+  Future<void> resetPasswordWithOtp({
+    required String identifier,
+    required String subdomain,
+    required String otp,
+    required String newPassword,
+  }) async {
+    try {
+      await _api.dio.post<dynamic>(
+        '/v1/auth/reset-password',
+        data: {
+          'identifier': identifier.trim().toLowerCase(),
+          'subdomain': subdomain.trim().toLowerCase(),
+          'otp': otp.trim(),
+          'new_password': newPassword,
+        },
+      );
+    } on DioException catch (e) {
+      final detail =
+          e.response?.data is Map ? (e.response!.data as Map)['detail'] : null;
+      throw AuthException(
+        detail?.toString() ?? 'Invalid or expired code.',
+      );
+    }
+  }
+
+  /// Best-effort FCM token registration. Safe to call on every cold
+  /// start — the server upserts on (user_id, fcm_token). Failures are
+  /// swallowed: push notifications aren't critical to using the app.
+  Future<void> registerDevice({
+    required String fcmToken,
+    String platform = 'android',
+    String? appVersion,
+    String? deviceLabel,
+  }) async {
+    if (fcmToken.isEmpty) return;
+    try {
+      await _api.dio.post<dynamic>(
+        '/v1/auth/devices/register',
+        data: {
+          'fcm_token': fcmToken,
+          'platform': platform,
+          if (appVersion != null) 'app_version': appVersion,
+          if (deviceLabel != null) 'device_label': deviceLabel,
+        },
+      );
+    } on DioException {
+      // Push registration is best-effort; never break the login UX.
+    }
+  }
+
+  Future<void> unregisterDevice({required String fcmToken}) async {
+    if (fcmToken.isEmpty) return;
+    try {
+      await _api.dio.post<dynamic>(
+        '/v1/auth/devices/unregister',
+        data: {'fcm_token': fcmToken},
+      );
+    } on DioException {
+      // Ignored.
+    }
+  }
+
   /// Resolve the canonical role for routing.
   UserRole? mapRole(String? code) {
     if (code == null) return null;
@@ -194,4 +292,22 @@ class AuthException implements Exception {
 
   @override
   String toString() => message;
+}
+
+/// Response from /v1/auth/forgot-password.
+class ForgotPasswordResult {
+  const ForgotPasswordResult({
+    required this.channel,
+    required this.expiresInMinutes,
+    this.devOtp,
+  });
+
+  /// "sms" | "email"
+  final String channel;
+  final int expiresInMinutes;
+
+  /// Echoed only when the backend is running with ENVIRONMENT != "production".
+  /// Mobile UI may surface it under a "Dev OTP" hint so testers can finish
+  /// the flow without a real SMS provider.
+  final String? devOtp;
 }

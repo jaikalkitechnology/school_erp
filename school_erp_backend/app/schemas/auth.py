@@ -91,3 +91,14 @@ class ResetPasswordRequest(BaseModel):
     subdomain: Optional[str] = None
     otp: str = Field(min_length=4, max_length=12)
     new_password: str = Field(min_length=6, max_length=128)
+
+
+class DeviceRegisterRequest(BaseModel):
+    fcm_token: str = Field(min_length=8, max_length=255)
+    platform: str = Field(default="android", max_length=16)
+    app_version: Optional[str] = Field(default=None, max_length=32)
+    device_label: Optional[str] = Field(default=None, max_length=128)
+
+
+class DeviceUnregisterRequest(BaseModel):
+    fcm_token: str = Field(min_length=8, max_length=255)
