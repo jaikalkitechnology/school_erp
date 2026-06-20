@@ -864,3 +864,54 @@ async def teacher_events_route(
         }
         for r in rows
     ]
+
+
+@router.get("/exams")
+async def teacher_exams_route(
+    days_back: int = Query(30, ge=0, le=180),
+    days_forward: int = Query(180, ge=1, le=365),
+    session: AsyncSession = Depends(tenant_scoped_session),
+):
+    """Published exams in a date window — surfaced on the teacher
+    Calendar's third tab so the dashboard's "upcoming exams" counter
+    has a corresponding feed."""
+    from datetime import date, timedelta
+
+    from sqlalchemy import or_
+
+    try:
+        from app.models.exams import Exam
+    except Exception:
+        return []
+
+    today = date.today()
+    start = today - timedelta(days=days_back)
+    end = today + timedelta(days=days_forward)
+
+    rows = list(
+        (
+            await session.execute(
+                select(Exam)
+                .where(
+                    Exam.published_at.isnot(None),
+                    or_(
+                        Exam.start_date.is_(None),
+                        Exam.start_date.between(start, end),
+                    ),
+                )
+                .order_by(Exam.start_date.is_(None), Exam.start_date.asc())
+            )
+        ).scalars().all()
+    )
+    return [
+        {
+            "id": e.id,
+            "name": e.name,
+            "kind": e.kind,
+            "start_date": e.start_date.isoformat() if e.start_date else None,
+            "end_date": e.end_date.isoformat() if e.end_date else None,
+            "status": e.status,
+            "notes": e.notes,
+        }
+        for e in rows
+    ]

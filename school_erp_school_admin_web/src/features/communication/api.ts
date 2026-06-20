@@ -81,3 +81,35 @@ export const bulkDeleteAnnouncements = async (ids: number[]) =>
 
 export const listOutbox = async (status?: DeliveryStatus) =>
   (await api.get<OutboxRow[]>(`${base}/outbox`, { params: status ? { status } : undefined })).data;
+
+// ---- 1-on-1 messages (inbox + sent for the logged-in admin) -------------
+// Reads off the platform-level /v1/messages router so the admin sees the
+// same teacher → admin messages the teacher app sends. No tenant prefix:
+// these messages are user-scoped, not surface-scoped.
+
+export interface DirectMessage {
+  id: number;
+  sender_user_id: number | null;
+  recipient_user_id: number;
+  subject: string | null;
+  body: string;
+  read_at: string | null;
+  created_at: string;
+  sender_name?: string;
+  sender_full_name?: string;
+}
+
+export const listInboxMessages = async () =>
+  (await api.get<DirectMessage[]>(`/v1/messages`)).data;
+
+export const listSentMessages = async () =>
+  (await api.get<DirectMessage[]>(`/v1/messages/sent`)).data;
+
+export const sendDirectMessage = async (payload: {
+  recipient_user_id: number;
+  body: string;
+  subject?: string;
+}) => (await api.post<DirectMessage>(`/v1/messages`, payload)).data;
+
+export const markMessageRead = async (id: number) =>
+  (await api.post<DirectMessage>(`/v1/messages/${id}/read`)).data;
