@@ -705,12 +705,54 @@ async def add_behaviour_note_route(
     principal: AuthPrincipal = Depends(_teacher),
     session: AsyncSession = Depends(tenant_scoped_session),
 ):
-    return await add_behaviour_note(
-        session,
-        tenant_id=principal.tenant_id,
-        teacher_user_id=principal.user_id,
-        payload=payload,
-    )
+    """Wrap the service call so a partially-migrated DB (missing the
+    behaviour_notes table) returns 503 with an actionable message
+    instead of FastAPI's default 500 stack."""
+    import logging
+
+    from sqlalchemy.exc import OperationalError, ProgrammingError
+
+    try:
+        return await add_behaviour_note(
+            session,
+            tenant_id=principal.tenant_id,
+            teacher_user_id=principal.user_id,
+            payload=payload,
+        )
+    except HTTPException:
+        raise
+    except (OperationalError, ProgrammingError) as exc:
+        # MySQL: "Table 'X.behaviour_notes' doesn't exist" (1146).
+        # Postgres: "relation behaviour_notes does not exist" (42P01).
+        msg = str(exc.orig if hasattr(exc, "orig") else exc)
+        if "behaviour_notes" in msg or "doesn't exist" in msg or "does not exist" in msg:
+            logging.getLogger(__name__).warning(
+                "behaviour_notes table missing: run `alembic upgrade head`. %s", msg,
+            )
+            raise HTTPException(
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                detail=(
+                    "Behaviour notes are not yet enabled on this database. "
+                    "Ask the admin to run the latest migration "
+                    "(alembic upgrade head)."
+                ),
+            )
+        logging.getLogger(__name__).exception(
+            "add_behaviour_note_route DB error", exc_info=exc,
+        )
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Database error: {msg[:200]}",
+        )
+    except Exception as exc:  # noqa: BLE001
+        logging.getLogger(__name__).exception(
+            "add_behaviour_note_route failed (user=%s student=%s)",
+            principal.user_id, payload.student_id,
+        )
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Could not save the note: {type(exc).__name__}: {exc}",
+        )
 
 
 # ---- My own staff leave -------------------------------------------------

@@ -1,3 +1,4 @@
+import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 
 import '../../api/teacher_repository.dart';
@@ -52,6 +53,12 @@ class _AddBehaviourNoteDialogState extends State<AddBehaviourNoteDialog> {
       );
       if (!mounted) return;
       Navigator.of(context).pop(true);
+    } on DioException catch (e) {
+      // Server returns {"detail": "…"} on failure — surface that instead
+      // of the opaque "DioException [bad response]" toString.
+      final body = e.response?.data;
+      final detail = body is Map ? body['detail'] : null;
+      setState(() => _error = detail?.toString() ?? 'Save failed: ${e.message ?? e}');
     } catch (e) {
       setState(() => _error = 'Save failed: $e');
     } finally {
