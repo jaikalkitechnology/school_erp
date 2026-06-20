@@ -15,6 +15,8 @@ from app.schemas.auth import (
     DeviceRegisterRequest,
     DeviceUnregisterRequest,
     ForgotPasswordRequest,
+    LoginOtpRequestBody,
+    LoginOtpVerifyBody,
     LoginRequest,
     LoginResponse,
     LogoutRequest,
@@ -34,8 +36,10 @@ from app.services.auth import (
 )
 from app.services.auth_otp import (
     register_device,
+    request_login_otp,
     request_password_reset_otp,
     unregister_device,
+    verify_login_otp_and_issue_tokens,
     verify_otp_and_reset_password,
 )
 
@@ -102,6 +106,47 @@ async def parent_select_child(
 ):
     student_id = await select_child(session, principal.user_id, principal.tenant_id, payload.student_id)
     return {"current_child_id": student_id}
+
+
+# ---- Passwordless login via OTP -------------------------------------------
+
+
+@router.post("/login/otp/request", status_code=status.HTTP_202_ACCEPTED)
+async def login_otp_request(
+    payload: LoginOtpRequestBody,
+    session: AsyncSession = Depends(platform_session),
+    ctx: TenantContext = Depends(get_tenant),
+):
+    """Send a one-time login code to the email/phone on file. Returns
+    202 unconditionally so callers can't enumerate which accounts
+    exist. In dev (ENVIRONMENT != "production") the response includes
+    ``dev_otp`` so testers can finish the flow without a real SMS
+    gateway."""
+    tenant = await _tenant_for_reset(payload.subdomain, ctx.tenant_id, session)
+    return await request_login_otp(
+        session, tenant=tenant, identifier=payload.identifier,
+    )
+
+
+@router.post("/login/otp/verify", response_model=LoginResponse)
+async def login_otp_verify(
+    payload: LoginOtpVerifyBody,
+    request: Request,
+    session: AsyncSession = Depends(platform_session),
+    ctx: TenantContext = Depends(get_tenant),
+):
+    """Trade an OTP for a fresh access + refresh token pair. Response
+    shape mirrors ``/v1/auth/login`` so the mobile cubit's happy path
+    works unchanged."""
+    tenant = await _tenant_for_reset(payload.subdomain, ctx.tenant_id, session)
+    return await verify_login_otp_and_issue_tokens(
+        session,
+        tenant=tenant,
+        identifier=payload.identifier,
+        otp=payload.otp,
+        user_agent=request.headers.get("user-agent"),
+        ip_address=request.client.host if request.client else None,
+    )
 
 
 # ---- password reset (real OTP flow) ---------------------------------------

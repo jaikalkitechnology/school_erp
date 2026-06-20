@@ -141,9 +141,12 @@ async def _deliver_otp(*, user: User, code: str, channel: str) -> None:
     Wired to ``settings.MSG91_AUTH_KEY`` / ``settings.SENDGRID_API_KEY``
     so production deployments can flip the switches without code
     changes. Both providers are hit synchronously here — if that gets
-    too slow under load we'll move to the notification_outbox queue."""
+    too slow under load we'll move to the notification_outbox queue.
+
+    SMS / email body is intentionally generic ("verification code") so
+    the same row can serve both Forgot Password and Login-via-OTP."""
     body = (
-        f"Your password reset code is {code}. "
+        f"Your verification code is {code}. "
         f"It expires in {_OTP_TTL_MINUTES} minutes."
     )
 
@@ -232,6 +235,120 @@ async def verify_otp_and_reset_password(
     user.failed_login_count = 0
     row.consumed_at = _now()
     await session.commit()
+
+
+# ---- login via OTP --------------------------------------------------------
+
+
+# request_login_otp reuses request_password_reset_otp end-to-end: same
+# table, same TTL / attempt-count caps, same dev echo. Exposed under a
+# distinct name so the auth router stays self-documenting, and so we
+# have a single place to evolve the login flow (eg. tighter rate limits
+# for login-OTP vs. password-reset OTP).
+async def request_login_otp(
+    session: AsyncSession,
+    *,
+    tenant: Tenant,
+    identifier: str,
+) -> dict:
+    return await request_password_reset_otp(
+        session, tenant=tenant, identifier=identifier,
+    )
+
+
+async def verify_login_otp_and_issue_tokens(
+    session: AsyncSession,
+    *,
+    tenant: Tenant,
+    identifier: str,
+    otp: str,
+    user_agent: Optional[str] = None,
+    ip_address: Optional[str] = None,
+):
+    """Validate the OTP and mint a normal LoginResponse — same shape
+    as ``/v1/auth/login``. Consumes the OTP row so the same code can't
+    be used twice."""
+    from sqlalchemy.orm import joinedload
+
+    from app.models.auth import RefreshToken, UserRole
+    from app.schemas.auth import LoginResponse
+    from app.services.auth import (
+        _issue_tokens,
+        _user_permissions,
+        build_current_user,
+    )
+
+    identifier = (identifier or "").strip().lower()
+    user = await _resolve_user_for_reset(session, tenant.id, identifier)
+    if user is None or not user.is_active:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid or expired code",
+        )
+
+    row = (
+        await session.execute(
+            select(PasswordResetOtp)
+            .where(
+                PasswordResetOtp.user_id == user.id,
+                PasswordResetOtp.consumed_at.is_(None),
+                PasswordResetOtp.expires_at > _now(),
+            )
+            .order_by(PasswordResetOtp.id.desc())
+            .limit(1)
+        )
+    ).scalar_one_or_none()
+    if row is None:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid or expired code",
+        )
+
+    if row.attempt_count >= _OTP_MAX_ATTEMPTS:
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail="Too many attempts. Request a new code.",
+        )
+
+    if row.code_hash != _hash_otp((otp or "").strip()):
+        row.attempt_count += 1
+        await session.commit()
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid or expired code",
+        )
+
+    # Refresh role assignments so primary_role / permissions are populated.
+    user = (
+        await session.execute(
+            select(User)
+            .options(joinedload(User.role_assignments).joinedload(UserRole.role))
+            .where(User.id == user.id)
+        )
+    ).unique().scalar_one()
+
+    role_codes = sorted({ur.role.code for ur in user.role_assignments if ur.role})
+    perms = await _user_permissions(session, user)
+    pair, jti, refresh_expiry = _issue_tokens(user, tenant, role_codes, perms)
+
+    row.consumed_at = _now()
+    user.failed_login_count = 0
+    user.last_login_at = _now()
+    session.add(
+        RefreshToken(
+            tenant_id=tenant.id,
+            user_id=user.id,
+            jti=jti,
+            expires_at=refresh_expiry,
+            user_agent=(user_agent or "")[:255],
+            ip_address=(ip_address or "")[:64],
+        )
+    )
+    await session.commit()
+    await session.refresh(user)
+
+    me = await build_current_user(session, user, tenant)
+    return LoginResponse(user=me, tokens=pair)
 
 
 # ---- device tokens ---------------------------------------------------------

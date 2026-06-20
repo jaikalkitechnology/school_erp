@@ -166,6 +166,75 @@ class AuthRepository {
     }
   }
 
+  /// Step 1 of passwordless login: ask the server to send a one-time
+  /// login code to the identifier (email or phone). Same response
+  /// shape as [requestPasswordResetOtp] — including the dev_otp echo
+  /// — so the mobile UI can render both flows from a single widget.
+  Future<ForgotPasswordResult> requestLoginOtp({
+    required String identifier,
+    required String subdomain,
+  }) async {
+    try {
+      final res = await _api.dio.post<Map<String, dynamic>>(
+        '/v1/auth/login/otp/request',
+        data: {
+          'identifier': identifier.trim().toLowerCase(),
+          'subdomain': subdomain.trim().toLowerCase(),
+        },
+      );
+      final body = res.data ?? const {};
+      return ForgotPasswordResult(
+        channel: (body['channel'] as String?) ?? 'sms',
+        expiresInMinutes:
+            (body['expires_in_minutes'] as num?)?.toInt() ?? 10,
+        devOtp: body['dev_otp'] as String?,
+      );
+    } on DioException catch (e) {
+      final detail =
+          e.response?.data is Map ? (e.response!.data as Map)['detail'] : null;
+      throw AuthException(
+        detail?.toString() ?? 'Could not send a login code. Try again.',
+      );
+    }
+  }
+
+  /// Step 2 of passwordless login: trade the OTP for the same
+  /// LoginResponse shape as [login]. On success the tokens are
+  /// persisted in secure storage so subsequent calls authenticate
+  /// transparently.
+  Future<LoginResult> loginWithOtp({
+    required String identifier,
+    required String subdomain,
+    required String otp,
+  }) async {
+    try {
+      final res = await _api.dio.post<Map<String, dynamic>>(
+        '/v1/auth/login/otp/verify',
+        data: {
+          'identifier': identifier.trim().toLowerCase(),
+          'subdomain': subdomain.trim().toLowerCase(),
+          'otp': otp.trim(),
+        },
+      );
+      final body = res.data!;
+      final tokens = TokenPair.fromJson(body['tokens'] as Map<String, dynamic>);
+      final user = AuthUser.fromJson(body['user'] as Map<String, dynamic>);
+      await _storage.write(key: _kAccessKey, value: tokens.accessToken);
+      await _storage.write(key: _kRefreshKey, value: tokens.refreshToken);
+      await _storage.write(
+        key: _kSubdomainKey,
+        value: user.tenantSubdomain ?? subdomain,
+      );
+      return LoginResult(user: user, tokens: tokens);
+    } on DioException catch (e) {
+      final detail =
+          e.response?.data is Map ? (e.response!.data as Map)['detail'] : null;
+      throw AuthException(
+        detail?.toString() ?? 'Invalid or expired code.',
+      );
+    }
+  }
+
   /// Step 1 of forgot-password: request that the server send a one-time
   /// code to the identifier (email or phone). The body returned by the
   /// server includes ``channel`` (sms/email) and, in dev builds only,
