@@ -93,6 +93,15 @@ class ResetPasswordRequest(BaseModel):
     new_password: str = Field(min_length=6, max_length=128)
 
 
+class ChangePasswordRequest(BaseModel):
+    """Used by the in-app "Change password" form. Authenticated request:
+    the current password serves as the second factor on top of the
+    bearer token (so a stolen / forgotten device can't silently rotate
+    the password)."""
+    current_password: str = Field(min_length=4, max_length=128)
+    new_password: str = Field(min_length=6, max_length=128)
+
+
 class LoginOtpRequestBody(BaseModel):
     """Step 1 of passwordless login: request that an OTP be dispatched
     to the email/phone on file."""
