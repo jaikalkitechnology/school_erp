@@ -224,6 +224,27 @@ async def login(
 
 
 async def refresh(session: AsyncSession, refresh_token: str) -> TokenPair:
+    """Rotate a refresh token: revoke the old row, mint a new pair.
+
+    Concurrency hazard: a single client (or two clients sharing the
+    same refresh token) can fire parallel /refresh calls. Each picks up
+    the same row and tries to UPDATE refresh_tokens.revoked_at. InnoDB
+    holds a row lock for the loser until ``innodb_lock_wait_timeout``
+    expires (default 50s), and the API ends up hanging for nearly a
+    minute before returning a 500 to the second caller.
+
+    Mitigation:
+      * Lock the row with ``SELECT ... FOR UPDATE NOWAIT`` so a
+        conflict bails immediately instead of blocking on the lock.
+      * Drop ``innodb_lock_wait_timeout`` to 5s for this session as a
+        belt + braces against the rare case where NOWAIT isn't honoured
+        (older MySQL, replicas, etc.).
+      * Re-check ``revoked_at`` after acquiring the lock: if the other
+        winner already rotated, return 401 cleanly instead of a 500.
+    """
+    from sqlalchemy import text
+    from sqlalchemy.exc import OperationalError
+
     try:
         payload = decode_token(refresh_token)
     except Exception:
@@ -237,16 +258,45 @@ async def refresh(session: AsyncSession, refresh_token: str) -> TokenPair:
     if not jti or not user_id or not tenant_id:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Malformed refresh token")
 
-    rt = (
-        await session.execute(
-            select(RefreshToken).where(
+    # Cap the lock wait at 5s on MySQL. Postgres / SQLite ignore the
+    # SET silently (the try/except below swallows their "unknown
+    # variable" error so the same code runs in dev with SQLite).
+    dialect = session.bind.dialect.name if session.bind is not None else ""
+    if dialect == "mysql":
+        try:
+            await session.execute(text("SET SESSION innodb_lock_wait_timeout = 5"))
+        except Exception:
+            pass
+
+    # FOR UPDATE NOWAIT serialises concurrent rotations on the row.
+    # The first caller wins and proceeds; the second hits OperationalError
+    # (MySQL 1205 lock-wait or NOWAIT failure) and we return 401.
+    try:
+        stmt = (
+            select(RefreshToken)
+            .where(
                 RefreshToken.jti == jti,
                 RefreshToken.user_id == user_id,
                 RefreshToken.tenant_id == tenant_id,
             )
+            .with_for_update(nowait=True)
         )
-    ).scalar_one_or_none()
-    if rt is None or rt.revoked_at is not None or rt.expires_at < _now():
+        rt = (await session.execute(stmt)).scalar_one_or_none()
+    except OperationalError:
+        # Another in-flight refresh holds the row. The winner will mint
+        # a new pair; this caller's safest move is to ask the user to
+        # sign in again rather than hang the UI for 50 seconds.
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Refresh in progress on another device; please sign in again",
+        )
+
+    if rt is None or rt.expires_at < _now():
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Refresh token revoked")
+    if rt.revoked_at is not None:
+        # We hold the row lock now, so if it's already revoked the
+        # other winner finished before us. Don't 500 — tell the client
+        # to log in.
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Refresh token revoked")
 
     # Rotate: revoke old, issue new.
@@ -279,6 +329,18 @@ async def refresh(session: AsyncSession, refresh_token: str) -> TokenPair:
 
 
 async def logout(session: AsyncSession, refresh_token: Optional[str], user_id: int, tenant_id: int) -> None:
+    # Same lock-timeout hardening as ``refresh``: a logout that races
+    # with a refresh on the same row would otherwise hang for up to
+    # ``innodb_lock_wait_timeout`` seconds before raising 500.
+    from sqlalchemy import text
+
+    dialect = session.bind.dialect.name if session.bind is not None else ""
+    if dialect == "mysql":
+        try:
+            await session.execute(text("SET SESSION innodb_lock_wait_timeout = 5"))
+        except Exception:
+            pass
+
     if refresh_token:
         try:
             payload = decode_token(refresh_token)
@@ -295,8 +357,9 @@ async def logout(session: AsyncSession, refresh_token: Optional[str], user_id: i
                 )
             ).scalar_one_or_none()
             if rt:
-                rt.revoked_at = _now()
-                await session.commit()
+                if rt.revoked_at is None:
+                    rt.revoked_at = _now()
+                    await session.commit()
                 return
     # No specific token -> revoke every active session for this user.
     rows = (
