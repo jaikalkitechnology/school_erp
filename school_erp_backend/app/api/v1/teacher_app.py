@@ -915,3 +915,80 @@ async def teacher_exams_route(
         }
         for e in rows
     ]
+
+
+@router.get("/exams/{exam_id}/timetable")
+async def teacher_exam_timetable_route(
+    exam_id: int,
+    session: AsyncSession = Depends(tenant_scoped_session),
+):
+    """Per-subject schedule for the exam: which paper is on which
+    date / time, what's the max + passing marks, which class it's for.
+
+    Returns one row per ExamSubject, ordered by (date, start time).
+    Rows with no date sink to the bottom — the UI shows them under a
+    "Date TBD" group so unscheduled papers are still visible.
+    """
+    from sqlalchemy.orm import aliased
+
+    try:
+        from app.models.academic import ClassDef, Subject
+        from app.models.exams import Exam, ExamSubject
+    except Exception:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Exams module is not enabled on this database",
+        )
+
+    exam = (
+        await session.execute(select(Exam).where(Exam.id == exam_id))
+    ).scalar_one_or_none()
+    if exam is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Exam not found",
+        )
+
+    subj_alias = aliased(Subject)
+    cls_alias = aliased(ClassDef)
+    rows = list(
+        (
+            await session.execute(
+                select(ExamSubject, subj_alias, cls_alias)
+                .join(subj_alias, ExamSubject.subject_id == subj_alias.id)
+                .join(cls_alias, ExamSubject.class_def_id == cls_alias.id)
+                .where(ExamSubject.exam_id == exam_id)
+                .order_by(
+                    ExamSubject.exam_date.is_(None),
+                    ExamSubject.exam_date.asc(),
+                    ExamSubject.starts_at.asc(),
+                )
+            )
+        ).all()
+    )
+    return {
+        "exam_id": exam.id,
+        "exam_name": exam.name,
+        "exam_kind": exam.kind,
+        "start_date": exam.start_date.isoformat() if exam.start_date else None,
+        "end_date": exam.end_date.isoformat() if exam.end_date else None,
+        "default_max_marks": float(exam.default_max_marks)
+        if exam.default_max_marks is not None
+        else None,
+        "papers": [
+            {
+                "id": es.id,
+                "subject_id": es.subject_id,
+                "subject_name": subj.name,
+                "class_id": es.class_def_id,
+                "class_name": cls.name,
+                "exam_date": es.exam_date.isoformat() if es.exam_date else None,
+                "starts_at": es.starts_at.isoformat() if es.starts_at else None,
+                "ends_at": es.ends_at.isoformat() if es.ends_at else None,
+                "max_marks": float(es.max_marks) if es.max_marks is not None else None,
+                "passing_marks": float(es.passing_marks)
+                if es.passing_marks is not None
+                else None,
+            }
+            for (es, subj, cls) in rows
+        ],
+    }
