@@ -452,6 +452,216 @@ async def decide_leave_route(
 # ---- Student drill-down --------------------------------------------------
 
 
+@router.get("/students/{student_id}/marks")
+async def student_marks_route(
+    student_id: int,
+    principal: AuthPrincipal = Depends(_teacher),
+    session: AsyncSession = Depends(tenant_scoped_session),
+):
+    """All exam results for a student the teacher has access to.
+
+    Reuses the parent_child_results aggregator (same shape as the
+    parent app's "exam results" tab). Teacher access is gated by
+    section: if the student's section isn't on this teacher's roster,
+    we 403."""
+    from sqlalchemy import select
+
+    from app.models.parent import Student
+    from app.services.exams import parent_child_results
+
+    student = (
+        await session.execute(select(Student).where(Student.id == student_id))
+    ).scalar_one_or_none()
+    if student is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Student not found",
+        )
+    if student.section_id is None:
+        return {"student_id": student_id, "exams": []}
+    await assert_section_access(
+        session, user_id=principal.user_id, section_id=student.section_id,
+    )
+    return await parent_child_results(session, student_id=student_id)
+
+
+# ---- Chat (1-on-1 messages) ---------------------------------------------
+
+
+@router.get("/messages/inbox")
+async def my_inbox_route(
+    principal: AuthPrincipal = Depends(_teacher),
+    session: AsyncSession = Depends(tenant_scoped_session),
+):
+    """Wrapper around comms.inbox_for so the teacher app doesn't need
+    to know the platform-level /v1/messages route exists."""
+    from app.services.comms import inbox_for
+
+    rows = await inbox_for(session, principal.user_id)
+    return [
+        {
+            "id": r.id,
+            "sender_user_id": r.sender_user_id,
+            "recipient_user_id": r.recipient_user_id,
+            "subject": r.subject,
+            "body": r.body,
+            "read_at": r.read_at.isoformat() if r.read_at else None,
+            "created_at": r.created_at.isoformat() if r.created_at else None,
+        }
+        for r in rows
+    ]
+
+
+@router.get("/messages/sent")
+async def my_sent_route(
+    principal: AuthPrincipal = Depends(_teacher),
+    session: AsyncSession = Depends(tenant_scoped_session),
+):
+    from app.services.comms import sent_for
+
+    rows = await sent_for(session, principal.user_id)
+    return [
+        {
+            "id": r.id,
+            "sender_user_id": r.sender_user_id,
+            "recipient_user_id": r.recipient_user_id,
+            "subject": r.subject,
+            "body": r.body,
+            "read_at": r.read_at.isoformat() if r.read_at else None,
+            "created_at": r.created_at.isoformat() if r.created_at else None,
+        }
+        for r in rows
+    ]
+
+
+@router.post("/messages/send", status_code=status.HTTP_201_CREATED)
+async def send_message_route(
+    payload: dict,
+    principal: AuthPrincipal = Depends(_teacher),
+    session: AsyncSession = Depends(tenant_scoped_session),
+):
+    """Send a 1-on-1 message to a parent / admin / student. Payload
+    must include recipient_user_id + body; subject is optional."""
+    from app.schemas.comms import MessageSend
+    from app.services.comms import send_message
+
+    msg = await send_message(
+        session,
+        principal.tenant_id,
+        principal.user_id,
+        MessageSend(
+            recipient_user_id=int(payload.get("recipient_user_id") or 0),
+            subject=payload.get("subject"),
+            body=str(payload.get("body") or "").strip(),
+        ),
+    )
+    return {
+        "id": msg.id,
+        "sender_user_id": msg.sender_user_id,
+        "recipient_user_id": msg.recipient_user_id,
+        "subject": msg.subject,
+        "body": msg.body,
+        "created_at": msg.created_at.isoformat() if msg.created_at else None,
+    }
+
+
+@router.post("/messages/{message_id}/read")
+async def mark_msg_read_route(
+    message_id: int,
+    principal: AuthPrincipal = Depends(_teacher),
+    session: AsyncSession = Depends(tenant_scoped_session),
+):
+    from app.services.comms import mark_message_read
+
+    msg = await mark_message_read(session, message_id, principal.user_id)
+    return {
+        "id": msg.id,
+        "read_at": msg.read_at.isoformat() if msg.read_at else None,
+    }
+
+
+@router.get("/messages/contacts")
+async def chat_contacts_route(
+    principal: AuthPrincipal = Depends(_teacher),
+    session: AsyncSession = Depends(tenant_scoped_session),
+):
+    """Suggested chat targets for the teacher: school admins +
+    principals (admin chat), and parents of students in any section
+    the teacher covers (parent chat). Students don't get an entry —
+    they don't have logins on this app surface."""
+    from sqlalchemy import select
+
+    from app.models.auth import Role, User, UserRole
+    from app.models.parent import Parent, ParentChildMapping, Student
+
+    # Admins + principals.
+    admins = list(
+        (
+            await session.execute(
+                select(User)
+                .join(UserRole, UserRole.user_id == User.id)
+                .join(Role, Role.id == UserRole.role_id)
+                .where(
+                    User.tenant_id == principal.tenant_id,
+                    User.is_active.is_(True),
+                    Role.code.in_(["school_admin", "principal", "vice_principal"]),
+                )
+            )
+        ).unique().scalars().all()
+    )
+
+    # Parents of accessible students.
+    accessible = await _accessible_section_ids(session, principal.user_id)
+    parent_rows: list[User] = []
+    if accessible:
+        students_in_my_sections = list(
+            (
+                await session.execute(
+                    select(Student.id).where(Student.section_id.in_(accessible))
+                )
+            ).scalars().all()
+        )
+        if students_in_my_sections:
+            parent_rows = list(
+                (
+                    await session.execute(
+                        select(User)
+                        .join(Parent, Parent.user_id == User.id)
+                        .join(
+                            ParentChildMapping,
+                            ParentChildMapping.parent_id == Parent.id,
+                        )
+                        .where(
+                            ParentChildMapping.student_id.in_(students_in_my_sections),
+                            User.is_active.is_(True),
+                        )
+                    )
+                ).unique().scalars().all()
+            )
+
+    def _u(u: User, kind: str) -> dict:
+        return {
+            "user_id": u.id,
+            "full_name": u.full_name,
+            "kind": kind,
+            "email": u.email,
+            "phone": u.phone,
+        }
+
+    seen: set[int] = set()
+    out: list[dict] = []
+    for u in admins:
+        if u.id in seen:
+            continue
+        seen.add(u.id)
+        out.append(_u(u, "admin"))
+    for u in parent_rows:
+        if u.id in seen:
+            continue
+        seen.add(u.id)
+        out.append(_u(u, "parent"))
+    return out
+
+
 @router.get("/students/{student_id}", response_model=StudentDrill)
 async def student_drill_route(
     student_id: int,

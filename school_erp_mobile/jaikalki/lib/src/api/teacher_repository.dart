@@ -12,6 +12,82 @@ class TeacherRepository {
     return TeacherMe.fromJson(res.data ?? const {});
   }
 
+  // ---- Chat / messages ---------------------------------------------------
+
+  Future<List<ChatContact>> chatContacts() async {
+    try {
+      final res = await _api.dio.get<List<dynamic>>(
+        '/v1/teacher/messages/contacts',
+      );
+      return (res.data ?? const [])
+          .map((e) => ChatContact.fromJson(e as Map<String, dynamic>))
+          .toList();
+    } on DioException {
+      return const [];
+    }
+  }
+
+  Future<List<ChatMessage>> inbox() async {
+    try {
+      final res = await _api.dio.get<List<dynamic>>(
+        '/v1/teacher/messages/inbox',
+      );
+      return (res.data ?? const [])
+          .map((e) => ChatMessage.fromJson(e as Map<String, dynamic>))
+          .toList();
+    } on DioException {
+      return const [];
+    }
+  }
+
+  Future<List<ChatMessage>> sent() async {
+    try {
+      final res = await _api.dio.get<List<dynamic>>(
+        '/v1/teacher/messages/sent',
+      );
+      return (res.data ?? const [])
+          .map((e) => ChatMessage.fromJson(e as Map<String, dynamic>))
+          .toList();
+    } on DioException {
+      return const [];
+    }
+  }
+
+  Future<ChatMessage> sendMessage({
+    required int recipientUserId,
+    required String body,
+    String? subject,
+  }) async {
+    final res = await _api.dio.post<Map<String, dynamic>>(
+      '/v1/teacher/messages/send',
+      data: {
+        'recipient_user_id': recipientUserId,
+        'body': body,
+        if (subject != null && subject.isNotEmpty) 'subject': subject,
+      },
+    );
+    return ChatMessage.fromJson(res.data ?? const {});
+  }
+
+  Future<void> markMessageRead(int messageId) async {
+    await _api.dio.post('/v1/teacher/messages/$messageId/read');
+  }
+
+  // ---- Student marks (Phase X tab on drill-down) -------------------------
+
+  Future<List<StudentExamRow>> studentMarks(int studentId) async {
+    try {
+      final res = await _api.dio.get<Map<String, dynamic>>(
+        '/v1/teacher/students/$studentId/marks',
+      );
+      return ((res.data?['exams'] as List<dynamic>?) ?? const [])
+          .map((e) => StudentExamRow.fromJson(e as Map<String, dynamic>))
+          .toList();
+    } on DioException {
+      return const [];
+    }
+  }
+
   /// Today's own-attendance row for the logged-in teacher (or null
   /// status when nothing's marked yet). Powers the "Mark me present"
   /// pill on the Today screen.
@@ -476,6 +552,9 @@ class TeacherToday {
     required this.pendingHomeworkCount,
     required this.pendingLeavesCount,
     required this.sectionsToMarkAttendance,
+    required this.totalStudentsCount,
+    required this.upcomingExamsCount,
+    required this.myPendingLeavesCount,
   });
 
   final String date;
@@ -484,6 +563,9 @@ class TeacherToday {
   final int pendingHomeworkCount;
   final int pendingLeavesCount;
   final int sectionsToMarkAttendance;
+  final int totalStudentsCount;
+  final int upcomingExamsCount;
+  final int myPendingLeavesCount;
 
   factory TeacherToday.fromJson(Map<String, dynamic> j) => TeacherToday(
         date: (j['date'] as String?) ?? '',
@@ -496,6 +578,12 @@ class TeacherToday {
         pendingLeavesCount: (j['pending_leaves_count'] as num?)?.toInt() ?? 0,
         sectionsToMarkAttendance:
             (j['sections_to_mark_attendance'] as num?)?.toInt() ?? 0,
+        totalStudentsCount:
+            (j['total_students_count'] as num?)?.toInt() ?? 0,
+        upcomingExamsCount:
+            (j['upcoming_exams_count'] as num?)?.toInt() ?? 0,
+        myPendingLeavesCount:
+            (j['my_pending_leaves_count'] as num?)?.toInt() ?? 0,
       );
 }
 
@@ -1078,4 +1166,107 @@ class MyAttendance {
         status: j['status'] as String?,
         remarks: j['remarks'] as String?,
       );
+}
+
+// ---- Chat models ---------------------------------------------------------
+
+class ChatContact {
+  const ChatContact({
+    required this.userId,
+    required this.fullName,
+    required this.kind,
+    required this.email,
+    required this.phone,
+  });
+
+  final int userId;
+  final String fullName;
+  /// "admin" | "parent"
+  final String kind;
+  final String? email;
+  final String? phone;
+
+  factory ChatContact.fromJson(Map<String, dynamic> j) => ChatContact(
+        userId: (j['user_id'] as num).toInt(),
+        fullName: (j['full_name'] as String?) ?? '',
+        kind: (j['kind'] as String?) ?? 'admin',
+        email: j['email'] as String?,
+        phone: j['phone'] as String?,
+      );
+}
+
+class ChatMessage {
+  const ChatMessage({
+    required this.id,
+    required this.senderUserId,
+    required this.recipientUserId,
+    required this.subject,
+    required this.body,
+    required this.readAt,
+    required this.createdAt,
+  });
+
+  final int id;
+  final int? senderUserId;
+  final int recipientUserId;
+  final String? subject;
+  final String body;
+  final String? readAt;
+  final String? createdAt;
+
+  bool get isRead => readAt != null;
+
+  factory ChatMessage.fromJson(Map<String, dynamic> j) => ChatMessage(
+        id: (j['id'] as num?)?.toInt() ?? 0,
+        senderUserId: (j['sender_user_id'] as num?)?.toInt(),
+        recipientUserId: (j['recipient_user_id'] as num?)?.toInt() ?? 0,
+        subject: j['subject'] as String?,
+        body: (j['body'] as String?) ?? '',
+        readAt: j['read_at'] as String?,
+        createdAt: j['created_at'] as String?,
+      );
+}
+
+// ---- Student exam history -------------------------------------------------
+
+class StudentExamRow {
+  const StudentExamRow({
+    required this.examId,
+    required this.examName,
+    required this.totalMax,
+    required this.totalObtained,
+    required this.percentage,
+    required this.overallGrade,
+    required this.overallStatus,
+    required this.subjects,
+  });
+
+  final int examId;
+  final String examName;
+  final double totalMax;
+  final double totalObtained;
+  final double percentage;
+  final String? overallGrade;
+  final String? overallStatus;
+  final List<Map<String, dynamic>> subjects;
+
+  factory StudentExamRow.fromJson(Map<String, dynamic> j) => StudentExamRow(
+        examId: (j['exam_id'] as num?)?.toInt() ?? 0,
+        examName: (j['exam_name'] as String?) ?? '',
+        totalMax: _toNumDouble(j['total_max']),
+        totalObtained: _toNumDouble(j['total_obtained']),
+        percentage: _toNumDouble(j['percentage']),
+        overallGrade: j['overall_grade'] as String?,
+        overallStatus: j['overall_status'] as String?,
+        subjects: ((j['subjects'] as List<dynamic>?) ?? const [])
+            .map((e) => (e as Map<String, dynamic>))
+            .toList(),
+      );
+}
+
+double _toNumDouble(dynamic v) {
+  if (v == null) return 0.0;
+  if (v is num) return v.toDouble();
+  if (v is String) return double.tryParse(v) ?? 0.0;
+  return 0.0;
 }

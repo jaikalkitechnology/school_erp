@@ -284,6 +284,7 @@ class _ApplyLeaveDialogState extends State<_ApplyLeaveDialog> {
               items: const [
                 DropdownMenuItem(value: 'casual', child: Text('Casual')),
                 DropdownMenuItem(value: 'sick', child: Text('Sick')),
+                DropdownMenuItem(value: 'emergency', child: Text('Emergency')),
                 DropdownMenuItem(value: 'earned', child: Text('Earned')),
                 DropdownMenuItem(value: 'unpaid', child: Text('Unpaid')),
                 DropdownMenuItem(value: 'other', child: Text('Other')),

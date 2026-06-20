@@ -236,27 +236,56 @@ class _CountStrip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Row(
+    return Column(
       children: [
-        _CountTile(
-          icon: Icons.event_available_outlined,
-          label: 'To mark',
-          value: today.sectionsToMarkAttendance.toString(),
-          tone: JaikalkiBrand.saffron,
+        Row(
+          children: [
+            _CountTile(
+              icon: Icons.event_available_outlined,
+              label: 'To mark',
+              value: today.sectionsToMarkAttendance.toString(),
+              tone: JaikalkiBrand.saffron,
+            ),
+            const SizedBox(width: 8),
+            _CountTile(
+              icon: Icons.assignment_outlined,
+              label: 'To grade',
+              value: today.pendingHomeworkCount.toString(),
+              tone: JaikalkiBrand.teal,
+            ),
+            const SizedBox(width: 8),
+            _CountTile(
+              icon: Icons.mail_outlined,
+              label: 'Leaves',
+              value: today.pendingLeavesCount.toString(),
+              tone: JaikalkiBrand.marigold,
+            ),
+          ],
         ),
-        const SizedBox(width: 8),
-        _CountTile(
-          icon: Icons.assignment_outlined,
-          label: 'To grade',
-          value: today.pendingHomeworkCount.toString(),
-          tone: JaikalkiBrand.teal,
-        ),
-        const SizedBox(width: 8),
-        _CountTile(
-          icon: Icons.mail_outlined,
-          label: 'Leaves',
-          value: today.pendingLeavesCount.toString(),
-          tone: JaikalkiBrand.marigold,
+        const SizedBox(height: 8),
+        Row(
+          children: [
+            _CountTile(
+              icon: Icons.groups_outlined,
+              label: 'Students',
+              value: today.totalStudentsCount.toString(),
+              tone: JaikalkiBrand.indigoDark,
+            ),
+            const SizedBox(width: 8),
+            _CountTile(
+              icon: Icons.history_edu_outlined,
+              label: 'Exams',
+              value: today.upcomingExamsCount.toString(),
+              tone: JaikalkiBrand.tealDark,
+            ),
+            const SizedBox(width: 8),
+            _CountTile(
+              icon: Icons.beach_access_outlined,
+              label: 'My leaves',
+              value: today.myPendingLeavesCount.toString(),
+              tone: JaikalkiBrand.saffronDark,
+            ),
+          ],
         ),
       ],
     );
