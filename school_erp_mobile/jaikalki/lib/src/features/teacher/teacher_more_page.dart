@@ -5,6 +5,7 @@ import '../../core/auth_cubit.dart';
 import '../../theme/brand.dart';
 import '../notifications/notifications_page.dart';
 import '../settings/settings_page.dart';
+import 'chat_list_page.dart';
 import 'homework_list_page.dart';
 import 'leaves_page.dart';
 import 'my_leaves_page.dart';
@@ -41,6 +42,14 @@ class TeacherMorePage extends StatelessWidget {
             label: 'My leaves',
             onTap: () => Navigator.of(context).push(
               MaterialPageRoute(builder: (_) => const MyLeavesPage()),
+            ),
+          ),
+          _Tile(
+            icon: Icons.chat_bubble_outline,
+            label: 'Chat',
+            subtitle: 'Message admins and parents',
+            onTap: () => Navigator.of(context).push(
+              MaterialPageRoute(builder: (_) => const ChatListPage()),
             ),
           ),
           _Tile(

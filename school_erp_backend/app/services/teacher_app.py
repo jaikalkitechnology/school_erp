@@ -98,6 +98,9 @@ class TeacherToday(BaseModel):
     pending_homework_count: int
     pending_leaves_count: int
     sections_to_mark_attendance: int
+    total_students_count: int = 0
+    upcoming_exams_count: int = 0
+    my_pending_leaves_count: int = 0
 
 
 class StudentRosterRow(BaseModel):
@@ -367,6 +370,57 @@ async def teacher_today(
 
     sections_to_mark = len({p.section_id for p in periods})
 
+    # Dashboard counters (new). Each guarded by try so a partial-DB
+    # tenant doesn't tank Today.
+    total_students = 0
+    try:
+        if accessible_section_ids:
+            total_students = int(
+                (
+                    await session.execute(
+                        select(func.count(Student.id)).where(
+                            Student.section_id.in_(accessible_section_ids),
+                            Student.is_active.is_(True),
+                        )
+                    )
+                ).scalar_one()
+            )
+    except Exception:  # pragma: no cover
+        total_students = 0
+
+    upcoming_exams = 0
+    try:
+        from app.models.exams import Exam
+
+        upcoming_exams = int(
+            (
+                await session.execute(
+                    select(func.count(Exam.id)).where(
+                        Exam.published_at.isnot(None),
+                    )
+                )
+            ).scalar_one()
+        )
+    except Exception:  # pragma: no cover
+        upcoming_exams = 0
+
+    my_pending_leaves = 0
+    try:
+        from app.models.staff_extras import StaffLeave
+
+        my_pending_leaves = int(
+            (
+                await session.execute(
+                    select(func.count(StaffLeave.id)).where(
+                        StaffLeave.user_id == user_id,
+                        StaffLeave.status == "pending",
+                    )
+                )
+            ).scalar_one()
+        )
+    except Exception:  # pragma: no cover
+        my_pending_leaves = 0
+
     return TeacherToday(
         date=today,
         day_of_week=dow,
@@ -374,6 +428,9 @@ async def teacher_today(
         pending_homework_count=submitted_to_grade,
         pending_leaves_count=pending_leaves,
         sections_to_mark_attendance=sections_to_mark,
+        total_students_count=total_students,
+        upcoming_exams_count=upcoming_exams,
+        my_pending_leaves_count=my_pending_leaves,
     )
 
 
