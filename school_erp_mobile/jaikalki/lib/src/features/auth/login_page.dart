@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import '../../core/auth_cubit.dart';
 import '../../core/service_locator.dart';
 import '../../theme/brand.dart';
+import 'forgot_password_page.dart';
 
 class LoginPage extends StatefulWidget {
   const LoginPage({super.key});
@@ -133,7 +134,24 @@ class _LoginPageState extends State<LoginPage> {
                             Text(errorMessage,
                                 style: t.bodyMedium?.copyWith(color: const Color(0xFFDC2626))),
                           ],
-                          const SizedBox(height: 22),
+                          const SizedBox(height: 6),
+                          Align(
+                            alignment: Alignment.centerRight,
+                            child: TextButton(
+                              onPressed: busy
+                                  ? null
+                                  : () => Navigator.of(context).push(
+                                        MaterialPageRoute(
+                                          builder: (_) => ForgotPasswordPage(
+                                            initialIdentifier: _identifier.text,
+                                            initialSubdomain: _subdomain.text,
+                                          ),
+                                        ),
+                                      ),
+                              child: const Text('Forgot password?'),
+                            ),
+                          ),
+                          const SizedBox(height: 6),
                           FilledButton(
                             onPressed: busy ? null : _submit,
                             child: Text(busy ? 'Signing in…' : 'Continue'),

@@ -172,3 +172,7 @@ from app.models.staff_extras import (  # noqa: F401
     StaffLeave,
     StaffLeaveStatus,
 )
+from app.models.auth_extras import (  # noqa: F401
+    PasswordResetOtp,
+    UserDevice,
+)

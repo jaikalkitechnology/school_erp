@@ -12,6 +12,8 @@ from app.core.tenant import TenantContext, get_tenant
 from app.core.tenant_session import platform_session
 from app.schemas.auth import (
     CurrentUser,
+    DeviceRegisterRequest,
+    DeviceUnregisterRequest,
     ForgotPasswordRequest,
     LoginRequest,
     LoginResponse,
@@ -28,8 +30,13 @@ from app.services.auth import (
     login as login_service,
     logout as logout_service,
     refresh as refresh_service,
-    reset_password,
     select_child,
+)
+from app.services.auth_otp import (
+    register_device,
+    request_password_reset_otp,
+    unregister_device,
+    verify_otp_and_reset_password,
 )
 
 router = APIRouter(prefix="/auth", tags=["auth"])
@@ -97,16 +104,52 @@ async def parent_select_child(
     return {"current_child_id": student_id}
 
 
-# ---- password reset (skeleton; OTP delivery wired in Phase 12) -------------
+# ---- password reset (real OTP flow) ---------------------------------------
+
+
+async def _tenant_for_reset(
+    payload_subdomain: Optional[str],
+    ctx_tenant_id: Optional[int],
+    session: AsyncSession,
+):
+    """Resolve the tenant the password reset is scoped to: explicit
+    subdomain in the payload beats the request's tenant header."""
+    from app.models.tenant import Tenant
+    from sqlalchemy import select as _select
+    from app.services.auth import _get_tenant_by_subdomain
+
+    if payload_subdomain:
+        return await _get_tenant_by_subdomain(session, payload_subdomain)
+    if ctx_tenant_id is None:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Tenant context required for password reset",
+        )
+    tenant = (
+        await session.execute(_select(Tenant).where(Tenant.id == ctx_tenant_id))
+    ).scalar_one_or_none()
+    if tenant is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="School not found",
+        )
+    return tenant
 
 
 @router.post("/forgot-password", status_code=status.HTTP_202_ACCEPTED)
-async def forgot_password(payload: ForgotPasswordRequest):
-    """Triggers an OTP send. Phase 12 plugs in MSG91/SendGrid."""
-    return {
-        "ok": True,
-        "message": "If that account exists, an OTP has been queued. (SMS/Email delivery lands in Phase 12.)",
-    }
+async def forgot_password(
+    payload: ForgotPasswordRequest,
+    session: AsyncSession = Depends(platform_session),
+    ctx: TenantContext = Depends(get_tenant),
+):
+    """Generate + dispatch a password-reset OTP. Always returns 202 so
+    the response can't be used to enumerate which accounts exist. In
+    dev (ENVIRONMENT != "production") the response also carries the OTP
+    under ``dev_otp`` so the mobile flow can be tested end-to-end
+    without a real SMS gateway."""
+    tenant = await _tenant_for_reset(payload.subdomain, ctx.tenant_id, session)
+    return await request_password_reset_otp(
+        session, tenant=tenant, identifier=payload.identifier,
+    )
 
 
 @router.post("/reset-password", status_code=status.HTTP_204_NO_CONTENT)
@@ -116,20 +159,54 @@ async def reset_password_endpoint(
     session: AsyncSession = Depends(platform_session),
     ctx: TenantContext = Depends(get_tenant),
 ):
-    """Phase 2 stub: trusts any OTP. Phase 12 will validate against the OTP store."""
-    if payload.subdomain:
-        # Lazy import to keep this file decoupled.
-        from app.services.auth import _get_tenant_by_subdomain
+    """Validate the OTP, set the new password, consume the OTP row."""
+    tenant = await _tenant_for_reset(payload.subdomain, ctx.tenant_id, session)
+    await verify_otp_and_reset_password(
+        session,
+        tenant=tenant,
+        identifier=payload.identifier,
+        otp=payload.otp,
+        new_password=payload.new_password,
+    )
 
-        tenant = await _get_tenant_by_subdomain(session, payload.subdomain)
-        tenant_id = tenant.id
-    elif ctx.tenant_id is not None:
-        tenant_id = ctx.tenant_id
-    else:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Tenant context required for password reset",
-        )
-    await reset_password(
-        session, tenant_id=tenant_id, identifier=payload.identifier, new_password=payload.new_password
+
+# ---- device tokens (FCM) --------------------------------------------------
+
+
+@router.post("/devices/register", status_code=status.HTTP_201_CREATED)
+async def register_device_route(
+    payload: DeviceRegisterRequest,
+    principal: AuthPrincipal = Depends(get_current_principal),
+    session: AsyncSession = Depends(platform_session),
+):
+    """Upsert the logged-in device's FCM token. Safe to call on every
+    cold-start: the (user_id, fcm_token) unique index turns repeated
+    registrations into idempotent ``last_seen_at`` bumps."""
+    row = await register_device(
+        session,
+        tenant_id=principal.tenant_id,
+        user_id=principal.user_id,
+        fcm_token=payload.fcm_token,
+        platform=payload.platform,
+        app_version=payload.app_version,
+        device_label=payload.device_label,
+    )
+    return {
+        "id": row.id,
+        "platform": row.platform,
+        "is_active": row.is_active,
+    }
+
+
+@router.post("/devices/unregister", status_code=status.HTTP_204_NO_CONTENT)
+async def unregister_device_route(
+    payload: DeviceUnregisterRequest,
+    principal: AuthPrincipal = Depends(get_current_principal),
+    session: AsyncSession = Depends(platform_session),
+):
+    """Soft-delete (is_active=False) the token for the current user.
+    Called on logout so the server stops pushing to a device the user
+    has signed out of."""
+    await unregister_device(
+        session, user_id=principal.user_id, fcm_token=payload.fcm_token,
     )
