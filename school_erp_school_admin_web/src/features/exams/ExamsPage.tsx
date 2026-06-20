@@ -18,6 +18,7 @@ import {
   publishExam,
   scheduleSubject,
   upsertGradeScale,
+  type ExamSubject,
   type ExamType,
   type ExamStatus,
   type MarkStatus,
@@ -88,12 +89,23 @@ function ExamsPanel() {
   const [name, setName] = useState("");
   const [kind, setKind] = useState<ExamType>("unit_test");
   const [maxMarks, setMaxMarks] = useState(100);
+  const [startDate, setStartDate] = useState("");
+  const [endDate, setEndDate] = useState("");
 
   const create = useMutation({
-    mutationFn: () => createExam({ name, kind, default_max_marks: maxMarks }),
+    mutationFn: () =>
+      createExam({
+        name,
+        kind,
+        default_max_marks: maxMarks,
+        start_date: startDate || null,
+        end_date: endDate || null,
+      }),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["exams"] });
       setName("");
+      setStartDate("");
+      setEndDate("");
     },
   });
   const publish = useMutation({
@@ -113,6 +125,9 @@ function ExamsPanel() {
   const [subjectId, setSubjectId] = useState<number | "">("");
   const [examMax, setExamMax] = useState(50);
   const [passing, setPassing] = useState(18);
+  const [paperDate, setPaperDate] = useState("");
+  const [startsAt, setStartsAt] = useState("");
+  const [endsAt, setEndsAt] = useState("");
   const schedule = useMutation({
     mutationFn: () =>
       scheduleSubject(activeExamId!, {
@@ -120,8 +135,16 @@ function ExamsPanel() {
         subject_id: Number(subjectId),
         max_marks: examMax,
         passing_marks: passing,
-      }),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ["exam-subjects", activeExamId] }),
+        exam_date: paperDate || null,
+        starts_at: startsAt || null,
+        ends_at: endsAt || null,
+      } as Partial<ExamSubject> & { class_def_id: number; subject_id: number }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["exam-subjects", activeExamId] });
+      setPaperDate("");
+      setStartsAt("");
+      setEndsAt("");
+    },
   });
 
   const classMap = useMemo(
@@ -150,6 +173,14 @@ function ExamsPanel() {
             </select>
           </div>
           <FieldNum label="Default max marks" value={maxMarks} onChange={setMaxMarks} />
+          <div className="grid grid-cols-2 gap-3">
+            <FieldDate label="From" value={startDate} onChange={setStartDate} />
+            <FieldDate label="To" value={endDate} onChange={setEndDate} />
+          </div>
+          <p className="text-xs text-muted-foreground">
+            From / To set the overall window. Per-paper date + time go on each
+            scheduled subject row below.
+          </p>
           <Button onClick={() => create.mutate()} disabled={!name || create.isPending}>
             <Plus className="h-4 w-4" /> Create
           </Button>
@@ -172,7 +203,22 @@ function ExamsPanel() {
                   <div className="flex items-center justify-between">
                     <div>
                       <p className="font-medium text-indigo-dark">{e.name}</p>
-                      <p className="text-xs text-muted-foreground">{e.kind} · max {e.default_max_marks}</p>
+                      <p className="text-xs text-muted-foreground">
+                        {e.kind} · max {e.default_max_marks}
+                        {e.start_date || e.end_date ? (
+                          <>
+                            {" · "}
+                            <span className="font-medium text-saffron-darker">
+                              {formatDateRange(e.start_date, e.end_date)}
+                            </span>
+                          </>
+                        ) : (
+                          <>
+                            {" · "}
+                            <span className="italic text-muted-foreground">no dates set</span>
+                          </>
+                        )}
+                      </p>
                     </div>
                     <div className="flex items-center gap-2">
                       <span className={cn("rounded-full px-2 py-0.5 text-[11px] uppercase", STATUS_TONE[e.status])}>
@@ -204,7 +250,12 @@ function ExamsPanel() {
               <Select label="Subject" value={subjectId} onChange={(v) => setSubjectId(v ? Number(v) : "")} options={(subjects.data ?? []).map((s) => ({ value: s.id, label: s.name }))} />
               <FieldNum label="Max" value={examMax} onChange={setExamMax} />
               <FieldNum label="Passing" value={passing} onChange={setPassing} />
-              <div className="flex items-end">
+              <FieldDate label="Paper date" value={paperDate} onChange={setPaperDate} />
+            </div>
+            <div className="grid gap-3 lg:grid-cols-5">
+              <FieldTime label="Starts at" value={startsAt} onChange={setStartsAt} />
+              <FieldTime label="Ends at" value={endsAt} onChange={setEndsAt} />
+              <div className="flex items-end lg:col-start-5">
                 <Button disabled={classDefId === "" || subjectId === "" || schedule.isPending} onClick={() => schedule.mutate()}>
                   <Plus className="h-4 w-4" /> Schedule
                 </Button>
@@ -212,8 +263,27 @@ function ExamsPanel() {
             </div>
             <ul className="divide-y divide-saffron-pale border-t border-saffron-pale">
               {(examSubjects.data ?? []).map((es) => (
-                <li key={es.id} className="flex justify-between px-2 py-2 text-sm">
-                  <span>{classMap.get(es.class_def_id)} · {subjectMap.get(es.subject_id)?.name ?? "?"}</span>
+                <li key={es.id} className="flex flex-wrap items-center justify-between gap-2 px-2 py-2 text-sm">
+                  <div className="flex flex-col">
+                    <span className="font-medium text-indigo-dark">
+                      {classMap.get(es.class_def_id)} · {subjectMap.get(es.subject_id)?.name ?? "?"}
+                    </span>
+                    <span className="text-xs text-muted-foreground">
+                      {es.exam_date ? (
+                        <span className="font-medium text-saffron-darker">
+                          {formatDayDate(es.exam_date)}
+                        </span>
+                      ) : (
+                        <span className="italic">no date</span>
+                      )}
+                      {es.starts_at || es.ends_at ? (
+                        <>
+                          {" · "}
+                          {formatTime(es.starts_at)} – {formatTime(es.ends_at)}
+                        </>
+                      ) : null}
+                    </span>
+                  </div>
                   <span className="font-mono text-xs text-muted-foreground">max {es.max_marks} · pass {es.passing_marks}</span>
                 </li>
               ))}
@@ -565,6 +635,51 @@ function FieldNum({ label, value, onChange }: { label: string; value: number; on
       <Input type="number" value={value} onChange={(e) => onChange(Number(e.target.value) || 0)} />
     </div>
   );
+}
+
+function FieldDate({ label, value, onChange }: { label: string; value: string; onChange: (v: string) => void }) {
+  return (
+    <div className="space-y-1.5">
+      <Label>{label}</Label>
+      <Input type="date" value={value} onChange={(e) => onChange(e.target.value)} />
+    </div>
+  );
+}
+
+function FieldTime({ label, value, onChange }: { label: string; value: string; onChange: (v: string) => void }) {
+  return (
+    <div className="space-y-1.5">
+      <Label>{label}</Label>
+      <Input type="time" value={value} onChange={(e) => onChange(e.target.value)} />
+    </div>
+  );
+}
+
+const _DOW = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+
+function formatDayDate(iso?: string | null) {
+  if (!iso) return "—";
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return iso;
+  return `${_DOW[d.getDay()]}, ${d.toLocaleDateString(undefined, { day: "numeric", month: "short" })}`;
+}
+
+function formatDateRange(start?: string | null, end?: string | null) {
+  if (!start && !end) return "no dates";
+  if (start && (!end || start === end)) return formatDayDate(start);
+  if (!start) return formatDayDate(end);
+  return `${formatDayDate(start)} → ${formatDayDate(end)}`;
+}
+
+function formatTime(t?: string | null) {
+  if (!t) return "—";
+  // accepts "HH:MM" or "HH:MM:SS"
+  const [hh, mm] = t.split(":");
+  const h = Number(hh);
+  if (Number.isNaN(h)) return t;
+  const period = h >= 12 ? "PM" : "AM";
+  const h12 = ((h + 11) % 12) + 1;
+  return `${h12}:${mm} ${period}`;
 }
 
 function Select<T extends string | number>({

@@ -26,6 +26,8 @@ export interface ExamSubject {
   max_marks: number;
   passing_marks: number;
   exam_date: string | null;
+  starts_at: string | null;
+  ends_at: string | null;
 }
 
 export interface RosterRow {
