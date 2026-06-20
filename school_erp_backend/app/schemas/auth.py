@@ -93,6 +93,22 @@ class ResetPasswordRequest(BaseModel):
     new_password: str = Field(min_length=6, max_length=128)
 
 
+class LoginOtpRequestBody(BaseModel):
+    """Step 1 of passwordless login: request that an OTP be dispatched
+    to the email/phone on file."""
+    identifier: str = Field(min_length=3, max_length=180)
+    subdomain: Optional[str] = Field(default=None, max_length=63)
+
+
+class LoginOtpVerifyBody(BaseModel):
+    """Step 2 of passwordless login: trade the OTP for access +
+    refresh tokens. Returns the same LoginResponse shape as
+    ``/v1/auth/login`` so the mobile cubit can reuse its happy path."""
+    identifier: str = Field(min_length=3, max_length=180)
+    subdomain: Optional[str] = Field(default=None, max_length=63)
+    otp: str = Field(min_length=4, max_length=12)
+
+
 class DeviceRegisterRequest(BaseModel):
     fcm_token: str = Field(min_length=8, max_length=255)
     platform: str = Field(default="android", max_length=16)

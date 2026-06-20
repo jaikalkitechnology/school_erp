@@ -69,6 +69,26 @@ class AuthCubit extends Cubit<AuthState> {
     }
   }
 
+  Future<void> loginWithOtp({
+    required String identifier,
+    required String subdomain,
+    required String otp,
+  }) async {
+    emit(const AuthAuthenticating());
+    try {
+      final result = await _repo.loginWithOtp(
+        identifier: identifier,
+        subdomain: subdomain,
+        otp: otp,
+      );
+      emit(AuthAuthenticated(result.user));
+    } on AuthException catch (e) {
+      emit(AuthError(e.message));
+    } catch (e) {
+      emit(AuthError('Sign-in failed: $e'));
+    }
+  }
+
   Future<void> logout() async {
     await _repo.logout();
     emit(const AuthInitial());
