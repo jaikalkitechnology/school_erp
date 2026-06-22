@@ -731,6 +731,22 @@ async def add_behaviour_note(
     session.add(obj)
     await session.commit()
     await session.refresh(obj)
+
+    if obj.visible_to_parent:
+        try:
+            await _notify_behaviour_note(
+                session,
+                tenant_id=tenant_id,
+                note=obj,
+                teacher_user_id=teacher_user_id,
+                student=student,
+            )
+        except Exception:  # noqa: BLE001
+            import logging
+            logging.getLogger(__name__).exception(
+                "behaviour.note notify failed (note_id=%s)", obj.id,
+            )
+
     return BehaviourNoteRead(
         id=obj.id,
         student_id=obj.student_id,
@@ -739,6 +755,60 @@ async def add_behaviour_note(
         headline=obj.headline,
         detail=obj.detail,
         visible_to_parent=obj.visible_to_parent,
+    )
+
+
+async def _notify_behaviour_note(
+    session: AsyncSession,
+    *,
+    tenant_id: int,
+    note,  # BehaviourNote
+    teacher_user_id: int,
+    student: Student,
+) -> None:
+    """Tell the parents about the new behaviour note. Skipped silently
+    when the note is teacher-only (visible_to_parent=False) — the
+    caller has already checked that flag."""
+    from app.models.auth import User
+    from app.models.parent import Parent, ParentChildMapping
+    from app.services.comms import notify
+
+    teacher = (
+        await session.execute(select(User).where(User.id == teacher_user_id))
+    ).scalar_one_or_none()
+
+    parent_user_ids = [
+        uid for (uid,) in (
+            await session.execute(
+                select(User.id)
+                .join(Parent, Parent.user_id == User.id)
+                .join(ParentChildMapping, ParentChildMapping.parent_id == Parent.id)
+                .where(
+                    ParentChildMapping.student_id == student.id,
+                    User.is_active.is_(True),
+                )
+            )
+        ).all()
+    ]
+    if not parent_user_ids:
+        return
+    users = list((await session.execute(
+        select(User).where(User.id.in_(parent_user_ids))
+    )).scalars().all())
+
+    await notify(
+        session,
+        tenant_id=tenant_id,
+        template_code="behaviour.note",
+        recipients=users,
+        context={
+            "teacher": teacher.full_name if teacher else "your child's teacher",
+            "headline": note.headline,
+        },
+        deeplink=f"/students/{student.id}/notes/{note.id}",
+        source_type="behaviour_note",
+        source_id=note.id,
+        kind="behaviour",
     )
 
 

@@ -23,6 +23,8 @@ from app.schemas.comms import (
     TemplateWrite,
 )
 from app.services.comms import (
+    refresh_default_template_channels,
+    seed_default_templates,
     create_announcement,
     delete_announcement,
     inbox_for,
@@ -59,6 +61,26 @@ sa_router = APIRouter(
 @sa_router.get("/templates", response_model=list[TemplateRead])
 async def list_templates_route(session: AsyncSession = Depends(tenant_scoped_session)):
     return await list_templates(session)
+
+
+@sa_router.post("/templates/sync-defaults")
+async def sync_default_templates_route(
+    principal: AuthPrincipal = Depends(get_current_principal),
+    session: AsyncSession = Depends(tenant_scoped_session),
+):
+    """Idempotent: inserts any predefined template rows the tenant
+    doesn't have yet (eg. homework.assigned was added after the tenant
+    was seeded) AND merges the default channel list into existing rows
+    so a newly-added channel like ``push`` lights up without losing the
+    tenant's own customisations (eg. they added SMS).
+
+    Call this once per tenant after deploying a new channel. Safe to
+    re-run."""
+    created = await seed_default_templates(session, principal.tenant_id)
+    refreshed = await refresh_default_template_channels(
+        session, tenant_id=principal.tenant_id,
+    )
+    return {"created": created, "channels_refreshed": refreshed}
 
 
 @sa_router.put("/templates/{code}", response_model=TemplateRead)

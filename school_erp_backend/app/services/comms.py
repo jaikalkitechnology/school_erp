@@ -52,24 +52,67 @@ _DEFAULTS: list[dict] = [
         "body_hi": "{{student}} का {{start}} से {{end}} तक का अवकाश {{decision}} किया गया। {{remarks}}",
         "subject_mr": "रजेचा अर्ज {{decision}}",
         "body_mr": "{{student}} ची {{start}} ते {{end}} पर्यंतची रजा {{decision}} झाली. {{remarks}}",
-        "channels": [Channel.IN_APP.value],
+        "channels": [Channel.IN_APP.value, Channel.PUSH.value],
     },
     {
         "code": "announcement.posted",
         "subject_en": "{{title}}",
         "body_en": "{{body}}",
-        "channels": [Channel.IN_APP.value],
+        "channels": [Channel.IN_APP.value, Channel.PUSH.value],
     },
     {
         "code": "fee.collected",
         "subject_en": "Receipt for {{invoice_number}}",
         "body_en": "We have received ₹{{amount}} for {{invoice_number}}. Thank you!",
-        "channels": [Channel.IN_APP.value, Channel.SMS.value],
+        "channels": [Channel.IN_APP.value, Channel.PUSH.value, Channel.SMS.value],
+    },
+    # Added below: every default template carries PUSH by default so the
+    # phone buzzes for the high-signal domain events. Add more here when
+    # you wire up a new notify() call site.
+    {
+        "code": "message.received",
+        "subject_en": "{{title}}",
+        "body_en": "{{body}}",
+        "channels": [Channel.IN_APP.value, Channel.PUSH.value],
+    },
+    {
+        "code": "homework.assigned",
+        "subject_en": "New homework: {{title}}",
+        "body_en": "{{subject}} · Due {{due_date}}",
+        "channels": [Channel.IN_APP.value, Channel.PUSH.value],
+    },
+    {
+        "code": "homework.graded",
+        "subject_en": "Homework graded: {{title}}",
+        "body_en": "{{student}} scored {{marks}} / {{max_marks}}.",
+        "channels": [Channel.IN_APP.value, Channel.PUSH.value],
+    },
+    {
+        "code": "fee.invoice",
+        "subject_en": "New invoice {{invoice_number}}",
+        "body_en": "₹{{amount}} due by {{due_date}} for {{student}}.",
+        "channels": [Channel.IN_APP.value, Channel.PUSH.value],
+    },
+    {
+        "code": "behaviour.note",
+        "subject_en": "Note from {{teacher}}",
+        "body_en": "{{headline}}",
+        "channels": [Channel.IN_APP.value, Channel.PUSH.value],
+    },
+    {
+        "code": "staff_leave.decided",
+        "subject_en": "Your leave was {{decision}}",
+        "body_en": "{{start}} → {{end}}. {{remarks}}",
+        "channels": [Channel.IN_APP.value, Channel.PUSH.value],
     },
 ]
 
 
 async def seed_default_templates(session: AsyncSession, tenant_id: int) -> int:
+    """Insert the predefined templates for a tenant. Idempotent on
+    (tenant_id, code) — skips rows that already exist. Use
+    ``refresh_default_template_channels`` to upgrade an existing tenant's
+    rows when a new channel (eg push) is added to a default."""
     existing = {
         c
         for (c,) in (
@@ -89,6 +132,40 @@ async def seed_default_templates(session: AsyncSession, tenant_id: int) -> int:
     if created:
         await session.commit()
     return created
+
+
+async def refresh_default_template_channels(
+    session: AsyncSession, tenant_id: Optional[int] = None,
+) -> int:
+    """Ensure every predefined template row has the channel list from
+    ``_DEFAULTS``. Used to roll out a new channel — eg push — to tenants
+    that were seeded before the channel existed. Doesn't touch tenant-
+    customised templates whose code isn't in ``_DEFAULTS``. Returns the
+    number of rows actually updated."""
+    by_code = {spec["code"]: spec for spec in _DEFAULTS}
+
+    stmt = select(NotificationTemplate).where(
+        NotificationTemplate.code.in_(by_code.keys())
+    )
+    if tenant_id is not None:
+        stmt = stmt.where(NotificationTemplate.tenant_id == tenant_id)
+    rows = (await session.execute(stmt)).scalars().all()
+
+    updated = 0
+    for row in rows:
+        desired = list(by_code[row.code]["channels"])
+        current = sorted(row.channels or [])
+        if sorted(desired) == current:
+            continue
+        # Merge in any tenant-added channels (sms / whatsapp / email) so
+        # local customisation isn't clobbered; we only enforce that the
+        # default channels are present.
+        merged = sorted(set(desired) | set(row.channels or []))
+        row.channels = merged
+        updated += 1
+    if updated:
+        await session.commit()
+    return updated
 
 
 async def list_templates(session: AsyncSession) -> list[NotificationTemplate]:
