@@ -25,5 +25,9 @@ uploads/tenant_*/
 # Secrets — service-account / credential JSONs must never be committed.
 firebase-service-account.json
 *-firebase-adminsdk-*.json
+*firebase-adminsdk*.json
+*firebaseadminsdk*.json
+schoolerp-*-firebase*.json
+schoolerp*firebase*.json
 google-services.json
 *.pem
