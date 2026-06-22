@@ -203,6 +203,12 @@ async def notify(
                 address = user.phone
             elif ch == Channel.EMAIL.value:
                 address = user.email
+            # Push doesn't use a per-row address — the push worker
+            # looks up active user_devices by recipient_user_id. So
+            # always queue push rows; let the worker decide whether
+            # the user has a device to deliver to.
+            needs_address = ch != Channel.PUSH.value
+            queued = (not needs_address) or address is not None
             outbox_row = NotificationOutbox(
                 tenant_id=tenant_id,
                 notification_id=None,  # populated post-commit
@@ -211,8 +217,8 @@ async def notify(
                 address=address,
                 subject=title,
                 body=body,
-                status=DeliveryStatus.SKIPPED.value if address is None else DeliveryStatus.QUEUED.value,
-                error=None if address else "missing address",
+                status=DeliveryStatus.QUEUED.value if queued else DeliveryStatus.SKIPPED.value,
+                error=None if queued else "missing address",
             )
             session.add(outbox_row)
             outbox += 1

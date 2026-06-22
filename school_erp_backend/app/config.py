@@ -77,8 +77,10 @@ class Settings(BaseSettings):
 
     # Firebase (push). Path is relative to the backend root by default;
     # override with FIREBASE_CREDENTIALS_PATH in the .env to point at the
-    # actual service-account JSON Google Cloud gave you.
-    FIREBASE_CREDENTIALS_PATH: str = "./school-jaikalki-firebase-adminsdk-fbsvc-5b1fcf0080.json"
+    # service-account JSON downloaded from Firebase Console → Project
+    # Settings → Service accounts → Generate new private key. Project id
+    # is currently schoolerp-1d377.
+    FIREBASE_CREDENTIALS_PATH: str = "./schoolerp-1d377-firebase-adminsdk.json"
 
     # Multi-tenant defaults
     DEFAULT_TENANT_LIMIT_STUDENTS: int = 500

@@ -1,4 +1,4 @@
-package com.erp_school.jaikalki
+package com.jaikalki.school_erp
 
 import io.flutter.embedding.android.FlutterActivity
 

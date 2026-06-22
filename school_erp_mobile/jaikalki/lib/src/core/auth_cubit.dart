@@ -1,6 +1,7 @@
 import 'package:flutter_bloc/flutter_bloc.dart';
 
 import '../api/auth_repository.dart';
+import 'push_service.dart';
 
 sealed class AuthState {
   const AuthState();
@@ -90,7 +91,21 @@ class AuthCubit extends Cubit<AuthState> {
   }
 
   Future<void> logout() async {
+    // Best-effort: tell the server to deactivate the push token for
+    // this device first, so the user doesn't keep receiving messages
+    // meant for the account they just signed out of.
+    await PushService.instance.unregisterCurrentDevice();
     await _repo.logout();
     emit(const AuthInitial());
+  }
+
+  /// Called from AuthCubit's bootstrap once the user is re-authenticated
+  /// on a cold start, and from the login happy path so the FCM token
+  /// gets attached to the new session. Safe to call repeatedly.
+  Future<void> registerPushIfReady() async {
+    // Kick PushService — it short-circuits if it's already initialised,
+    // otherwise it'll prompt for permission, grab the token, and POST
+    // to /v1/auth/devices/register against the current session.
+    await PushService.instance.start();
   }
 }
