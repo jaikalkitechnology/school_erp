@@ -532,7 +532,61 @@ async def generate_invoice_for_student(
     session.add(invoice)
     await session.commit()
     await session.refresh(invoice)
+
+    try:
+        await _notify_invoice_generated(
+            session, tenant_id=tenant_id, invoice=invoice, student=student,
+        )
+    except Exception:  # noqa: BLE001
+        import logging
+        logging.getLogger(__name__).exception(
+            "fee.invoice notify failed (invoice_id=%s)", invoice.id,
+        )
     return invoice
+
+
+async def _notify_invoice_generated(
+    session: AsyncSession, *, tenant_id: int, invoice: "FeeInvoice", student: Student,
+) -> None:
+    """Tell the parents of this student that a new invoice is due."""
+    from app.models.auth import User
+    from app.models.parent import Parent, ParentChildMapping
+    from app.services.comms import notify
+
+    parent_user_ids = [
+        uid for (uid,) in (
+            await session.execute(
+                select(User.id)
+                .join(Parent, Parent.user_id == User.id)
+                .join(ParentChildMapping, ParentChildMapping.parent_id == Parent.id)
+                .where(
+                    ParentChildMapping.student_id == student.id,
+                    User.is_active.is_(True),
+                )
+            )
+        ).all()
+    ]
+    if not parent_user_ids:
+        return
+    users = list((await session.execute(
+        select(User).where(User.id.in_(parent_user_ids))
+    )).scalars().all())
+    await notify(
+        session,
+        tenant_id=tenant_id,
+        template_code="fee.invoice",
+        recipients=users,
+        context={
+            "invoice_number": invoice.invoice_number,
+            "amount": f"{invoice.total_amount:.2f}",
+            "due_date": invoice.due_date.isoformat() if invoice.due_date else "—",
+            "student": student.full_name,
+        },
+        deeplink=f"/fees/invoices/{invoice.id}",
+        source_type="fee_invoice",
+        source_id=invoice.id,
+        kind="fees",
+    )
 
 
 # ---- Discount CRUD ---------------------------------------------------------

@@ -95,7 +95,91 @@ async def create_homework(
     session.add(obj)
     await session.commit()
     await session.refresh(obj)
+
+    # Notify every parent of every student in the section. Best-effort:
+    # the homework is already saved, so a notify() blow-up shouldn't 500
+    # the caller — they'll see it via the standard in-app feed anyway.
+    try:
+        await _notify_parents_homework_assigned(
+            session, tenant_id=tenant_id, homework=obj,
+        )
+    except Exception:  # noqa: BLE001
+        import logging
+        logging.getLogger(__name__).exception(
+            "homework.assigned notify failed (homework_id=%s)", obj.id,
+        )
     return obj
+
+
+async def _notify_parents_homework_assigned(
+    session: AsyncSession, *, tenant_id: int, homework: Homework,
+) -> None:
+    """Fan the new homework out to the parents of every student in the
+    section. Subject lookup is best-effort — falls back to "Homework"
+    if the subject id isn't set."""
+    from app.models.auth import User
+    from app.models.parent import Parent, ParentChildMapping
+    from app.services.comms import notify
+
+    student_ids = [
+        sid for (sid,) in (
+            await session.execute(
+                select(Student.id).where(Student.section_id == homework.section_id)
+            )
+        ).all()
+    ]
+    if not student_ids:
+        return
+
+    parent_user_ids = [
+        uid for (uid,) in (
+            await session.execute(
+                select(User.id)
+                .join(Parent, Parent.user_id == User.id)
+                .join(ParentChildMapping, ParentChildMapping.parent_id == Parent.id)
+                .where(
+                    ParentChildMapping.student_id.in_(student_ids),
+                    User.is_active.is_(True),
+                )
+            )
+        ).all()
+    ]
+    if not parent_user_ids:
+        return
+
+    users = list((await session.execute(
+        select(User).where(User.id.in_(parent_user_ids))
+    )).scalars().all())
+
+    subject_name = "Homework"
+    if homework.subject_id is not None:
+        try:
+            from app.models.academic import Subject
+            row = (
+                await session.execute(
+                    select(Subject.name).where(Subject.id == homework.subject_id)
+                )
+            ).first()
+            if row:
+                subject_name = row[0]
+        except Exception:  # noqa: BLE001
+            pass
+
+    await notify(
+        session,
+        tenant_id=tenant_id,
+        template_code="homework.assigned",
+        recipients=users,
+        context={
+            "title": homework.title,
+            "subject": subject_name,
+            "due_date": homework.due_date.isoformat(),
+        },
+        deeplink=f"/homework/{homework.id}",
+        source_type="homework",
+        source_id=homework.id,
+        kind="homework",
+    )
 
 
 async def update_homework(
@@ -223,7 +307,72 @@ async def grade_submission(
     sub.graded_at = _now()
     await session.commit()
     await session.refresh(sub)
+
+    try:
+        await _notify_homework_graded(
+            session, tenant_id=homework.tenant_id, submission=sub, homework=homework,
+        )
+    except Exception:  # noqa: BLE001
+        import logging
+        logging.getLogger(__name__).exception(
+            "homework.graded notify failed (submission_id=%s)", sub.id,
+        )
     return sub
+
+
+async def _notify_homework_graded(
+    session: AsyncSession, *, tenant_id: int,
+    submission: HomeworkSubmission, homework: Homework,
+) -> None:
+    """Tell every parent of this student that the paper was graded."""
+    from app.models.auth import User
+    from app.models.parent import Parent, ParentChildMapping
+    from app.services.comms import notify
+
+    student = (
+        await session.execute(
+            select(Student).where(Student.id == submission.student_id)
+        )
+    ).scalar_one_or_none()
+    if student is None:
+        return
+
+    parent_user_ids = [
+        uid for (uid,) in (
+            await session.execute(
+                select(User.id)
+                .join(Parent, Parent.user_id == User.id)
+                .join(ParentChildMapping, ParentChildMapping.parent_id == Parent.id)
+                .where(
+                    ParentChildMapping.student_id == student.id,
+                    User.is_active.is_(True),
+                )
+            )
+        ).all()
+    ]
+    if not parent_user_ids:
+        return
+
+    users = list((await session.execute(
+        select(User).where(User.id.in_(parent_user_ids))
+    )).scalars().all())
+
+    await notify(
+        session,
+        tenant_id=tenant_id,
+        template_code="homework.graded",
+        recipients=users,
+        context={
+            "title": homework.title,
+            "student": student.full_name,
+            "marks": str(submission.marks) if submission.marks is not None else "—",
+            "max_marks": str(homework.max_marks or "—"),
+        },
+        deeplink=f"/homework/{homework.id}/submissions/{submission.id}",
+        source_type="homework_submission",
+        source_id=submission.id,
+        kind="homework",
+    )
 
 
 async def list_submissions(
