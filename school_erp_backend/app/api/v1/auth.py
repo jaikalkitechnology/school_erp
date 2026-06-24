@@ -4,6 +4,9 @@ from __future__ import annotations
 
 from typing import Optional
 
+from sqlalchemy import select
+
+from sqlalchemy.orm import Session
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -44,6 +47,13 @@ from app.services.auth_otp import (
     verify_login_otp_and_issue_tokens,
     verify_otp_and_reset_password,
 )
+
+from sqlalchemy.orm import Session
+
+from app.database import get_db
+from app.models.auth_extras import UserDevice
+from app.schemas.auth import SendNotificationRequest
+from app.services import fcm
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
@@ -246,8 +256,9 @@ async def reset_password_endpoint(
 # so already-released client builds keep working until they're updated.
 
 
-@router.post("/devices/fcm/register", status_code=status.HTTP_201_CREATED)
-@router.post("/devices/register", status_code=status.HTTP_201_CREATED)
+ claude/analyze-school-erp-Kk7Z4
+=======
+ master
 async def register_device_route(
     payload: DeviceRegisterRequest,
     principal: AuthPrincipal = Depends(get_current_principal),
@@ -277,7 +288,10 @@ async def register_device_route(
 
 
 @router.post("/devices/fcm/unregister", status_code=status.HTTP_204_NO_CONTENT)
+ claude/analyze-school-erp-Kk7Z4
 @router.post("/devices/unregister", status_code=status.HTTP_204_NO_CONTENT)
+=======
+ master
 async def unregister_device_route(
     payload: DeviceUnregisterRequest,
     principal: AuthPrincipal = Depends(get_current_principal),
@@ -289,3 +303,46 @@ async def unregister_device_route(
     await unregister_device(
         session, user_id=principal.user_id, fcm_token=payload.fcm_token,
     )
+
+@router.post("/send-notification")
+async def send_notification(
+    payload: SendNotificationRequest,
+    session: AsyncSession = Depends(platform_session),
+):
+    result = await session.execute(
+        select(UserDevice).where(
+            UserDevice.user_id == payload.user_id,
+            UserDevice.is_active.is_(True)
+        )
+    )
+
+    devices = result.scalars().all()
+
+    if not devices:
+        raise HTTPException(
+            status_code=404,
+            detail="No active devices found"
+        )
+
+    success = 0
+
+    for device in devices:
+        try:
+            fcm.send_push(
+                token=device.fcm_token,
+                title=payload.title,
+                body=payload.body,
+                data={
+                    "screen": payload.screen or "",
+                    **payload.data
+                }
+            )
+            success += 1
+        except Exception as e:
+            print(f"FCM Error: {e}")
+
+    return {
+        "success": True,
+        "sent_count": success,
+        "total_devices": len(devices)
+    }

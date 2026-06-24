@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from datetime import datetime
-from typing import List, Optional
+from typing import List, Optional, Dict, Any
 
 from pydantic import BaseModel, ConfigDict, EmailStr, Field, field_validator
 
@@ -127,3 +127,10 @@ class DeviceRegisterRequest(BaseModel):
 
 class DeviceUnregisterRequest(BaseModel):
     fcm_token: str = Field(min_length=8, max_length=255)
+
+class SendNotificationRequest(BaseModel):
+    user_id: int
+    title: str
+    body: str
+    screen: Optional[str] = None
+    data: Dict[str, Any] = {}

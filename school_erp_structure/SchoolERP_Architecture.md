@@ -75,7 +75,7 @@ All on a **single mobile app** + React admin panel for Super Admin.
 │  ├─ Librarian                                           │
 │  ├─ Transport Manager                                   │
 │  └─ Other staff                                         │
-│  Platforms: Android + iOS + Web                         │
+ │  Platforms: Android + iOS + Web                         │
 └─────────────────────────────────────────────────────────┘
                         ↓
 ┌─────────────────────────────────────────────────────────┐
