@@ -63,8 +63,14 @@ class PushService {
   /// target this device. No-ops if the user isn't logged in (the
   /// register endpoint requires auth) — the next cold-start after
   /// login will re-register.
-  Future<void> _registerWithBackend(String token) async {
-    if (token.isEmpty || token == _lastRegisteredToken) return;
+  ///
+  /// [force] bypasses the "already registered this token" short-circuit.
+  /// Use it on a fresh login: even if FCM hands back the same token
+  /// string, the *session* is new and the backend needs to (re)upsert
+  /// the row against the new user_id.
+  Future<void> _registerWithBackend(String token, {bool force = false}) async {
+    if (token.isEmpty) return;
+    if (!force && token == _lastRegisteredToken) return;
     try {
       await locator<AuthRepository>().registerDevice(
         fcmToken: token,
@@ -74,6 +80,31 @@ class PushService {
       debugPrint('FCM token registered with backend.');
     } catch (e) {
       debugPrint('FCM token register failed (will retry on next start): $e');
+    }
+  }
+
+  /// Public hook for AuthCubit: called after a successful login (or
+  /// session restore) so the backend always sees an up-to-date
+  /// (user_id, fcm_token) row for this device.
+  ///
+  /// Distinct from [start] — that's an idempotent boot hook that
+  /// guards with [_started]; this one ignores the guard and forces a
+  /// re-register against the freshly-authenticated session. Initialises
+  /// the FCM listeners on the first call so a clean "logged out at
+  /// app boot → log in" path still works.
+  Future<void> registerForCurrentSession() async {
+    try {
+      // Make sure start() has run so onTokenRefresh / onMessage are
+      // hooked up; start()'s own _started guard prevents double-listen.
+      await start();
+      final token = await FirebaseMessaging.instance.getToken();
+      if (token == null) {
+        debugPrint('registerForCurrentSession: getToken() returned null');
+        return;
+      }
+      await _registerWithBackend(token, force: true);
+    } catch (e, st) {
+      debugPrint('registerForCurrentSession failed: $e\n$st');
     }
   }
 

@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter_bloc/flutter_bloc.dart';
 
 import '../api/auth_repository.dart';
@@ -34,6 +36,10 @@ class AuthCubit extends Cubit<AuthState> {
     final result = await _repo.tryMe();
     if (result.user != null) {
       emit(AuthAuthenticated(result.user!));
+      // Cold-start with a valid session: re-register the FCM token
+      // against this session so the backend has a fresh row even if
+      // the OS rotated the token while the app was killed.
+      unawaited(PushService.instance.registerForCurrentSession());
       return;
     }
     if (result.sessionInvalid) {
@@ -63,6 +69,11 @@ class AuthCubit extends Cubit<AuthState> {
         subdomain: subdomain,
       );
       emit(AuthAuthenticated(result.user));
+      // Force a fresh /v1/auth/devices/register against this session.
+      // Even when FCM hands back the same token string we saw on the
+      // previous user, the backend needs to upsert it against the new
+      // user_id (and deactivate the old user's row).
+      unawaited(PushService.instance.registerForCurrentSession());
     } on AuthException catch (e) {
       emit(AuthError(e.message));
     } catch (e) {
@@ -83,6 +94,7 @@ class AuthCubit extends Cubit<AuthState> {
         otp: otp,
       );
       emit(AuthAuthenticated(result.user));
+      unawaited(PushService.instance.registerForCurrentSession());
     } on AuthException catch (e) {
       emit(AuthError(e.message));
     } catch (e) {
@@ -97,15 +109,5 @@ class AuthCubit extends Cubit<AuthState> {
     await PushService.instance.unregisterCurrentDevice();
     await _repo.logout();
     emit(const AuthInitial());
-  }
-
-  /// Called from AuthCubit's bootstrap once the user is re-authenticated
-  /// on a cold start, and from the login happy path so the FCM token
-  /// gets attached to the new session. Safe to call repeatedly.
-  Future<void> registerPushIfReady() async {
-    // Kick PushService — it short-circuits if it's already initialised,
-    // otherwise it'll prompt for permission, grab the token, and POST
-    // to /v1/auth/devices/register against the current session.
-    await PushService.instance.start();
   }
 }
