@@ -364,12 +364,19 @@ async def register_device(
     app_version: Optional[str] = None,
     device_label: Optional[str] = None,
 ) -> UserDevice:
-    """Idempotent upsert keyed on (user_id, fcm_token).
+    """Upsert the (user_id, fcm_token) row + claim the token away from
+    any other user that previously held it.
 
-    Re-registration (eg. on every app start) just bumps last_seen_at and
-    flips is_active back to true. A fresh FCM rotation creates a new
-    row, which is fine — we deactivate any stale tokens for the same
-    user the next time FCM tells us a delivery failed.
+    Why the claim step matters: an FCM token represents a single device
+    install, not an account. If user A logs out and user B logs in on
+    the same phone, FCM hands us the same token string but we'd still
+    have user A's row sitting at ``is_active=1`` — every push aimed at
+    user A would then land on user B's phone. We fix that by flipping
+    every other user's row for this token to ``is_active=False`` before
+    upserting our own. Multi-account-on-one-device scenario stays sane.
+
+    Re-registration for the same (user_id, fcm_token) is idempotent —
+    just bumps last_seen_at + refreshes the metadata columns.
     """
     fcm_token = (fcm_token or "").strip()
     if not fcm_token:
@@ -377,6 +384,17 @@ async def register_device(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="fcm_token is required",
         )
+
+    # Claim the token: deactivate it on any other user's row.
+    await session.execute(
+        update(UserDevice)
+        .where(
+            UserDevice.fcm_token == fcm_token,
+            UserDevice.user_id != user_id,
+            UserDevice.is_active.is_(True),
+        )
+        .values(is_active=False)
+    )
 
     existing = (
         await session.execute(
