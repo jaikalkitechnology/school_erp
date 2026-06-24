@@ -250,17 +250,27 @@ async def reset_password_endpoint(
 
 
 # ---- device tokens (FCM) --------------------------------------------------
+#
+# Canonical paths are /devices/fcm/register and /devices/fcm/unregister.
+# The bare /devices/register and /devices/unregister are kept as aliases
+# so already-released client builds keep working until they're updated.
 
 
-@router.post("/devices/fcm/register", status_code=status.HTTP_201_CREATED)
+ claude/analyze-school-erp-Kk7Z4
+=======
+ master
 async def register_device_route(
     payload: DeviceRegisterRequest,
     principal: AuthPrincipal = Depends(get_current_principal),
     session: AsyncSession = Depends(platform_session),
 ):
-    """Upsert the logged-in device's FCM token. Safe to call on every
-    cold-start: the (user_id, fcm_token) unique index turns repeated
-    registrations into idempotent ``last_seen_at`` bumps."""
+    """Upsert the logged-in device's FCM token against this session.
+
+    The mobile client calls this on every successful login so a fresh
+    user always replaces whoever was previously bound to the same
+    token on the same phone. ``register_device`` deactivates any other
+    user's row holding this fcm_token before upserting, so future
+    pushes targeted at the previous user stop landing on this device."""
     row = await register_device(
         session,
         tenant_id=principal.tenant_id,
@@ -278,6 +288,10 @@ async def register_device_route(
 
 
 @router.post("/devices/fcm/unregister", status_code=status.HTTP_204_NO_CONTENT)
+ claude/analyze-school-erp-Kk7Z4
+@router.post("/devices/unregister", status_code=status.HTTP_204_NO_CONTENT)
+=======
+ master
 async def unregister_device_route(
     payload: DeviceUnregisterRequest,
     principal: AuthPrincipal = Depends(get_current_principal),

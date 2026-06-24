@@ -333,7 +333,7 @@ class AuthRepository {
     if (fcmToken.isEmpty) return;
     try {
       await _api.dio.post<dynamic>(
-        '/v1/auth/devices/register',
+        '/v1/auth/devices/fcm/register',
         data: {
           'fcm_token': fcmToken,
           'platform': platform,
@@ -350,7 +350,7 @@ class AuthRepository {
     if (fcmToken.isEmpty) return;
     try {
       await _api.dio.post<dynamic>(
-        '/v1/auth/devices/unregister',
+        '/v1/auth/devices/fcm/unregister',
         data: {'fcm_token': fcmToken},
       );
     } on DioException {
