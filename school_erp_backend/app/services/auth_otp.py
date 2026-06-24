@@ -364,19 +364,34 @@ async def register_device(
     app_version: Optional[str] = None,
     device_label: Optional[str] = None,
 ) -> UserDevice:
-    """Upsert the (user_id, fcm_token) row + claim the token away from
-    any other user that previously held it.
+    """Upsert the (user_id, fcm_token) row and make sure this is the
+    ONLY active row for the user — and that no other user holds the
+    same fcm_token.
 
-    Why the claim step matters: an FCM token represents a single device
-    install, not an account. If user A logs out and user B logs in on
-    the same phone, FCM hands us the same token string but we'd still
-    have user A's row sitting at ``is_active=1`` — every push aimed at
-    user A would then land on user B's phone. We fix that by flipping
-    every other user's row for this token to ``is_active=False`` before
-    upserting our own. Multi-account-on-one-device scenario stays sane.
+    Two cleanup steps run before the upsert:
 
-    Re-registration for the same (user_id, fcm_token) is idempotent —
-    just bumps last_seen_at + refreshes the metadata columns.
+    1. **Cross-user claim.** Deactivate any other user's row holding
+       this fcm_token. An FCM token represents a single device install;
+       if user A logs out and user B logs in on the same phone, FCM
+       hands us the same token but user A's row would otherwise stay
+       ``is_active=True`` and continue receiving pushes meant for A on
+       the now-stranger's phone.
+
+    2. **Same-user prune.** Deactivate every OTHER active row for this
+       user_id where the fcm_token doesn't match what we're about to
+       upsert. This stops stale-token accumulation: each time FCM
+       rotates the token the old rows just sat at ``is_active=True``
+       and the push worker fanned out to all of them — which is what
+       drove ``total_devices: 3`` on a single-device account and made
+       every send fail with ``registration-token-not-registered``.
+
+    Net result: per user there is exactly one active push target at
+    a time. If a real multi-device scenario shows up later
+    (phone + tablet), we'll add a per-(user, platform) qualifier
+    instead of stripping by user alone.
+
+    Re-registration for the same (user_id, fcm_token) stays idempotent
+    — just bumps last_seen_at + refreshes metadata.
     """
     fcm_token = (fcm_token or "").strip()
     if not fcm_token:
@@ -385,12 +400,24 @@ async def register_device(
             detail="fcm_token is required",
         )
 
-    # Claim the token: deactivate it on any other user's row.
+    # (1) Claim the token: deactivate it on any other user's row.
     await session.execute(
         update(UserDevice)
         .where(
             UserDevice.fcm_token == fcm_token,
             UserDevice.user_id != user_id,
+            UserDevice.is_active.is_(True),
+        )
+        .values(is_active=False)
+    )
+
+    # (2) Prune stale rows: deactivate this user's other active rows
+    # whose fcm_token doesn't match what we're about to upsert.
+    await session.execute(
+        update(UserDevice)
+        .where(
+            UserDevice.user_id == user_id,
+            UserDevice.fcm_token != fcm_token,
             UserDevice.is_active.is_(True),
         )
         .values(is_active=False)
