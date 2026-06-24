@@ -364,34 +364,27 @@ async def register_device(
     app_version: Optional[str] = None,
     device_label: Optional[str] = None,
 ) -> UserDevice:
-    """Upsert the (user_id, fcm_token) row and make sure this is the
-    ONLY active row for the user — and that no other user holds the
-    same fcm_token.
+    """One row per user. The user's existing row (if any) is updated
+    in place with the new fcm_token; if multiple rows exist from older
+    code paths, the most recent one is kept and the rest are deleted.
 
-    Two cleanup steps run before the upsert:
+    Two cleanup steps run first:
 
     1. **Cross-user claim.** Deactivate any other user's row holding
-       this fcm_token. An FCM token represents a single device install;
-       if user A logs out and user B logs in on the same phone, FCM
-       hands us the same token but user A's row would otherwise stay
-       ``is_active=True`` and continue receiving pushes meant for A on
-       the now-stranger's phone.
+       this exact fcm_token. An FCM token represents a single device
+       install; if user A logs out and user B logs in on the same
+       phone we don't want A's row to keep ``is_active=True`` and
+       continue receiving pushes meant for A on the now-stranger's
+       phone.
 
-    2. **Same-user prune.** Deactivate every OTHER active row for this
-       user_id where the fcm_token doesn't match what we're about to
-       upsert. This stops stale-token accumulation: each time FCM
-       rotates the token the old rows just sat at ``is_active=True``
-       and the push worker fanned out to all of them — which is what
-       drove ``total_devices: 3`` on a single-device account and made
-       every send fail with ``registration-token-not-registered``.
+    2. **Same-user collapse.** Find every row for this user_id,
+       keep the most recent one as the target, delete the rest, and
+       overwrite the target's fcm_token / metadata. The phone-and-account
+       pairing becomes a single mutable row, not an audit log — which
+       is what you saw asked for ("just replace old with new login
+       fcm").
 
-    Net result: per user there is exactly one active push target at
-    a time. If a real multi-device scenario shows up later
-    (phone + tablet), we'll add a per-(user, platform) qualifier
-    instead of stripping by user alone.
-
-    Re-registration for the same (user_id, fcm_token) stays idempotent
-    — just bumps last_seen_at + refreshes metadata.
+    First-time user (no row yet) → insert.
     """
     fcm_token = (fcm_token or "").strip()
     if not fcm_token:
@@ -400,7 +393,7 @@ async def register_device(
             detail="fcm_token is required",
         )
 
-    # (1) Claim the token: deactivate it on any other user's row.
+    # (1) Cross-user claim: deactivate any other user's row with this token.
     await session.execute(
         update(UserDevice)
         .where(
@@ -411,38 +404,33 @@ async def register_device(
         .values(is_active=False)
     )
 
-    # (2) Prune stale rows: deactivate this user's other active rows
-    # whose fcm_token doesn't match what we're about to upsert.
-    await session.execute(
-        update(UserDevice)
-        .where(
-            UserDevice.user_id == user_id,
-            UserDevice.fcm_token != fcm_token,
-            UserDevice.is_active.is_(True),
-        )
-        .values(is_active=False)
+    # (2) Same-user collapse: pick the most recent row to update, drop the rest.
+    existing_rows = list(
+        (
+            await session.execute(
+                select(UserDevice)
+                .where(UserDevice.user_id == user_id)
+                .order_by(UserDevice.id.desc())
+            )
+        ).scalars().all()
     )
 
-    existing = (
-        await session.execute(
-            select(UserDevice).where(
-                UserDevice.user_id == user_id,
-                UserDevice.fcm_token == fcm_token,
-            )
-        )
-    ).scalar_one_or_none()
-
-    if existing is not None:
-        existing.is_active = True
-        existing.last_seen_at = _now()
-        existing.platform = platform or existing.platform
+    if existing_rows:
+        target = existing_rows[0]
+        for stale in existing_rows[1:]:
+            await session.delete(stale)
+        target.fcm_token = fcm_token
+        target.is_active = True
+        target.last_seen_at = _now()
+        target.platform = platform or target.platform
         if app_version:
-            existing.app_version = app_version
+            target.app_version = app_version
         if device_label:
-            existing.device_label = device_label
+            target.device_label = device_label
         await session.commit()
-        return existing
+        return target
 
+    # (3) First-time row for this user.
     row = UserDevice(
         tenant_id=tenant_id,
         user_id=user_id,
