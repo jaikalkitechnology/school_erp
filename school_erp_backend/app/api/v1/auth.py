@@ -5,8 +5,6 @@ from __future__ import annotations
 from typing import Optional
 
 from sqlalchemy import select
-
-from sqlalchemy.orm import Session
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -48,9 +46,6 @@ from app.services.auth_otp import (
     verify_otp_and_reset_password,
 )
 
-from sqlalchemy.orm import Session
-
-from app.database import get_db
 from app.models.auth_extras import UserDevice
 from app.schemas.auth import SendNotificationRequest
 from app.services import fcm
@@ -256,9 +251,8 @@ async def reset_password_endpoint(
 # so already-released client builds keep working until they're updated.
 
 
- claude/analyze-school-erp-Kk7Z4
-=======
- master
+@router.post("/devices/fcm/register", status_code=status.HTTP_201_CREATED)
+@router.post("/devices/register", status_code=status.HTTP_201_CREATED)
 async def register_device_route(
     payload: DeviceRegisterRequest,
     principal: AuthPrincipal = Depends(get_current_principal),
@@ -288,10 +282,7 @@ async def register_device_route(
 
 
 @router.post("/devices/fcm/unregister", status_code=status.HTTP_204_NO_CONTENT)
- claude/analyze-school-erp-Kk7Z4
 @router.post("/devices/unregister", status_code=status.HTTP_204_NO_CONTENT)
-=======
- master
 async def unregister_device_route(
     payload: DeviceUnregisterRequest,
     principal: AuthPrincipal = Depends(get_current_principal),
@@ -304,27 +295,46 @@ async def unregister_device_route(
         session, user_id=principal.user_id, fcm_token=payload.fcm_token,
     )
 
+
 @router.post("/send-notification")
 async def send_notification(
     payload: SendNotificationRequest,
     session: AsyncSession = Depends(platform_session),
 ):
+    """Fire a one-off push to every active device the user has.
+
+    Errors per-device are collected and returned in ``errors`` rather
+    than raised — we don't want a single dead token to fail the whole
+    fan-out. Uses ``logging`` instead of ``print()`` so a broken stdout
+    pipe under systemd / supervisor doesn't turn this into a 500
+    (which is the symptom that brought us here)."""
+    import logging
+    log = logging.getLogger(__name__)
+
     result = await session.execute(
         select(UserDevice).where(
             UserDevice.user_id == payload.user_id,
-            UserDevice.is_active.is_(True)
+            UserDevice.is_active.is_(True),
         )
     )
-
     devices = result.scalars().all()
 
     if not devices:
         raise HTTPException(
-            status_code=404,
-            detail="No active devices found"
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="No active devices found",
+        )
+
+    if not fcm.is_available():
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail=f"FCM not configured: {fcm.unavailable_reason()}",
         )
 
     success = 0
+    failed = 0
+    errors: list[dict] = []
+    invalid_tokens: list[str] = []
 
     for device in devices:
         try:
@@ -334,15 +344,43 @@ async def send_notification(
                 body=payload.body,
                 data={
                     "screen": payload.screen or "",
-                    **payload.data
-                }
+                    **{k: str(v) for k, v in payload.data.items()},
+                },
             )
             success += 1
-        except Exception as e:
-            print(f"FCM Error: {e}")
+        except Exception as exc:  # noqa: BLE001 - FCM raises many types
+            failed += 1
+            err_code = getattr(exc, "code", "") or ""
+            log.warning(
+                "FCM send failed user_id=%s device_id=%s code=%s err=%s",
+                payload.user_id, device.id, err_code, exc,
+            )
+            errors.append({
+                "device_id": device.id,
+                "code": err_code,
+                "error": str(exc),
+            })
+            if err_code in {
+                "registration-token-not-registered",
+                "invalid-argument",
+            }:
+                invalid_tokens.append(device.fcm_token)
+
+    # Auto-prune dead tokens so the next call doesn't keep retrying them.
+    if invalid_tokens:
+        from sqlalchemy import update as _update
+        await session.execute(
+            _update(UserDevice)
+            .where(UserDevice.fcm_token.in_(invalid_tokens))
+            .values(is_active=False)
+        )
+        await session.commit()
 
     return {
-        "success": True,
+        "success": success > 0,
         "sent_count": success,
-        "total_devices": len(devices)
+        "failed_count": failed,
+        "total_devices": len(devices),
+        "deactivated": len(invalid_tokens),
+        "errors": errors,
     }
