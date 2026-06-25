@@ -35,11 +35,18 @@ class _TodayPageState extends State<TodayPage> {
   }
 
   Future<void> _markPresent() async {
-    setState(() => _markingMe = true);
+    setState(() {
+      _markingMe = true;
+    });
     try {
       final updated = await locator<TeacherRepository>().markMyAttendance();
       if (!mounted) return;
-      setState(() => _myAtt = Future.value(updated));
+      // Wrap in braces so the closure returns void, not the Future
+      // we're assigning. Arrow form (() => _myAtt = ...) makes
+      // setState's analyzer complain "callback returned a Future".
+      setState(() {
+        _myAtt = Future.value(updated);
+      });
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Marked present.')),
       );
@@ -49,7 +56,11 @@ class _TodayPageState extends State<TodayPage> {
         SnackBar(content: Text('Could not mark: $e')),
       );
     } finally {
-      if (mounted) setState(() => _markingMe = false);
+      if (mounted) {
+        setState(() {
+          _markingMe = false;
+        });
+      }
     }
   }
 
