@@ -49,6 +49,11 @@ class AnnouncementWrite(BaseModel):
     expires_at: Optional[datetime] = None
     is_pinned: bool = False
     publish: bool = True
+    # Per-announcement push override. When None we use whatever the
+    # ``announcement.posted`` template has configured. Set to False to
+    # silence push for one specific announcement (eg. low-priority
+    # notice that shouldn't buzz everyone's phone).
+    send_push: Optional[bool] = None
 
 
 class AnnouncementRead(BaseModel):
@@ -67,6 +72,9 @@ class AnnouncementRead(BaseModel):
 class PublishResult(BaseModel):
     announcement_id: int
     fanned_out_to: int
+    # Set after notify() runs so the admin UI can render
+    # "Pushed to N phones" alongside the in-app fan-out count.
+    push_queued: int = 0
 
 
 # ---- Notifications ---------------------------------------------------------

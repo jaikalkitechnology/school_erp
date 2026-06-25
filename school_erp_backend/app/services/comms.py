@@ -237,8 +237,15 @@ async def notify(
     source_type: Optional[str] = None,
     source_id: Optional[int] = None,
     kind: str = "generic",
+    channel_override: Optional[list[str]] = None,
 ) -> tuple[int, int]:
-    """Returns (notifications_created, outbox_rows_queued)."""
+    """Returns (notifications_created, push_outbox_rows_queued).
+
+    ``channel_override`` lets the caller bypass the template's channel
+    list for one call — set it to e.g. ``[in_app, push]`` to force
+    push for an admin-pushed announcement, or ``[in_app]`` to silence
+    push for one specific event. None = use the template as-is.
+    """
     template = (
         await session.execute(
             select(NotificationTemplate).where(NotificationTemplate.code == template_code)
@@ -254,8 +261,12 @@ async def notify(
         body = _format(template.body_en, context)
         channels = list(template.channels or [Channel.IN_APP.value])
 
+    # Per-call override beats the template's stored channel list.
+    if channel_override is not None:
+        channels = list(channel_override)
+
     notifs = 0
-    outbox = 0
+    push_queued = 0
     for user in recipients:
         notification: Optional[Notification] = None
         if Channel.IN_APP.value in channels:
@@ -298,7 +309,8 @@ async def notify(
                 error=None if queued else "missing address",
             )
             session.add(outbox_row)
-            outbox += 1
+            if queued and ch == Channel.PUSH.value:
+                push_queued += 1
         # Link outbox rows to the freshly-created notification once flushed.
     await session.flush()
     if notifs:
@@ -314,7 +326,7 @@ async def notify(
                 latest_id_by_user[n.recipient_user_id] = n.id
         # Best-effort link (only the newest notif per user counts).
     await session.commit()
-    return notifs, outbox
+    return notifs, push_queued
 
 
 # ---- Audience resolver -----------------------------------------------------
@@ -445,7 +457,20 @@ async def create_announcement(
     tenant_id: int,
     author_user_id: int,
     payload: AnnouncementWrite,
-) -> tuple[Announcement, int]:
+) -> tuple[Announcement, int, int]:
+    """Create the announcement row + (if publishing) fan it out to the
+    resolved audience.
+
+    Returns (announcement, in_app_count, push_queued_count). The push
+    count is the number of outbox rows for ``channel='push'`` that the
+    notify() call queued — the worker drains those into actual FCM
+    sends. Honours ``payload.send_push`` as a per-announcement override
+    for the template's channel list:
+      - None → use the template's channels as-is
+      - True → ensure push is in the channel list for this call
+      - False → strip push for this call (in-app + sms still fire if
+        the template has them)
+    """
     obj = Announcement(
         tenant_id=tenant_id,
         title=payload.title,
@@ -461,12 +486,14 @@ async def create_announcement(
     await session.flush()
 
     fanned = 0
+    push_queued = 0
     if payload.publish:
         users = await _resolve_audience(
             session, tenant_id=tenant_id, audience=payload.audience, audience_id=payload.audience_id
         )
         if users:
-            n_created, _ = await notify(
+            channel_override = _channel_override_for_announcement(payload.send_push)
+            n_created, push_queued = await notify(
                 session,
                 tenant_id=tenant_id,
                 template_code="announcement.posted",
@@ -476,11 +503,31 @@ async def create_announcement(
                 source_type="announcement",
                 source_id=obj.id,
                 kind="announcement",
+                channel_override=channel_override,
             )
             fanned = n_created
     await session.commit()
     await session.refresh(obj)
-    return obj, fanned
+    return obj, fanned, push_queued
+
+
+def _channel_override_for_announcement(
+    send_push: Optional[bool],
+) -> Optional[list[str]]:
+    """Translate the admin's per-call ``send_push`` toggle into a
+    channel-list override for ``notify()``.
+
+    None  → no override (use template's channels)
+    True  → in-app + push (matches the default announcement.posted
+            template; this is mostly a guard against tenants whose
+            template was customised to drop push)
+    False → in-app only (admin explicitly opted out of push)
+    """
+    if send_push is None:
+        return None
+    if send_push:
+        return [Channel.IN_APP.value, Channel.PUSH.value]
+    return [Channel.IN_APP.value]
 
 
 # ---- Direct messages -------------------------------------------------------
