@@ -238,8 +238,13 @@ async def notify(
     source_id: Optional[int] = None,
     kind: str = "generic",
     channel_override: Optional[list[str]] = None,
-) -> tuple[int, int]:
-    """Returns (notifications_created, push_outbox_rows_queued).
+) -> tuple[int, list[int]]:
+    """Returns (notifications_created, push_outbox_ids).
+
+    The second element is the list of ``notification_outbox.id`` rows
+    just queued with ``channel='push'`` — pass it straight into
+    ``push_dispatch.drain_pending_push_outbox_ids`` to send those
+    pushes synchronously without waiting for the worker.
 
     ``channel_override`` lets the caller bypass the template's channel
     list for one call — set it to e.g. ``[in_app, push]`` to force
@@ -266,7 +271,7 @@ async def notify(
         channels = list(channel_override)
 
     notifs = 0
-    push_queued = 0
+    push_outbox_rows: list[NotificationOutbox] = []
     for user in recipients:
         notification: Optional[Notification] = None
         if Channel.IN_APP.value in channels:
@@ -310,7 +315,7 @@ async def notify(
             )
             session.add(outbox_row)
             if queued and ch == Channel.PUSH.value:
-                push_queued += 1
+                push_outbox_rows.append(outbox_row)
         # Link outbox rows to the freshly-created notification once flushed.
     await session.flush()
     if notifs:
@@ -326,7 +331,11 @@ async def notify(
                 latest_id_by_user[n.recipient_user_id] = n.id
         # Best-effort link (only the newest notif per user counts).
     await session.commit()
-    return notifs, push_queued
+    # After the commit above the queued rows have ids — return them
+    # so the caller can pass them to push_dispatch and fire FCM
+    # immediately without waiting for the background worker.
+    push_outbox_ids = [r.id for r in push_outbox_rows if r.id is not None]
+    return notifs, push_outbox_ids
 
 
 # ---- Audience resolver -----------------------------------------------------
@@ -457,20 +466,26 @@ async def create_announcement(
     tenant_id: int,
     author_user_id: int,
     payload: AnnouncementWrite,
-) -> tuple[Announcement, int, int]:
+) -> tuple[Announcement, int, int, int]:
     """Create the announcement row + (if publishing) fan it out to the
-    resolved audience.
+    resolved audience AND fire FCM pushes immediately.
 
-    Returns (announcement, in_app_count, push_queued_count). The push
-    count is the number of outbox rows for ``channel='push'`` that the
-    notify() call queued — the worker drains those into actual FCM
-    sends. Honours ``payload.send_push`` as a per-announcement override
-    for the template's channel list:
+    Returns (announcement, in_app_count, push_sent, push_failed). The
+    push numbers are the count of phones actually reached via FCM —
+    notify() queues the outbox rows, then we call
+    ``drain_pending_push_outbox_ids`` synchronously so the admin sees
+    real delivery numbers in the publish toast even when the async
+    ``push_worker`` daemon isn't running.
+
+    Honours ``payload.send_push`` as a per-announcement override of
+    the template's channel list:
       - None → use the template's channels as-is
       - True → ensure push is in the channel list for this call
       - False → strip push for this call (in-app + sms still fire if
         the template has them)
     """
+    from app.services.push_dispatch import drain_pending_push_outbox_ids
+
     obj = Announcement(
         tenant_id=tenant_id,
         title=payload.title,
@@ -486,14 +501,14 @@ async def create_announcement(
     await session.flush()
 
     fanned = 0
-    push_queued = 0
+    push_outbox_ids: list[int] = []
     if payload.publish:
         users = await _resolve_audience(
             session, tenant_id=tenant_id, audience=payload.audience, audience_id=payload.audience_id
         )
         if users:
             channel_override = _channel_override_for_announcement(payload.send_push)
-            n_created, push_queued = await notify(
+            n_created, push_outbox_ids = await notify(
                 session,
                 tenant_id=tenant_id,
                 template_code="announcement.posted",
@@ -506,9 +521,22 @@ async def create_announcement(
                 channel_override=channel_override,
             )
             fanned = n_created
+    # notify() already committed the new rows above; this commit picks
+    # up the Announcement insert flush done before notify ran.
     await session.commit()
     await session.refresh(obj)
-    return obj, fanned, push_queued
+
+    # Fire FCM immediately for the rows we just queued. Failures are
+    # written back to the outbox row's status so the audit trail is
+    # honest whether or not a separate push worker is running.
+    push_sent = 0
+    push_failed = 0
+    if push_outbox_ids:
+        result = await drain_pending_push_outbox_ids(session, push_outbox_ids)
+        push_sent = result.sent
+        push_failed = result.failed
+
+    return obj, fanned, push_sent, push_failed
 
 
 def _channel_override_for_announcement(

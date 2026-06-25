@@ -32,9 +32,12 @@ export interface AnnouncementWrite {
 export interface PublishResult {
   announcement_id: number;
   fanned_out_to: number;
-  // Number of push outbox rows queued for the announcement.posted
-  // template. The push worker drains them into actual FCM sends.
-  push_queued: number;
+  // Phones actually reached via FCM (drain ran synchronously inside
+  // the publish handler). Zero if every recipient has no active
+  // device, or if FCM is misconfigured.
+  push_sent: number;
+  // Sends FCM rejected (dead token, mismatched-credential, etc).
+  push_failed: number;
 }
 
 export interface Template {

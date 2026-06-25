@@ -72,9 +72,14 @@ class AnnouncementRead(BaseModel):
 class PublishResult(BaseModel):
     announcement_id: int
     fanned_out_to: int
-    # Set after notify() runs so the admin UI can render
-    # "Pushed to N phones" alongside the in-app fan-out count.
-    push_queued: int = 0
+    # Phones actually reached via FCM (drain ran synchronously inside
+    # the publish handler). Zero if every recipient has no active
+    # device, or if FCM is misconfigured.
+    push_sent: int = 0
+    # FCM rejected sends (dead token, mismatched-credential, etc).
+    # Surfaces in the admin UI as " - N pushes failed" so silent
+    # rot is impossible to miss.
+    push_failed: int = 0
 
 
 # ---- Notifications ---------------------------------------------------------

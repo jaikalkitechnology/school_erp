@@ -303,84 +303,53 @@ async def send_notification(
 ):
     """Fire a one-off push to every active device the user has.
 
-    Errors per-device are collected and returned in ``errors`` rather
-    than raised — we don't want a single dead token to fail the whole
-    fan-out. Uses ``logging`` instead of ``print()`` so a broken stdout
-    pipe under systemd / supervisor doesn't turn this into a 500
-    (which is the symptom that brought us here)."""
-    import logging
-    log = logging.getLogger(__name__)
+    Per-device errors are collected and returned rather than raised —
+    we don't want a single dead token to fail the whole fan-out.
+    Shares the implementation with the admin Communication page's
+    announcement publish path so behaviour is identical."""
+    from app.services.push_dispatch import send_push_to_user
 
-    result = await session.execute(
-        select(UserDevice).where(
-            UserDevice.user_id == payload.user_id,
-            UserDevice.is_active.is_(True),
-        )
-    )
-    devices = result.scalars().all()
-
-    if not devices:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="No active devices found",
-        )
-
+    # Guard before we even query devices so the 404 vs 503 distinction
+    # is preserved.
     if not fcm.is_available():
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
             detail=f"FCM not configured: {fcm.unavailable_reason()}",
         )
 
-    success = 0
-    failed = 0
-    errors: list[dict] = []
-    invalid_tokens: list[str] = []
-
-    for device in devices:
-        try:
-            fcm.send_push(
-                token=device.fcm_token,
-                title=payload.title,
-                body=payload.body,
-                data={
-                    "screen": payload.screen or "",
-                    **{k: str(v) for k, v in payload.data.items()},
-                },
-            )
-            success += 1
-        except Exception as exc:  # noqa: BLE001 - FCM raises many types
-            failed += 1
-            err_code = getattr(exc, "code", "") or ""
-            log.warning(
-                "FCM send failed user_id=%s device_id=%s code=%s err=%s",
-                payload.user_id, device.id, err_code, exc,
-            )
-            errors.append({
-                "device_id": device.id,
-                "code": err_code,
-                "error": str(exc),
-            })
-            if err_code in {
-                "registration-token-not-registered",
-                "invalid-argument",
-            }:
-                invalid_tokens.append(device.fcm_token)
-
-    # Auto-prune dead tokens so the next call doesn't keep retrying them.
-    if invalid_tokens:
-        from sqlalchemy import update as _update
+    devices_count = (
         await session.execute(
-            _update(UserDevice)
-            .where(UserDevice.fcm_token.in_(invalid_tokens))
-            .values(is_active=False)
+            select(UserDevice).where(
+                UserDevice.user_id == payload.user_id,
+                UserDevice.is_active.is_(True),
+            )
         )
-        await session.commit()
+    ).scalars().all()
+    if not devices_count:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="No active devices found",
+        )
+
+    result = await send_push_to_user(
+        session,
+        user_id=payload.user_id,
+        title=payload.title,
+        body=payload.body,
+        data={
+            "screen": payload.screen or "",
+            **{k: str(v) for k, v in payload.data.items()},
+        },
+    )
+    success = result.sent
+    failed = result.failed
+    errors = result.errors
 
     return {
         "success": success > 0,
         "sent_count": success,
         "failed_count": failed,
-        "total_devices": len(devices),
-        "deactivated": len(invalid_tokens),
+        "total_devices": len(devices_count),
+        "deactivated": result.deactivated,
         "errors": errors,
     }
