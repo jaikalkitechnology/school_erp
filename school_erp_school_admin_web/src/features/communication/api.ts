@@ -24,11 +24,17 @@ export interface AnnouncementWrite {
   is_pinned?: boolean;
   publish?: boolean;
   expires_at?: string;
+  // Per-announcement push toggle. Omit / null → use the template
+  // default. true / false → force or silence push for this one.
+  send_push?: boolean | null;
 }
 
 export interface PublishResult {
   announcement_id: number;
   fanned_out_to: number;
+  // Number of push outbox rows queued for the announcement.posted
+  // template. The push worker drains them into actual FCM sends.
+  push_queued: number;
 }
 
 export interface Template {

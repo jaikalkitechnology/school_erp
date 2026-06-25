@@ -307,6 +307,8 @@ function AnnouncementsPanel() {
   const [audience, setAudience] = useState<Audience>("all");
   const [audienceId, setAudienceId] = useState<number | "">("");
   const [pinned, setPinned] = useState(false);
+  // Default on: most announcements should buzz the phone.
+  const [sendPush, setSendPush] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [lastResult, setLastResult] = useState<string | null>(null);
   // Per-row ticks for bulk delete. Cleared after each successful mutation.
@@ -389,10 +391,18 @@ function AnnouncementsPanel() {
         audience_id: audience === "class" || audience === "section" ? Number(audienceId) || undefined : undefined,
         is_pinned: pinned,
         publish: true,
+        send_push: sendPush,
       }),
     onSuccess: (res) => {
-      setLastResult(`Published. Notified ${res.fanned_out_to} user${res.fanned_out_to === 1 ? "" : "s"}.`);
+      const inAppLine = `Notified ${res.fanned_out_to} user${res.fanned_out_to === 1 ? "" : "s"} in-app`;
+      const pushLine = res.push_queued > 0
+        ? `, pushed to ${res.push_queued} phone${res.push_queued === 1 ? "" : "s"}`
+        : sendPush
+          ? " · push skipped (no active devices for the audience)"
+          : " · push intentionally off";
+      setLastResult(`Published. ${inAppLine}${pushLine}.`);
       setTitle(""); setBody(""); setPinned(false); setAudienceId("");
+      // Don't reset sendPush — admin's preference stays sticky.
       qc.invalidateQueries({ queryKey: ["announcements"] });
     },
     onError: (err: any) => setError(err?.response?.data?.detail ?? "Could not publish"),
@@ -409,7 +419,7 @@ function AnnouncementsPanel() {
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2"><Megaphone className="h-5 w-5" /> New announcement</CardTitle>
-          <CardDescription>Pick an audience; we'll fan it out as in-app notifications instantly.</CardDescription>
+          <CardDescription>Pick an audience; we'll fan it out as in-app notifications and (by default) a push to every recipient's phone.</CardDescription>
         </CardHeader>
         <CardContent className="space-y-3">
           <Field label="Title" value={title} onChange={setTitle} />
@@ -432,10 +442,27 @@ function AnnouncementsPanel() {
               />
             )}
           </div>
-          <label className="flex items-center gap-2 text-sm">
-            <input type="checkbox" className="h-4 w-4 accent-saffron" checked={pinned} onChange={(e) => setPinned(e.target.checked)} />
-            Pin to the top
-          </label>
+          <div className="space-y-2">
+            <label className="flex items-center gap-2 text-sm">
+              <input type="checkbox" className="h-4 w-4 accent-saffron" checked={pinned} onChange={(e) => setPinned(e.target.checked)} />
+              Pin to the top
+            </label>
+            <label className="flex items-start gap-2 text-sm">
+              <input
+                type="checkbox"
+                className="mt-0.5 h-4 w-4 accent-saffron"
+                checked={sendPush}
+                onChange={(e) => setSendPush(e.target.checked)}
+              />
+              <span>
+                Also send push notification
+                <span className="ml-2 text-xs text-muted-foreground">
+                  Buzzes every recipient's phone via FCM. Uncheck to keep
+                  the announcement in-app only.
+                </span>
+              </span>
+            </label>
+          </div>
           {error && <p className="text-sm text-destructive">{error}</p>}
           {lastResult && <p className="text-sm text-teal-dark">{lastResult}</p>}
           <Button onClick={() => create.mutate()} disabled={!title || !body || create.isPending}>
