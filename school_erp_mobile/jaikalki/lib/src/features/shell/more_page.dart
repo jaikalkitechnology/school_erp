@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
 import '../../core/auth_cubit.dart';
+import '../../core/children_cubit.dart';
+import '../../core/service_locator.dart';
 import '../../core/settings_cubit.dart';
 import '../../theme/brand.dart';
 import '../calendar/calendar_page.dart';
@@ -24,8 +26,15 @@ class MorePage extends StatelessWidget {
     final s = settings.strings;
     return Scaffold(
       appBar: AppBar(title: Text(s.tabMore)),
-      body: ListView(
-        children: [
+      body: RefreshIndicator(
+        // The More tab is a static menu — pull-to-refresh just bumps the
+        // ChildrenCubit so the next time you tap into Profile / Results /
+        // Library you don't see stale child data.
+        onRefresh: () async {
+          await locator<ChildrenCubit>().load();
+        },
+        child: ListView(
+          children: [
           _Tile(
             icon: Icons.badge_outlined,
             label: 'Student profile',
@@ -81,6 +90,7 @@ class MorePage extends StatelessWidget {
             onTap: () => context.read<AuthCubit>().logout(),
           ),
         ],
+        ),
       ),
     );
   }
