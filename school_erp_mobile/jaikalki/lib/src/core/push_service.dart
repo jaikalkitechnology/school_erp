@@ -2,20 +2,40 @@ import 'dart:io' show Platform;
 
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/foundation.dart';
+import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 
 import '../api/auth_repository.dart';
 import 'service_locator.dart';
 
-/// Thin wrapper around firebase_messaging that:
-///  - requests notification permission once,
-///  - fetches the device's FCM token + posts it to the backend so the
-///    push worker can target this device,
-///  - listens for foreground messages and re-registers the token when
-///    FCM rotates it.
+/// Top-level so FCM can invoke it from a background isolate when the
+/// app is killed. Must be a top-level / static function — not a method
+/// — or FCM's plugin host can't find the entry point.
 ///
-/// Intentionally side-effect-light so it can be called from main(): we
-/// swallow every failure and log to console. The notification_outbox is
-/// the source of truth for whether a message was delivered.
+/// We intentionally don't do anything heavy here: FCM already shows
+/// the system tray notification using the `notification` block in the
+/// payload. The handler exists so the plugin's "did you register a
+/// background handler?" check passes and `data`-only messages still
+/// reach us (useful when we add deep-link routing later).
+@pragma('vm:entry-point')
+Future<void> firebaseMessagingBackgroundHandler(RemoteMessage message) async {
+  debugPrint(
+    'FCM background message: title=${message.notification?.title} '
+    'body=${message.notification?.body} data=${message.data}',
+  );
+}
+
+/// Thin wrapper around firebase_messaging + flutter_local_notifications:
+///
+///  * Requests notification permission (Android 13+, iOS).
+///  * Fetches the FCM token and posts it to the backend.
+///  * Listens for foreground messages and shows them in the system tray
+///    via flutter_local_notifications — FCM does NOT auto-display
+///    notifications while the app is foregrounded, so without this the
+///    user only sees nothing when the app is open.
+///  * Background/killed delivery is handled by Play Services using
+///    the `notification` block in the FCM payload (the AndroidManifest
+///    declares the default channel id ``jaikalki_default`` so the
+///    system tray banner uses our channel).
 class PushService {
   PushService._();
   static final PushService instance = PushService._();
@@ -23,16 +43,39 @@ class PushService {
   bool _started = false;
   String? _lastRegisteredToken;
 
+  /// Default Android channel id. Must match the value in
+  /// AndroidManifest.xml under
+  /// ``com.google.firebase.messaging.default_notification_channel_id``.
+  static const String _channelId = 'jaikalki_default';
+  static const String _channelName = 'General';
+  static const String _channelDescription =
+      'School updates, announcements, homework, fees, and chat.';
+
+  final FlutterLocalNotificationsPlugin _local =
+      FlutterLocalNotificationsPlugin();
+
   Future<void> start() async {
     if (_started) return;
     _started = true;
     try {
+      // 1) Local-notifications plugin: needed for foreground banners.
+      await _initLocalNotifications();
+
+      // 2) FCM permission + listeners.
       final messaging = FirebaseMessaging.instance;
 
       final settings = await messaging.requestPermission(
         alert: true, badge: true, sound: true, provisional: false,
       );
       debugPrint('FCM permission status: ${settings.authorizationStatus}');
+
+      // iOS only: allow the OS to show the system banner while we're in
+      // the foreground too, in addition to our own local notification.
+      // On Android the OS suppresses tray banners for foreground apps no
+      // matter what, so the local notification is the only path.
+      await messaging.setForegroundNotificationPresentationOptions(
+        alert: true, badge: true, sound: true,
+      );
 
       // First-time token; may be null on iOS until APNs is wired.
       final token = await messaging.getToken();
@@ -47,16 +90,99 @@ class PushService {
         _registerWithBackend(newToken);
       });
 
-      // Foreground messages: log + (later) surface a local notification.
-      FirebaseMessaging.onMessage.listen((message) {
+      // 3) Foreground messages → render a local notification so the
+      //    user actually sees the banner instead of nothing.
+      FirebaseMessaging.onMessage.listen((message) async {
         debugPrint(
           'FCM foreground message: title=${message.notification?.title} '
           'body=${message.notification?.body} data=${message.data}',
+        );
+        await _showLocalNotificationFrom(message);
+      });
+
+      // 4) Background / killed: register the top-level handler so the
+      //    plugin keeps delivering messages to us even when the isolate
+      //    is asleep. The system tray banner is shown by Play Services
+      //    from the `notification` payload — not from this handler.
+      FirebaseMessaging.onBackgroundMessage(firebaseMessagingBackgroundHandler);
+
+      // 5) Optional: log taps on a tray notification while the app was
+      //    in the background. Useful later for deep-link routing.
+      FirebaseMessaging.onMessageOpenedApp.listen((message) {
+        debugPrint(
+          'FCM notification tapped: data=${message.data}',
         );
       });
     } catch (e, st) {
       debugPrint('PushService.start failed: $e\n$st');
     }
+  }
+
+  Future<void> _initLocalNotifications() async {
+    const androidInit = AndroidInitializationSettings('@mipmap/ic_launcher');
+    const iosInit = DarwinInitializationSettings(
+      requestAlertPermission: false,
+      requestBadgePermission: false,
+      requestSoundPermission: false,
+    );
+    const init = InitializationSettings(android: androidInit, iOS: iosInit);
+
+    await _local.initialize(
+      init,
+      onDidReceiveNotificationResponse: (resp) {
+        debugPrint('Local notification tapped: payload=${resp.payload}');
+        // Hook deep-link routing here once we wire payload → screen.
+      },
+    );
+
+    // Android needs the channel to exist before we post to it. Idempotent.
+    final android =
+        _local.resolvePlatformSpecificImplementation<
+            AndroidFlutterLocalNotificationsPlugin>();
+    await android?.createNotificationChannel(
+      const AndroidNotificationChannel(
+        _channelId,
+        _channelName,
+        description: _channelDescription,
+        importance: Importance.high,
+      ),
+    );
+    // Android 13+: explicit POST_NOTIFICATIONS permission.
+    await android?.requestNotificationsPermission();
+  }
+
+  Future<void> _showLocalNotificationFrom(RemoteMessage message) async {
+    final notification = message.notification;
+    final title = notification?.title ?? message.data['title'] as String?;
+    final body = notification?.body ?? message.data['body'] as String?;
+    if ((title == null || title.isEmpty) && (body == null || body.isEmpty)) {
+      // Data-only push with no human-readable payload — skip.
+      return;
+    }
+    const androidDetails = AndroidNotificationDetails(
+      _channelId,
+      _channelName,
+      channelDescription: _channelDescription,
+      importance: Importance.high,
+      priority: Priority.high,
+      icon: '@mipmap/ic_launcher',
+    );
+    const iosDetails = DarwinNotificationDetails(
+      presentAlert: true, presentBadge: true, presentSound: true,
+    );
+    const details = NotificationDetails(android: androidDetails, iOS: iosDetails);
+
+    final id = (message.messageId?.hashCode ?? DateTime.now().millisecondsSinceEpoch)
+        .abs()
+        .toInt() & 0x7fffffff;
+
+    await _local.show(
+      id,
+      title ?? '',
+      body ?? '',
+      details,
+      payload: message.data['screen'] as String?,
+    );
   }
 
   /// Tells the API server about the FCM token so the push worker can
@@ -86,12 +212,6 @@ class PushService {
   /// Public hook for AuthCubit: called after a successful login (or
   /// session restore) so the backend always sees an up-to-date
   /// (user_id, fcm_token) row for this device.
-  ///
-  /// Distinct from [start] — that's an idempotent boot hook that
-  /// guards with [_started]; this one ignores the guard and forces a
-  /// re-register against the freshly-authenticated session. Initialises
-  /// the FCM listeners on the first call so a clean "logged out at
-  /// app boot → log in" path still works.
   Future<void> registerForCurrentSession() async {
     try {
       // Make sure start() has run so onTokenRefresh / onMessage are
