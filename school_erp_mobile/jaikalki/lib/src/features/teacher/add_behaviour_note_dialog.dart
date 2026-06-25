@@ -75,16 +75,22 @@ class _AddBehaviourNoteDialogState extends State<AddBehaviourNoteDialog> {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Row(
+            // Wrap (not Row) so the three chips can flow onto a second
+            // line on narrow phones — "positive / neutral / concern"
+            // overflows the dialog width otherwise.
+            Wrap(
+              spacing: 6,
+              runSpacing: 6,
               children: [
                 for (final k in const ['positive', 'neutral', 'concern'])
-                  Padding(
-                    padding: const EdgeInsets.only(right: 6),
-                    child: ChoiceChip(
-                      label: Text(k),
-                      selected: _kind == k,
-                      onSelected: (_) => setState(() => _kind = k),
-                    ),
+                  ChoiceChip(
+                    label: Text(k),
+                    selected: _kind == k,
+                    onSelected: (_) {
+                      setState(() {
+                        _kind = k;
+                      });
+                    },
                   ),
               ],
             ),

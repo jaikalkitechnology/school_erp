@@ -140,8 +140,20 @@ async def _teacher_for_user(
 async def _accessible_sections(
     session: AsyncSession, *, user_id: int
 ) -> list[int]:
-    """Sections this user is allowed to touch — either as in-charge or
-    as the subject teacher of any subject in that section."""
+    """Sections this user is allowed to touch.
+
+    * Regular teachers: sections where they're the in-charge or the
+      subject teacher of any subject.
+    * Senior staff (principal / vice-principal / coordinator /
+      school admin): every section in the tenant — they oversee the
+      whole school.
+    """
+    if await _user_has_senior_role(session, user_id):
+        return list(
+            (
+                await session.execute(select(Section.id))
+            ).scalars().all()
+        )
     in_charge_ids = list(
         (
             await session.execute(
@@ -161,15 +173,40 @@ async def _accessible_sections(
     return sorted({*in_charge_ids, *teach_ids})
 
 
+_SENIOR_STAFF_ROLES = {"principal", "vice_principal", "coordinator", "school_admin"}
+
+
+async def _user_has_senior_role(session: AsyncSession, user_id: int) -> bool:
+    """Senior staff (principal / vice-principal / coordinator /
+    school admin) oversee every section in the school. They don't need
+    to be the in-charge or a subject teacher to view a roster — they
+    have blanket access."""
+    from app.models.auth import Role, UserRole
+
+    rows = (
+        await session.execute(
+            select(Role.code)
+            .join(UserRole, UserRole.role_id == Role.id)
+            .where(UserRole.user_id == user_id)
+        )
+    ).all()
+    return any(code in _SENIOR_STAFF_ROLES for (code,) in rows)
+
+
 async def assert_section_access(
     session: AsyncSession, *, user_id: int, section_id: int
 ) -> None:
     sections = await _accessible_sections(session, user_id=user_id)
-    if section_id not in sections:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="You don't teach this section",
-        )
+    if section_id in sections:
+        return
+    # Fallback: senior staff have blanket access even when they're not
+    # the in-charge / a subject teacher of the section.
+    if await _user_has_senior_role(session, user_id):
+        return
+    raise HTTPException(
+        status_code=status.HTTP_403_FORBIDDEN,
+        detail="You don't teach this section",
+    )
 
 
 # ---- Profile + access map -------------------------------------------------
