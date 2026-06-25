@@ -380,15 +380,33 @@ async def generate_invoices(
             detail="period_end must be on or after period_start",
         )
 
+    # Filter students by EITHER:
+    #   - student.class_def_id directly matching the structure's class
+    #   - student.section_id pointing at a section that lives under
+    #     that class (the common case — UIs that only pick a section
+    #     leave class_def_id NULL on the student row).
+    #
+    # Without the second branch the bulk generate silently created 0
+    # invoices whenever the admin's SIS forms only set section_id,
+    # which is exactly the symptom you saw on the parent app
+    # ("invoices don't appear in fees screen").
+    from sqlalchemy import or_
+    from app.models.academic import Section as _Section
+
     students = list(
         (
             await session.execute(
-                select(Student).where(
-                    Student.class_def_id == structure.class_def_id,
+                select(Student)
+                .outerjoin(_Section, _Section.id == Student.section_id)
+                .where(
                     Student.is_active.is_(True),
+                    or_(
+                        Student.class_def_id == structure.class_def_id,
+                        _Section.class_def_id == structure.class_def_id,
+                    ),
                 )
             )
-        ).scalars().all()
+        ).scalars().unique().all()
     )
 
     base_amount = _D(structure.amount)
