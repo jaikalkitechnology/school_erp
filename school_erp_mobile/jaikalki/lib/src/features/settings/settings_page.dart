@@ -23,7 +23,15 @@ class SettingsPage extends StatelessWidget {
       builder: (context, state) {
         final s = state.strings;
         final t = Theme.of(context).textTheme;
-        return ListView(
+        return RefreshIndicator(
+          // No remote data on Settings, but adding the indicator keeps
+          // gesture parity with the rest of the parent app — every
+          // screen reacts to pull-to-refresh even if it's just a
+          // settings reread.
+          onRefresh: () async {
+            await context.read<SettingsCubit>().bootstrap();
+          },
+          child: ListView(
           padding: const EdgeInsets.all(20),
           children: [
             _Section(
@@ -58,6 +66,7 @@ class SettingsPage extends StatelessWidget {
             const SizedBox(height: 24),
             Text(s.aboutLine, style: t.bodyMedium),
           ],
+          ),
         );
       },
     );

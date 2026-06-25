@@ -43,24 +43,32 @@ class _DashboardPageState extends State<DashboardPage> {
 
           return Scaffold(
             appBar: AppBar(title: Text(s.today)),
-            body: ListView(
-              padding: const EdgeInsets.all(20),
-              children: [
-                _Header(user: user, greeting: greeting),
-                if (isParent) ...[
-                  const SizedBox(height: 16),
-                  const _ChildSwitcher(),
-                  const SizedBox(height: 16),
-                  const _ChildDashboardCard(),
-                  const SizedBox(height: 16),
-                  const _IdCardTile(),
-                  const SizedBox(height: 16),
-                  const _AttendanceCard(),
-                ] else ...[
-                  const SizedBox(height: 16),
-                  _StaffStats(),
+            body: RefreshIndicator(
+              onRefresh: () async {
+                // Refresh the children list + the selected child's data
+                // (attendance / fees / homework caches all listen to
+                // ChildrenCubit so reloading here cascades).
+                await locator<ChildrenCubit>().load();
+              },
+              child: ListView(
+                padding: const EdgeInsets.all(20),
+                children: [
+                  _Header(user: user, greeting: greeting),
+                  if (isParent) ...[
+                    const SizedBox(height: 16),
+                    const _ChildSwitcher(),
+                    const SizedBox(height: 16),
+                    const _ChildDashboardCard(),
+                    const SizedBox(height: 16),
+                    const _IdCardTile(),
+                    const SizedBox(height: 16),
+                    const _AttendanceCard(),
+                  ] else ...[
+                    const SizedBox(height: 16),
+                    _StaffStats(),
+                  ],
                 ],
-              ],
+              ),
             ),
           );
         },
@@ -237,8 +245,10 @@ class _ChildDashboardCard extends StatelessWidget {
             value: (dash.todayAttendance ?? '—').replaceAll('_', ' '),
             hint: 'Attendance',
           ),
-          _Tile(label: 'Pending leaves', value: dash.pendingLeaves.toString(), hint: 'Approvals'),
-          _Tile(label: 'Documents', value: dash.documentsCount.toString(), hint: 'On record'),
+          // "Pending leaves" + "Documents" tiles removed — parents
+          // weren't using either and the bare 2x2 of fees / today /
+          // <empty> looked unbalanced. The data still flows in
+          // ParentDashboard, just not surfaced on Home.
         ];
         return Column(
           crossAxisAlignment: CrossAxisAlignment.start,
