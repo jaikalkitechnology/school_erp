@@ -395,11 +395,19 @@ function AnnouncementsPanel() {
       }),
     onSuccess: (res) => {
       const inAppLine = `Notified ${res.fanned_out_to} user${res.fanned_out_to === 1 ? "" : "s"} in-app`;
-      const pushLine = res.push_queued > 0
-        ? `, pushed to ${res.push_queued} phone${res.push_queued === 1 ? "" : "s"}`
-        : sendPush
-          ? " · push skipped (no active devices for the audience)"
-          : " · push intentionally off";
+      let pushLine: string;
+      if (!sendPush) {
+        pushLine = " · push intentionally off";
+      } else if (res.push_sent > 0) {
+        pushLine = `, pushed to ${res.push_sent} phone${res.push_sent === 1 ? "" : "s"}`;
+        if (res.push_failed > 0) {
+          pushLine += ` (${res.push_failed} failed)`;
+        }
+      } else if (res.push_failed > 0) {
+        pushLine = ` · ${res.push_failed} push send${res.push_failed === 1 ? "" : "s"} failed`;
+      } else {
+        pushLine = " · push skipped (no active devices for the audience)";
+      }
       setLastResult(`Published. ${inAppLine}${pushLine}.`);
       setTitle(""); setBody(""); setPinned(false); setAudienceId("");
       // Don't reset sendPush — admin's preference stays sticky.

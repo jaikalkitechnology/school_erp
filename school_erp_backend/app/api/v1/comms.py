@@ -111,13 +111,14 @@ async def create_announcement_route(
     principal: AuthPrincipal = Depends(_school_admin),
     session: AsyncSession = Depends(tenant_scoped_session),
 ):
-    obj, fanned, push_queued = await create_announcement(
+    obj, fanned, push_sent, push_failed = await create_announcement(
         session, principal.tenant_id, principal.user_id, payload
     )
     return PublishResult(
         announcement_id=obj.id,
         fanned_out_to=fanned,
-        push_queued=push_queued,
+        push_sent=push_sent,
+        push_failed=push_failed,
     )
 
 
