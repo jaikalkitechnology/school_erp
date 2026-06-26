@@ -125,6 +125,7 @@ class AllocationRead(BaseModel):
     model_config = ConfigDict(from_attributes=True)
     id: int
     student_id: int
+    student_name: Optional[str] = None  # populated by the list route
     route_id: int
     pickup_stop_id: Optional[int]
     drop_stop_id: Optional[int]

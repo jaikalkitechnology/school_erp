@@ -3,12 +3,12 @@ import 'package:dio/dio.dart';
 import 'api_client.dart';
 
 /// Driver-app wrapper around the existing /v1/school-admin/transport
-/// router. Same backend endpoints, scoped to a `transport_manager` /
-/// staff role so the mobile driver shell can drive trips end-to-end:
+/// router. Same backend endpoints, scoped to the ``transport_manager``
+/// role so the mobile driver shell can drive trips end-to-end:
 ///
 ///   - List today's routes / pick one
 ///   - Start trip
-///   - Push GPS pings every 30 s while the trip is running
+///   - Push GPS pings every 15-30 s while the trip is running
 ///   - Mark students boarded / dropped
 ///   - Complete trip
 class DriverRepository {
@@ -22,6 +22,21 @@ class DriverRepository {
       );
       return (res.data ?? const [])
           .map((e) => DriverRoute.fromJson(e as Map<String, dynamic>))
+          .toList();
+    } on DioException {
+      return const [];
+    }
+  }
+
+  /// Roster of students currently allocated to a route — used by the
+  /// Boarding scan page to render tap-to-mark rows.
+  Future<List<DriverAllocation>> routeAllocations(int routeId) async {
+    try {
+      final res = await _api.dio.get<List<dynamic>>(
+        '/v1/school-admin/transport/routes/$routeId/allocations',
+      );
+      return (res.data ?? const [])
+          .map((e) => DriverAllocation.fromJson(e as Map<String, dynamic>))
           .toList();
     } on DioException {
       return const [];
@@ -155,5 +170,38 @@ class DriverTrip {
         tripDate: j['trip_date'] as String?,
         startedAt: j['started_at'] as String?,
         completedAt: j['completed_at'] as String?,
+      );
+}
+
+/// One row of the route roster: a student allocated to this route,
+/// plus their pickup stop. The Boarding page renders these as
+/// tap-to-mark rows.
+class DriverAllocation {
+  const DriverAllocation({
+    required this.id,
+    required this.studentId,
+    required this.studentName,
+    required this.routeId,
+    required this.pickupStopId,
+    required this.dropStopId,
+  });
+
+  final int id;
+  final int studentId;
+  final String studentName;
+  final int routeId;
+  final int? pickupStopId;
+  final int? dropStopId;
+
+  factory DriverAllocation.fromJson(Map<String, dynamic> j) =>
+      DriverAllocation(
+        id: (j['id'] as num?)?.toInt() ?? 0,
+        studentId: (j['student_id'] as num?)?.toInt() ?? 0,
+        studentName: (j['student_name'] as String?) ??
+            (j['full_name'] as String?) ??
+            'Student #${j['student_id']}',
+        routeId: (j['route_id'] as num?)?.toInt() ?? 0,
+        pickupStopId: (j['pickup_stop_id'] as num?)?.toInt(),
+        dropStopId: (j['drop_stop_id'] as num?)?.toInt(),
       );
 }

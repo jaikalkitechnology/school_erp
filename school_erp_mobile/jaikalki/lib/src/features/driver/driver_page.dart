@@ -2,10 +2,14 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:geolocator/geolocator.dart';
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 
+import '../../api/api_client.dart';
 import '../../api/driver_repository.dart';
+import '../../core/bus_tracking_service.dart';
 import '../../core/service_locator.dart';
 import '../../theme/brand.dart';
+import 'boarding_scan_page.dart';
 
 /// Driver mini-app baked into the existing Flutter binary. Reachable
 /// from More → Driver for users holding the ``transport_manager`` (or
@@ -99,9 +103,28 @@ class _DriverPageState extends State<DriverPage> {
         tripDate: _today(),
       );
       setState(() => _activeTrip = trip);
-      _ping(); // fire a first ping immediately
+
+      // Hand off the GPS loop to the background foreground service
+      // so the driver can lock their phone without losing pings.
+      final token = await const FlutterSecureStorage()
+          .read(key: 'jaikalki.access_token');
+      final subdomain = await const FlutterSecureStorage()
+          .read(key: 'jaikalki.subdomain');
+      if (token != null) {
+        await BusTrackingService.startForTrip(
+          tripId: trip.id,
+          accessToken: token,
+          baseUrl: locator<ApiClient>().baseUrl,
+          subdomain: subdomain,
+        );
+      }
+
+      // Also keep a foreground ping so the on-screen "last position"
+      // pill in this page updates without waiting for the next
+      // background tick.
+      _pingFromForeground();
       _pingTimer = Timer.periodic(
-        const Duration(seconds: 30), (_) => _ping(),
+        const Duration(seconds: 30), (_) => _pingFromForeground(),
       );
     } catch (e) {
       setState(() => _lastError = 'Could not start trip: $e');
@@ -110,29 +133,19 @@ class _DriverPageState extends State<DriverPage> {
     }
   }
 
-  Future<void> _ping() async {
-    final trip = _activeTrip;
-    if (trip == null) return;
+  Future<void> _pingFromForeground() async {
+    // Best-effort screen-update ping. The real every-15-s ping happens
+    // in the BusTrackingService background isolate.
     try {
-      final pos = await Geolocator.getCurrentPosition(
-        locationSettings: const LocationSettings(
-          accuracy: LocationAccuracy.high,
-          timeLimit: Duration(seconds: 8),
-        ),
-      );
-      _lastPosition = pos;
-      await locator<DriverRepository>().pingTrip(
-        tripId: trip.id,
-        lat: pos.latitude,
-        lng: pos.longitude,
-        speedKph: pos.speed * 3.6, // m/s → km/h
-      );
-      if (mounted) setState(() => _lastError = null);
-    } catch (e) {
-      if (mounted) {
-        setState(() => _lastError = 'Last ping failed: $e');
+      final pos = await Geolocator.getLastKnownPosition()
+          .timeout(const Duration(seconds: 5));
+      if (pos != null && mounted) {
+        setState(() {
+          _lastPosition = pos;
+          _lastError = null;
+        });
       }
-    }
+    } catch (_) {/* silent */}
   }
 
   Future<void> _endTrip() async {
@@ -141,6 +154,7 @@ class _DriverPageState extends State<DriverPage> {
     setState(() => _completing = true);
     _pingTimer?.cancel();
     _pingTimer = null;
+    await BusTrackingService.stop();
     try {
       await locator<DriverRepository>().completeTrip(tripId: trip.id);
       if (!mounted) return;
@@ -158,6 +172,20 @@ class _DriverPageState extends State<DriverPage> {
     }
   }
 
+  void _openBoardingScan() {
+    final trip = _activeTrip;
+    final route = _selectedRoute;
+    if (trip == null || route == null) return;
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => BoardingScanPage(
+          tripId: trip.id,
+          routeId: route.id,
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -172,6 +200,7 @@ class _DriverPageState extends State<DriverPage> {
                 trip: _activeTrip!,
                 position: _lastPosition,
                 onEnd: _completing ? null : _endTrip,
+                onBoarding: _openBoardingScan,
                 completing: _completing,
               )
             else
@@ -336,11 +365,13 @@ class _LiveTripCard extends StatelessWidget {
     required this.trip,
     required this.position,
     required this.onEnd,
+    required this.onBoarding,
     required this.completing,
   });
   final DriverTrip trip;
   final Position? position;
   final VoidCallback? onEnd;
+  final VoidCallback? onBoarding;
   final bool completing;
 
   @override
@@ -428,29 +459,48 @@ class _LiveTripCard extends StatelessWidget {
             ),
           ],
           const SizedBox(height: 14),
-          SizedBox(
-            width: double.infinity,
-            child: ElevatedButton.icon(
-              onPressed: onEnd,
-              icon: completing
-                  ? const SizedBox(
-                      width: 14, height: 14,
-                      child: CircularProgressIndicator(
-                        strokeWidth: 2,
-                        color: JaikalkiBrand.tealDark,
-                      ),
-                    )
-                  : const Icon(Icons.flag_outlined),
-              label: const Text('End trip'),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.white,
-                foregroundColor: JaikalkiBrand.tealDark,
-                padding: const EdgeInsets.symmetric(vertical: 12),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
+          Row(
+            children: [
+              Expanded(
+                child: OutlinedButton.icon(
+                  onPressed: onBoarding,
+                  icon: const Icon(Icons.qr_code_scanner_outlined),
+                  label: const Text('Boarding'),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: Colors.white,
+                    side: BorderSide(color: Colors.white.withOpacity(0.6)),
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                  ),
                 ),
               ),
-            ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: ElevatedButton.icon(
+                  onPressed: onEnd,
+                  icon: completing
+                      ? const SizedBox(
+                          width: 14, height: 14,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            color: JaikalkiBrand.tealDark,
+                          ),
+                        )
+                      : const Icon(Icons.flag_outlined),
+                  label: const Text('End trip'),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.white,
+                    foregroundColor: JaikalkiBrand.tealDark,
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                  ),
+                ),
+              ),
+            ],
           ),
         ],
       ),

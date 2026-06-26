@@ -4,6 +4,7 @@ import { Bus as BusIcon, MapPin, Plus, Play, Square, Wrench, Fuel } from "lucide
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { cn } from "@/lib/utils";
 import {
   addFuel,
@@ -12,6 +13,7 @@ import {
   createBus,
   createDriver,
   createRoute,
+  generateMonthlyTransportInvoices,
   listBuses,
   listDrivers,
   listFuel,
@@ -27,7 +29,7 @@ import {
   type TripPhase,
 } from "./api";
 
-const TABS = ["Fleet", "Routes", "Live trip", "Logs"] as const;
+const TABS = ["Fleet", "Routes", "Live trip", "Billing", "Logs"] as const;
 type Tab = (typeof TABS)[number];
 
 const PHASE_TONE: Record<TripPhase, string> = {
@@ -71,6 +73,7 @@ export function TransportPage() {
       {tab === "Fleet" && <FleetPanel />}
       {tab === "Routes" && <RoutesPanel />}
       {tab === "Live trip" && <LiveTripPanel />}
+      {tab === "Billing" && <BillingPanel />}
       {tab === "Logs" && <LogsPanel />}
     </div>
   );
@@ -693,6 +696,127 @@ function LogsPanel() {
             </CardContent>
           </Card>
         </div>
+      )}
+    </div>
+  );
+}
+
+// ---- Billing (Phase 26 — monthly transport invoice generator) -----------
+
+function BillingPanel() {
+  const now = new Date();
+  const [year, setYear] = useState(now.getFullYear());
+  const [month, setMonth] = useState(now.getMonth() + 1);
+  const [dueDay, setDueDay] = useState(10);
+  const [result, setResult] = useState<null | {
+    created: number;
+    skipped: number;
+    period_start: string;
+    period_end: string;
+  }>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  const run = useMutation({
+    mutationFn: () =>
+      generateMonthlyTransportInvoices({ year, month, due_day: dueDay }),
+    onSuccess: (data) => {
+      setResult(data);
+      setError(null);
+    },
+    onError: (err: any) =>
+      setError(err?.response?.data?.detail ?? "Could not generate invoices"),
+  });
+
+  const months = [
+    "Jan", "Feb", "Mar", "Apr", "May", "Jun",
+    "Jul", "Aug", "Sep", "Oct", "Nov", "Dec",
+  ];
+
+  return (
+    <div className="grid gap-4 lg:grid-cols-2">
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <BusIcon className="h-5 w-5" /> Monthly transport invoices
+          </CardTitle>
+          <CardDescription>
+            Spin up a FeeInvoice for every active StudentTransport row with
+            <code className="mx-1 rounded bg-muted px-1">fee_per_month &gt; 0</code>.
+            Idempotent — re-running for the same month skips students already
+            invoiced. Invoices show up in the parent's Fees screen alongside
+            tuition.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          <div className="grid grid-cols-3 gap-3">
+            <div className="space-y-1.5">
+              <Label>Year</Label>
+              <Input
+                type="number"
+                value={year}
+                onChange={(e) => setYear(Number(e.target.value) || year)}
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label>Month</Label>
+              <select
+                className="h-11 w-full rounded-md border border-input bg-background px-3 text-sm"
+                value={month}
+                onChange={(e) => setMonth(Number(e.target.value))}
+              >
+                {months.map((m, i) => (
+                  <option key={i} value={i + 1}>
+                    {i + 1} · {m}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div className="space-y-1.5">
+              <Label>Due day</Label>
+              <Input
+                type="number"
+                min={1}
+                max={28}
+                value={dueDay}
+                onChange={(e) => setDueDay(Number(e.target.value) || dueDay)}
+              />
+            </div>
+          </div>
+          {error && <p className="text-sm text-destructive">{error}</p>}
+          <Button onClick={() => run.mutate()} disabled={run.isPending}>
+            {run.isPending ? "Generating…" : "Generate invoices"}
+          </Button>
+        </CardContent>
+      </Card>
+
+      {result && (
+        <Card>
+          <CardHeader>
+            <CardTitle>Result</CardTitle>
+            <CardDescription>
+              {result.period_start} → {result.period_end}
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-2 text-sm">
+            <p>
+              <span className="font-semibold text-teal-dark">
+                {result.created}
+              </span>{" "}
+              new invoice{result.created === 1 ? "" : "s"} created.
+            </p>
+            <p>
+              <span className="font-semibold text-muted-foreground">
+                {result.skipped}
+              </span>{" "}
+              student{result.skipped === 1 ? "" : "s"} already invoiced for this
+              month — left untouched.
+            </p>
+            <p className="pt-2 text-xs text-muted-foreground">
+              Parents will see the new invoices on next pull-to-refresh of
+              their Fees screen.
+            </p>
+          </CardContent>
+        </Card>
       )}
     </div>
   );

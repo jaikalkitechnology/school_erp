@@ -4,6 +4,18 @@
          without this, but the user sees nothing. -->
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>
 
+    <!-- Transport driver foreground GPS pinger (Phase 26).
+         FOREGROUND_SERVICE keeps the location loop alive when the driver
+         locks their phone; the _LOCATION variant is required on Android
+         14+ for location-type services. ACCESS_BACKGROUND_LOCATION lets
+         us read GPS once the screen is off. -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE"/>
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_LOCATION"/>
+    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION"/>
+    <uses-permission android:name="android.permission.ACCESS_BACKGROUND_LOCATION"/>
+    <uses-permission android:name="android.permission.WAKE_LOCK"/>
+    <uses-permission android:name="android.permission.INTERNET"/>
+
     <application
         android:label="jaikalki"
         android:name="${applicationName}"
@@ -17,6 +29,16 @@
         <meta-data
             android:name="com.google.firebase.messaging.default_notification_channel_id"
             android:value="jaikalki_default" />
+
+        <!-- Google Maps API key. The release build will refuse to draw
+             tiles until a real key with the "Maps SDK for Android" API
+             enabled is dropped here. The placeholder lets local builds
+             compile; the user can override it via a Gradle property:
+                 ./gradlew assembleDebug -PMAPS_API_KEY=AIza...
+             Or just replace the literal below. -->
+        <meta-data
+            android:name="com.google.android.geo.API_KEY"
+            android:value="${MAPS_API_KEY}" />
 
         <activity
             android:name=".MainActivity"

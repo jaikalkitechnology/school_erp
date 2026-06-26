@@ -2,9 +2,12 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:url_launcher/url_launcher.dart';
 
+import '../../api/api_client.dart';
 import '../../api/parent_repository.dart';
+import '../../api/trip_stream.dart';
 import '../../core/children_cubit.dart';
 import '../../core/service_locator.dart';
 import '../../theme/brand.dart';
@@ -30,8 +33,11 @@ class _TransportPageState extends State<TransportPage>
     with WidgetsBindingObserver {
   StreamSubscription<ChildrenState>? _childrenSub;
   Future<ChildTransport>? _future;
+  Future<RouteGeometry>? _geometryFuture;
   int? _loadedFor;
   Timer? _poll;
+  StreamSubscription<TripPositionFrame>? _streamSub;
+  TripPositionFrame? _liveFrame;
 
   @override
   void initState() {
@@ -47,6 +53,7 @@ class _TransportPageState extends State<TransportPage>
     WidgetsBinding.instance.removeObserver(this);
     _childrenSub?.cancel();
     _poll?.cancel();
+    _streamSub?.cancel();
     super.dispose();
   }
 
@@ -57,8 +64,13 @@ class _TransportPageState extends State<TransportPage>
     if (state == AppLifecycleState.paused ||
         state == AppLifecycleState.inactive) {
       _poll?.cancel();
+      _streamSub?.cancel();
+      _streamSub = null;
     } else if (state == AppLifecycleState.resumed) {
-      _restartPollIfNeeded();
+      final s = locator<ChildrenCubit>().state;
+      if (s is ChildrenLoaded && s.selectedId != null) {
+        _restartLiveStreamIfNeeded(s.selectedId!);
+      }
     }
   }
 
@@ -72,8 +84,10 @@ class _TransportPageState extends State<TransportPage>
   void _load(int studentId) {
     setState(() {
       _future = locator<ParentRepository>().transport(studentId);
+      _geometryFuture = locator<ParentRepository>().routeGeometry(studentId);
     });
-    _future!.then((_) => _restartPollIfNeeded()).catchError((_) {});
+    _future!.then((_) => _restartLiveStreamIfNeeded(studentId))
+        .catchError((_) {});
   }
 
   Future<void> _refresh() async {
@@ -84,20 +98,38 @@ class _TransportPageState extends State<TransportPage>
     }
   }
 
-  /// Restart the 30-second poll if the latest data shows a live trip.
-  /// Idle when there's no trip in progress so we don't drain battery.
-  void _restartPollIfNeeded() {
+  /// Subscribe to the SSE stream while a trip is live; tear it down
+  /// otherwise. Falls back to a 30 s poll if the stream errors out
+  /// (proxy stripped chunked encoding, network drop, etc).
+  void _restartLiveStreamIfNeeded(int studentId) {
     _poll?.cancel();
+    _streamSub?.cancel();
+    _streamSub = null;
     _future?.then((data) {
-      if (!mounted) return;
-      if (data.todayTrip?.isLive == true) {
-        _poll = Timer.periodic(const Duration(seconds: 30), (_) {
-          final s = locator<ChildrenCubit>().state;
-          if (s is ChildrenLoaded && s.selectedId != null && mounted) {
-            _load(s.selectedId!);
+      if (!mounted || data.todayTrip?.isLive != true) return;
+      final stream = TripStream(locator<ApiClient>()).subscribe(
+        data.todayTrip!.id,
+      );
+      _streamSub = stream.listen(
+        (frame) {
+          if (!mounted) return;
+          setState(() => _liveFrame = frame);
+          if (!frame.isLive) {
+            _streamSub?.cancel();
+            _streamSub = null;
+            _load(studentId);
           }
-        });
-      }
+        },
+        onError: (_) {
+          // SSE failed — fall back to the polling refresh that the
+          // page used before. Keeps the UI alive on flaky networks.
+          _streamSub?.cancel();
+          _streamSub = null;
+          _poll = Timer.periodic(const Duration(seconds: 30), (_) {
+            if (mounted) _load(studentId);
+          });
+        },
+      );
     });
   }
 
@@ -137,7 +169,11 @@ class _TransportPageState extends State<TransportPage>
                   if (!data.isAllocated) {
                     return const _NotAllocated();
                   }
-                  return _AllocatedView(data: data);
+                  return _AllocatedView(
+                    data: data,
+                    liveFrame: _liveFrame,
+                    geometryFuture: _geometryFuture,
+                  );
                 },
               ),
       ),
@@ -186,8 +222,14 @@ class _NotAllocated extends StatelessWidget {
 }
 
 class _AllocatedView extends StatefulWidget {
-  const _AllocatedView({required this.data});
+  const _AllocatedView({
+    required this.data,
+    required this.liveFrame,
+    required this.geometryFuture,
+  });
   final ChildTransport data;
+  final TripPositionFrame? liveFrame;
+  final Future<RouteGeometry>? geometryFuture;
 
   @override
   State<_AllocatedView> createState() => _AllocatedViewState();
@@ -234,8 +276,20 @@ class _AllocatedViewState extends State<_AllocatedView> {
       children: [
         _RouteHeaderCard(data: widget.data),
         const SizedBox(height: 14),
-        _TripStatusCard(trip: widget.data.todayTrip),
+        _TripStatusCard(
+          trip: widget.data.todayTrip,
+          liveFrame: widget.liveFrame,
+        ),
         const SizedBox(height: 14),
+        if (widget.data.todayTrip?.isLive == true)
+          _LiveMapCard(
+            liveFrame: widget.liveFrame,
+            fallback: widget.data.todayTrip,
+            geometryFuture: widget.geometryFuture,
+            pickup: widget.data.pickupStop,
+            drop: widget.data.dropStop,
+          ),
+        if (widget.data.todayTrip?.isLive == true) const SizedBox(height: 14),
         _StopsCard(pickup: widget.data.pickupStop, drop: widget.data.dropStop),
         const SizedBox(height: 14),
         _DriverCard(name: widget.data.driverName, phone: widget.data.driverPhone),
@@ -332,8 +386,15 @@ class _RouteHeaderCard extends StatelessWidget {
 }
 
 class _TripStatusCard extends StatelessWidget {
-  const _TripStatusCard({required this.trip});
+  const _TripStatusCard({
+    required this.trip,
+    required this.liveFrame,
+  });
   final TransportTrip? trip;
+  /// Latest SSE frame; overrides ``trip.lastLat/Lng/lastSpeedKph`` so
+  /// the card reflects ~1 s real-time data instead of the polled value
+  /// snapshotted when the page last refreshed.
+  final TripPositionFrame? liveFrame;
 
   String _phaseLabel(String phase) {
     switch (phase) {
@@ -481,6 +542,10 @@ class _TripStatusCard extends StatelessWidget {
           ),
           if (t.isLive) ...[
             const Divider(height: 18),
+            // Prefer the SSE live frame when present so the speed /
+            // position pill is sub-second fresh; fall back to the
+            // last polled snapshot otherwise.
+            // (Used in the speed + lat/lng row below.)
             if (t.nextStop != null)
               Row(
                 children: [
@@ -523,8 +588,8 @@ class _TripStatusCard extends StatelessWidget {
                     size: 14, color: JaikalkiBrand.textSecondary),
                 const SizedBox(width: 4),
                 Text(
-                  t.lastSpeedKph != null
-                      ? '${t.lastSpeedKph!.toStringAsFixed(0)} km/h'
+                  (liveFrame?.speedKph ?? t.lastSpeedKph) != null
+                      ? '${((liveFrame?.speedKph ?? t.lastSpeedKph)!).toStringAsFixed(0)} km/h'
                       : 'Speed —',
                   style: const TextStyle(
                     fontSize: 12,
@@ -538,8 +603,9 @@ class _TripStatusCard extends StatelessWidget {
                 const SizedBox(width: 4),
                 Expanded(
                   child: Text(
-                    t.lastLat != null && t.lastLng != null
-                        ? '${t.lastLat!.toStringAsFixed(4)}, ${t.lastLng!.toStringAsFixed(4)}'
+                    (liveFrame?.lat ?? t.lastLat) != null &&
+                            (liveFrame?.lng ?? t.lastLng) != null
+                        ? '${(liveFrame?.lat ?? t.lastLat)!.toStringAsFixed(4)}, ${(liveFrame?.lng ?? t.lastLng)!.toStringAsFixed(4)}'
                         : 'Awaiting first GPS ping…',
                     style: const TextStyle(
                       fontSize: 11,
@@ -855,6 +921,121 @@ class _FeeCard extends StatelessWidget {
           ),
         ],
       ),
+    );
+  }
+}
+
+class _LiveMapCard extends StatefulWidget {
+  const _LiveMapCard({
+    required this.liveFrame,
+    required this.fallback,
+    required this.geometryFuture,
+    required this.pickup,
+    required this.drop,
+  });
+  final TripPositionFrame? liveFrame;
+  final TransportTrip? fallback;
+  final Future<RouteGeometry>? geometryFuture;
+  final TransportStop? pickup;
+  final TransportStop? drop;
+
+  @override
+  State<_LiveMapCard> createState() => _LiveMapCardState();
+}
+
+class _LiveMapCardState extends State<_LiveMapCard> {
+  GoogleMapController? _controller;
+
+  @override
+  void didUpdateWidget(covariant _LiveMapCard old) {
+    super.didUpdateWidget(old);
+    // Recentre on the bus when a fresh SSE frame arrives.
+    final lat = widget.liveFrame?.lat ?? widget.fallback?.lastLat;
+    final lng = widget.liveFrame?.lng ?? widget.fallback?.lastLng;
+    if (lat != null && lng != null && _controller != null) {
+      _controller!.animateCamera(
+        CameraUpdate.newLatLng(LatLng(lat, lng)),
+      );
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final lat = widget.liveFrame?.lat ?? widget.fallback?.lastLat;
+    final lng = widget.liveFrame?.lng ?? widget.fallback?.lastLng;
+    if (lat == null || lng == null) return const SizedBox.shrink();
+
+    return FutureBuilder<RouteGeometry>(
+      future: widget.geometryFuture,
+      builder: (context, snap) {
+        final geometry = snap.data ?? const RouteGeometry(stops: []);
+        final polylinePts = <LatLng>[
+          for (final s in geometry.stops)
+            if (s.lat != null && s.lng != null) LatLng(s.lat!, s.lng!),
+        ];
+        return ClipRRect(
+          borderRadius: BorderRadius.circular(16),
+          child: SizedBox(
+            height: 220,
+            child: GoogleMap(
+              initialCameraPosition: CameraPosition(
+                target: LatLng(lat, lng),
+                zoom: 14,
+              ),
+              onMapCreated: (c) => _controller = c,
+              myLocationButtonEnabled: false,
+              zoomControlsEnabled: false,
+              compassEnabled: false,
+              markers: {
+                Marker(
+                  markerId: const MarkerId('bus'),
+                  position: LatLng(lat, lng),
+                  icon: BitmapDescriptor.defaultMarkerWithHue(
+                      BitmapDescriptor.hueAzure),
+                  infoWindow: const InfoWindow(title: 'Bus'),
+                ),
+                if (widget.pickup?.latitude != null &&
+                    widget.pickup?.longitude != null)
+                  Marker(
+                    markerId: const MarkerId('pickup'),
+                    position: LatLng(
+                      widget.pickup!.latitude!,
+                      widget.pickup!.longitude!,
+                    ),
+                    icon: BitmapDescriptor.defaultMarkerWithHue(
+                        BitmapDescriptor.hueOrange),
+                    infoWindow: InfoWindow(
+                      title: 'Pickup · ${widget.pickup!.name}',
+                    ),
+                  ),
+                if (widget.drop?.latitude != null &&
+                    widget.drop?.longitude != null)
+                  Marker(
+                    markerId: const MarkerId('drop'),
+                    position: LatLng(
+                      widget.drop!.latitude!,
+                      widget.drop!.longitude!,
+                    ),
+                    icon: BitmapDescriptor.defaultMarkerWithHue(
+                        BitmapDescriptor.hueGreen),
+                    infoWindow: InfoWindow(
+                      title: 'Drop · ${widget.drop!.name}',
+                    ),
+                  ),
+              },
+              polylines: {
+                if (polylinePts.length >= 2)
+                  Polyline(
+                    polylineId: const PolylineId('route'),
+                    points: polylinePts,
+                    color: JaikalkiBrand.tealDark,
+                    width: 4,
+                  ),
+              },
+            ),
+          ),
+        );
+      },
     );
   }
 }
