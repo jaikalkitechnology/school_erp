@@ -71,8 +71,12 @@ _reader = require_roles(
     "coordinator", "class_teacher", "subject_teacher",
 )
 _driver_or_staff = require_roles(
-    "school_admin", "principal", "vice_principal", "transport_manager",
-    "coordinator",
+    # Bus / driver functionality is now gated to the single
+    # ``transport_manager`` role. Senior staff (school_admin /
+    # principal / vice_principal / coordinator) still manage routes
+    # and buses through the admin web — they don't need to start
+    # trips or push GPS pings, so they're intentionally left out.
+    "transport_manager",
 )
 _parent = require_roles("parent")
 

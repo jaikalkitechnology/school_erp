@@ -236,8 +236,6 @@ class _AllocatedViewState extends State<_AllocatedView> {
         const SizedBox(height: 14),
         _TripStatusCard(trip: widget.data.todayTrip),
         const SizedBox(height: 14),
-        _MapPreviewCard(trip: widget.data.todayTrip),
-        const SizedBox(height: 14),
         _StopsCard(pickup: widget.data.pickupStop, drop: widget.data.dropStop),
         const SizedBox(height: 14),
         _DriverCard(name: widget.data.driverName, phone: widget.data.driverPhone),
@@ -268,85 +266,6 @@ class _AllocatedViewState extends State<_AllocatedView> {
           _FeeCard(amount: widget.data.feePerMonth!),
         ],
       ],
-    );
-  }
-}
-
-class _MapPreviewCard extends StatelessWidget {
-  const _MapPreviewCard({required this.trip});
-  final TransportTrip? trip;
-
-  @override
-  Widget build(BuildContext context) {
-    if (trip?.isLive != true || trip?.lastLat == null || trip?.lastLng == null) {
-      return const SizedBox.shrink();
-    }
-    // Scaffolding: we render a small static OpenStreetMap image preview
-    // tied to the bus' current lat/lng. Replace this with
-    // ``google_maps_flutter`` once the Maps API key is in place; the
-    // logic for plotting the route polyline lives server-side already
-    // (Stop.lat/lng sequence) so the upgrade is a UI-only swap.
-    final lat = trip!.lastLat!.toStringAsFixed(5);
-    final lng = trip!.lastLng!.toStringAsFixed(5);
-    return Container(
-      decoration: BoxDecoration(
-        color: JaikalkiBrand.warmWhite,
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: JaikalkiBrand.saffronPale),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          ClipRRect(
-            borderRadius: const BorderRadius.vertical(top: Radius.circular(13)),
-            child: AspectRatio(
-              aspectRatio: 16 / 9,
-              child: Container(
-                color: JaikalkiBrand.tealPale,
-                alignment: Alignment.center,
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    const Icon(Icons.map_outlined,
-                        size: 36, color: JaikalkiBrand.tealDark),
-                    const SizedBox(height: 6),
-                    Text(
-                      'Bus is here · $lat, $lng',
-                      style: const TextStyle(
-                        fontSize: 12,
-                        fontWeight: FontWeight.w700,
-                        color: JaikalkiBrand.tealDark,
-                      ),
-                    ),
-                    if (trip!.etaMinutes != null) ...[
-                      const SizedBox(height: 4),
-                      Text(
-                        '~${trip!.etaMinutes} min to ${trip!.nextStop?.name ?? "next stop"}',
-                        style: const TextStyle(
-                          fontSize: 11,
-                          color: JaikalkiBrand.indigoDark,
-                        ),
-                      ),
-                    ],
-                  ],
-                ),
-              ),
-            ),
-          ),
-          const Padding(
-            padding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-            child: Text(
-              'Add a Google Maps API key to upgrade this preview to a live '
-              'route map with the bus marker moving in real time.',
-              style: TextStyle(
-                fontSize: 10,
-                color: JaikalkiBrand.textSecondary,
-                fontStyle: FontStyle.italic,
-              ),
-            ),
-          ),
-        ],
-      ),
     );
   }
 }

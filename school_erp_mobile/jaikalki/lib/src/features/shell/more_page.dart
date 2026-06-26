@@ -28,14 +28,10 @@ class MorePage extends StatelessWidget {
     final s = settings.strings;
     final auth = context.watch<AuthCubit>().state;
     final roles = auth is AuthAuthenticated ? auth.user.roles : const <String>[];
-    // Anyone with a transport-staff role (or senior school staff) gets
-    // the Driver entry point on More so they can run trips from the
-    // same Flutter binary as the parent app.
-    const _transportStaffRoles = {
-      'transport_manager', 'school_admin', 'principal',
-      'vice_principal', 'coordinator',
-    };
-    final showDriver = roles.any(_transportStaffRoles.contains);
+    // Bus / driver functionality is gated to one role only — the
+    // school's transport_manager. Senior staff still manage routes /
+    // buses through the admin web, not via this mobile shell.
+    final showDriver = roles.contains('transport_manager');
     return Scaffold(
       appBar: AppBar(title: Text(s.tabMore)),
       body: RefreshIndicator(
@@ -49,8 +45,8 @@ class MorePage extends StatelessWidget {
           children: [
           if (showDriver)
             _Tile(
-              icon: Icons.local_taxi_outlined,
-              label: 'Driver',
+              icon: Icons.directions_bus_filled_outlined,
+              label: 'Bus',
               subtitle: 'Start a trip · live tracking',
               onTap: () => Navigator.of(context).push(
                 MaterialPageRoute(builder: (_) => const DriverPage()),
