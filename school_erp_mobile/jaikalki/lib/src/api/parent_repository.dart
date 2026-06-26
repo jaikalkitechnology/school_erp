@@ -202,6 +202,44 @@ class ParentRepository {
     return ChildFeeView.fromJson(res.data ?? const {});
   }
 
+  // ----- Phase 18: Transport (bus tracking) --------------------------------
+
+  Future<ChildTransport> transport(int studentId) async {
+    final res = await _api.dio.get<Map<String, dynamic>>(
+      '/v1/parent/children/$studentId/transport',
+    );
+    return ChildTransport.fromJson(res.data ?? const {});
+  }
+
+  /// "Not coming today" — flips a single dated skip row server-side.
+  /// Idempotent on (student, date, direction).
+  Future<void> skipTransport({
+    required int studentId,
+    required String skipDate,
+    String direction = 'pickup',
+    String? reason,
+  }) async {
+    await _api.dio.post<dynamic>(
+      '/v1/parent/children/$studentId/transport/skip',
+      data: {
+        'skip_date': skipDate,
+        'direction': direction,
+        if (reason != null) 'reason': reason,
+      },
+    );
+  }
+
+  Future<void> unskipTransport({
+    required int studentId,
+    required String skipDate,
+    String direction = 'pickup',
+  }) async {
+    await _api.dio.delete<dynamic>(
+      '/v1/parent/children/$studentId/transport/skip',
+      queryParameters: {'skip_date': skipDate, 'direction': direction},
+    );
+  }
+
   Future<Map<String, dynamic>> initiatePayment({
     required int invoiceId,
     required int studentId,
@@ -987,4 +1025,138 @@ class StudentProfile {
         schoolPhone: j['school_phone'] as String?,
         schoolLogoUrl: j['school_logo_url'] as String?,
       );
+}
+
+// ---- Phase 18 models (transport / bus tracking) --------------------------
+
+class ChildTransport {
+  const ChildTransport({
+    required this.studentId,
+    required this.routeId,
+    required this.routeName,
+    required this.pickupStop,
+    required this.dropStop,
+    required this.feePerMonth,
+    required this.busRegistration,
+    required this.driverName,
+    required this.driverPhone,
+    required this.todayTrip,
+  });
+
+  final int studentId;
+  final int? routeId;
+  final String? routeName;
+  final TransportStop? pickupStop;
+  final TransportStop? dropStop;
+  final double? feePerMonth;
+  final String? busRegistration;
+  final String? driverName;
+  final String? driverPhone;
+  final TransportTrip? todayTrip;
+
+  bool get isAllocated => routeId != null;
+
+  factory ChildTransport.fromJson(Map<String, dynamic> j) => ChildTransport(
+        studentId: (j['student_id'] as num?)?.toInt() ?? 0,
+        routeId: (j['route_id'] as num?)?.toInt(),
+        routeName: j['route_name'] as String?,
+        pickupStop: j['pickup_stop'] is Map
+            ? TransportStop.fromJson(j['pickup_stop'] as Map<String, dynamic>)
+            : null,
+        dropStop: j['drop_stop'] is Map
+            ? TransportStop.fromJson(j['drop_stop'] as Map<String, dynamic>)
+            : null,
+        feePerMonth: _toDoubleOrNullParent(j['fee_per_month']),
+        busRegistration: j['bus_registration'] as String?,
+        driverName: j['driver_name'] as String?,
+        driverPhone: j['driver_phone'] as String?,
+        todayTrip: j['today_trip'] is Map
+            ? TransportTrip.fromJson(j['today_trip'] as Map<String, dynamic>)
+            : null,
+      );
+}
+
+class TransportStop {
+  const TransportStop({
+    required this.id,
+    required this.name,
+    required this.sequence,
+    required this.latitude,
+    required this.longitude,
+    required this.scheduledArrival,
+  });
+
+  final int id;
+  final String name;
+  final int sequence;
+  final double? latitude;
+  final double? longitude;
+  final String? scheduledArrival;
+
+  factory TransportStop.fromJson(Map<String, dynamic> j) => TransportStop(
+        id: (j['id'] as num?)?.toInt() ?? 0,
+        name: (j['name'] as String?) ?? '',
+        sequence: (j['sequence'] as num?)?.toInt() ?? 0,
+        latitude: _toDoubleOrNullParent(j['latitude']),
+        longitude: _toDoubleOrNullParent(j['longitude']),
+        scheduledArrival: j['scheduled_arrival'] as String?,
+      );
+}
+
+class TransportTrip {
+  const TransportTrip({
+    required this.id,
+    required this.phase,
+    required this.direction,
+    required this.tripDate,
+    required this.startedAt,
+    required this.completedAt,
+    required this.lastLat,
+    required this.lastLng,
+    required this.lastSpeedKph,
+    required this.lastPingAt,
+    required this.nextStop,
+    required this.etaMinutes,
+  });
+
+  final int id;
+  /// scheduled / in_progress / completed / cancelled
+  final String phase;
+  /// pickup / drop
+  final String? direction;
+  final String? tripDate;
+  final String? startedAt;
+  final String? completedAt;
+  final double? lastLat;
+  final double? lastLng;
+  final double? lastSpeedKph;
+  final String? lastPingAt;
+  final TransportStop? nextStop;
+  final int? etaMinutes;
+
+  bool get isLive => phase == 'in_progress';
+
+  factory TransportTrip.fromJson(Map<String, dynamic> j) => TransportTrip(
+        id: (j['id'] as num?)?.toInt() ?? 0,
+        phase: (j['phase'] as String?) ?? 'scheduled',
+        direction: j['direction'] as String?,
+        tripDate: j['trip_date'] as String?,
+        startedAt: j['started_at'] as String?,
+        completedAt: j['completed_at'] as String?,
+        lastLat: _toDoubleOrNullParent(j['last_lat']),
+        lastLng: _toDoubleOrNullParent(j['last_lng']),
+        lastSpeedKph: _toDoubleOrNullParent(j['last_speed_kph']),
+        lastPingAt: j['last_ping_at'] as String?,
+        nextStop: j['next_stop'] is Map
+            ? TransportStop.fromJson(j['next_stop'] as Map<String, dynamic>)
+            : null,
+        etaMinutes: (j['eta_minutes'] as num?)?.toInt(),
+      );
+}
+
+double? _toDoubleOrNullParent(dynamic v) {
+  if (v == null) return null;
+  if (v is num) return v.toDouble();
+  if (v is String) return double.tryParse(v);
+  return null;
 }

@@ -153,6 +153,7 @@ from app.models.transport import (  # noqa: F401
     Trip,
     TripBoarding,
     TripDirection,
+    TripSkip,
     TripPhase,
 )
 from app.models.tenant import (  # noqa: F401

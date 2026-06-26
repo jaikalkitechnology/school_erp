@@ -2,6 +2,7 @@ import 'package:get_it/get_it.dart';
 
 import '../api/api_client.dart';
 import '../api/auth_repository.dart';
+import '../api/driver_repository.dart';
 import '../api/messages_repository.dart';
 import '../api/parent_repository.dart';
 import '../api/teacher_repository.dart';
@@ -33,6 +34,9 @@ void registerDependencies() {
   }
   if (!locator.isRegistered<MessagesRepository>()) {
     locator.registerLazySingleton<MessagesRepository>(() => MessagesRepository(locator<ApiClient>()));
+  }
+  if (!locator.isRegistered<DriverRepository>()) {
+    locator.registerLazySingleton<DriverRepository>(() => DriverRepository(locator<ApiClient>()));
   }
   if (!locator.isRegistered<AuthCubit>()) {
     locator.registerLazySingleton<AuthCubit>(() => AuthCubit(locator<AuthRepository>()));

@@ -25,6 +25,7 @@ from app.models.transport import (
     TripBoarding,
     TripDirection,
     TripPhase,
+    TripSkip,
 )
 from app.schemas.transport import (
     AllocationWrite,
@@ -329,6 +330,23 @@ async def start_trip(
         obj.started_at = obj.started_at or now
     await session.commit()
     await session.refresh(obj)
+
+    # Push to every parent on the route: "bus has left school".
+    route = (
+        await session.execute(select(Route).where(Route.id == obj.route_id))
+    ).scalar_one_or_none()
+    await _notify_route_event(
+        session,
+        tenant_id=tenant_id,
+        route_id=obj.route_id,
+        template_code="transport.bus_departed",
+        context={
+            "route": route.name if route else f"Route #{obj.route_id}",
+            "direction": obj.direction,
+        },
+        deeplink=f"/transport/trips/{obj.id}",
+        source_id=obj.id,
+    )
     return obj
 
 
@@ -352,6 +370,10 @@ async def ping_trip(session: AsyncSession, trip_id: int, payload: GpsPing) -> Tr
         trip.started_at = trip.started_at or trip.last_ping_at
     await session.commit()
     await session.refresh(trip)
+
+    # Geofence: emit approaching / arrived pushes once per stop, per
+    # trip, per stage. Cheap enough to run every ping.
+    await maybe_geofence_push(session, trip=trip)
     return trip
 
 
@@ -468,6 +490,32 @@ async def record_boarding(
         obj.captured_by_user_id = user_id
     await session.commit()
     await session.refresh(obj)
+
+    # Push to this child's parents on every BOARDED / DEBOARDED event.
+    student = (
+        await session.execute(
+            select(Student).where(Student.id == payload.student_id)
+        )
+    ).scalar_one_or_none()
+    if student is not None and obj.event in {
+        BoardingEvent.BOARDED.value, BoardingEvent.DEBOARDED.value,
+    }:
+        code = (
+            "transport.boarded" if obj.event == BoardingEvent.BOARDED.value
+            else "transport.dropped"
+        )
+        await _notify_student_event(
+            session,
+            tenant_id=tenant_id,
+            student_id=student.id,
+            template_code=code,
+            context={
+                "student": student.full_name,
+                "time": now.strftime("%H:%M"),
+            },
+            deeplink=f"/transport/trips/{trip_id}",
+            source_id=obj.id,
+        )
     return obj
 
 
@@ -592,4 +640,502 @@ async def parent_transport(session: AsyncSession, student_id: int) -> dict:
         "driver_name": driver.full_name if driver else None,
         "driver_phone": driver.phone if driver else None,
         "today_trip": today_trip_view,
+    }
+
+
+# ============================================================================
+# Phase 26 — skip toggle / push notifications / transport fees / SSE stream.
+# ============================================================================
+
+
+# ---- "Not coming today" -----------------------------------------------------
+
+
+async def list_skips_for_today(
+    session: AsyncSession, *, route_id: int, on_date: Optional[date] = None,
+) -> list[TripSkip]:
+    """Skip rows for every student on this route on this date. Driver
+    app reads this so it knows whose stop to bypass."""
+    on_date = on_date or date.today()
+    student_ids = list(
+        (
+            await session.execute(
+                select(StudentTransport.student_id).where(
+                    StudentTransport.route_id == route_id,
+                    StudentTransport.is_active.is_(True),
+                )
+            )
+        ).scalars().all()
+    )
+    if not student_ids:
+        return []
+    return list(
+        (
+            await session.execute(
+                select(TripSkip).where(
+                    TripSkip.student_id.in_(student_ids),
+                    TripSkip.skip_date == on_date,
+                )
+            )
+        ).scalars().all()
+    )
+
+
+async def upsert_skip(
+    session: AsyncSession,
+    *,
+    tenant_id: int,
+    student_id: int,
+    skip_date: date,
+    direction: str = TripDirection.PICKUP.value,
+    reason: Optional[str] = None,
+) -> TripSkip:
+    """Idempotent on (student_id, skip_date, direction) — reusing the
+    same row means the parent can edit the reason without piling up
+    duplicates."""
+    existing = (
+        await session.execute(
+            select(TripSkip).where(
+                TripSkip.student_id == student_id,
+                TripSkip.skip_date == skip_date,
+                TripSkip.direction == direction,
+            )
+        )
+    ).scalar_one_or_none()
+    if existing is not None:
+        if reason is not None:
+            existing.reason = reason
+        await session.commit()
+        return existing
+    row = TripSkip(
+        tenant_id=tenant_id,
+        student_id=student_id,
+        skip_date=skip_date,
+        direction=direction,
+        reason=reason,
+    )
+    session.add(row)
+    await session.commit()
+    return row
+
+
+async def remove_skip(
+    session: AsyncSession,
+    *,
+    student_id: int,
+    skip_date: date,
+    direction: str = TripDirection.PICKUP.value,
+) -> None:
+    """Parent changed their mind / wants to un-skip a future date."""
+    row = (
+        await session.execute(
+            select(TripSkip).where(
+                TripSkip.student_id == student_id,
+                TripSkip.skip_date == skip_date,
+                TripSkip.direction == direction,
+            )
+        )
+    ).scalar_one_or_none()
+    if row is not None:
+        await session.delete(row)
+        await session.commit()
+
+
+# ---- Push notification hooks -----------------------------------------------
+
+
+async def _parent_users_for_students(
+    session: AsyncSession, *, student_ids: list[int],
+):
+    """Resolve User rows for the parents linked to the given students.
+    Used by the transport push hooks to fan out FCM messages."""
+    if not student_ids:
+        return []
+    from app.models.auth import User
+    from app.models.parent import Parent, ParentChildMapping
+
+    rows = list(
+        (
+            await session.execute(
+                select(User)
+                .join(Parent, Parent.user_id == User.id)
+                .join(
+                    ParentChildMapping,
+                    ParentChildMapping.parent_id == Parent.id,
+                )
+                .where(
+                    ParentChildMapping.student_id.in_(student_ids),
+                    User.is_active.is_(True),
+                )
+            )
+        ).unique().scalars().all()
+    )
+    return rows
+
+
+async def _notify_route_event(
+    session: AsyncSession,
+    *,
+    tenant_id: int,
+    route_id: int,
+    template_code: str,
+    context: dict,
+    deeplink: Optional[str] = None,
+    source_id: Optional[int] = None,
+) -> None:
+    """Fan an FCM push to the parents of every active rider on a
+    route. Skip rows for the current date are honoured so opted-out
+    parents don't get the buzz. Failures are swallowed — the trip /
+    boarding row is already committed by the caller."""
+    try:
+        from app.services.comms import notify
+        from app.services.push_dispatch import drain_pending_push_outbox_ids
+
+        student_ids = list(
+            (
+                await session.execute(
+                    select(StudentTransport.student_id).where(
+                        StudentTransport.route_id == route_id,
+                        StudentTransport.is_active.is_(True),
+                    )
+                )
+            ).scalars().all()
+        )
+        if not student_ids:
+            return
+        # Drop students who opted out today.
+        skipped_today = {
+            sid for (sid,) in (
+                await session.execute(
+                    select(TripSkip.student_id).where(
+                        TripSkip.student_id.in_(student_ids),
+                        TripSkip.skip_date == date.today(),
+                    )
+                )
+            ).all()
+        }
+        active_ids = [sid for sid in student_ids if sid not in skipped_today]
+        if not active_ids:
+            return
+        users = await _parent_users_for_students(session, student_ids=active_ids)
+        if not users:
+            return
+        _, ids = await notify(
+            session,
+            tenant_id=tenant_id,
+            template_code=template_code,
+            recipients=users,
+            context=context,
+            deeplink=deeplink,
+            source_type="transport_trip",
+            source_id=source_id,
+            kind="transport",
+        )
+        if ids:
+            await drain_pending_push_outbox_ids(session, ids)
+    except Exception:
+        import logging
+        logging.getLogger(__name__).exception(
+            "transport notify %s failed (route_id=%s)", template_code, route_id,
+        )
+
+
+async def _notify_student_event(
+    session: AsyncSession,
+    *,
+    tenant_id: int,
+    student_id: int,
+    template_code: str,
+    context: dict,
+    deeplink: Optional[str] = None,
+    source_id: Optional[int] = None,
+) -> None:
+    """Fan an FCM push to a single student's parent. Used for
+    boarded / dropped per-child events."""
+    try:
+        from app.services.comms import notify
+        from app.services.push_dispatch import drain_pending_push_outbox_ids
+
+        users = await _parent_users_for_students(session, student_ids=[student_id])
+        if not users:
+            return
+        _, ids = await notify(
+            session,
+            tenant_id=tenant_id,
+            template_code=template_code,
+            recipients=users,
+            context=context,
+            deeplink=deeplink,
+            source_type="transport_boarding",
+            source_id=source_id,
+            kind="transport",
+        )
+        if ids:
+            await drain_pending_push_outbox_ids(session, ids)
+    except Exception:
+        import logging
+        logging.getLogger(__name__).exception(
+            "transport notify %s failed (student_id=%s)", template_code, student_id,
+        )
+
+
+# ---- Approaching-stop watcher (called from every GPS ping) ----------------
+
+
+# When the bus is within this many km of a stop, parents of students who
+# board / disembark at that stop get a single "approaching" push. Stored
+# in a tiny per-trip set so we don't spam every ping.
+_APPROACH_RADIUS_KM = 0.7
+_ARRIVE_RADIUS_KM = 0.15
+# In-process suppression: prevents one ping-burst from firing the same
+# notification twice. Wiped on process restart, which is fine — a fresh
+# ping after restart can buzz once, no big deal.
+_NOTIFY_SEEN: set[tuple[int, int, str]] = set()
+
+
+async def maybe_geofence_push(
+    session: AsyncSession,
+    *,
+    trip: Trip,
+) -> None:
+    """Called from ``ping_trip`` after the GPS row is updated. Checks
+    every stop on the route; for any stop the bus is now within
+    ``_APPROACH_RADIUS_KM`` of, fires a single
+    ``transport.approaching_stop`` push to the parents of the riders
+    boarding at that stop. Same logic again at ``_ARRIVE_RADIUS_KM`` for
+    ``transport.arrived_stop``."""
+    if trip.last_lat is None or trip.last_lng is None:
+        return
+    lat = float(trip.last_lat)
+    lng = float(trip.last_lng)
+    stops = list(
+        (
+            await session.execute(
+                select(Stop).where(Stop.route_id == trip.route_id)
+            )
+        ).scalars().all()
+    )
+    if not stops:
+        return
+
+    for s in stops:
+        if s.latitude is None or s.longitude is None:
+            continue
+        d_km = _haversine_km(lat, lng, float(s.latitude), float(s.longitude))
+        if d_km > _APPROACH_RADIUS_KM:
+            continue
+
+        stage = "arrived" if d_km <= _ARRIVE_RADIUS_KM else "approaching"
+        key = (trip.id, s.id, stage)
+        if key in _NOTIFY_SEEN:
+            continue
+        _NOTIFY_SEEN.add(key)
+
+        # Parents who board / disembark at this stop.
+        student_ids = list(
+            (
+                await session.execute(
+                    select(StudentTransport.student_id).where(
+                        StudentTransport.is_active.is_(True),
+                        (StudentTransport.pickup_stop_id == s.id)
+                        | (StudentTransport.drop_stop_id == s.id),
+                    )
+                )
+            ).scalars().all()
+        )
+        skipped_today = {
+            sid for (sid,) in (
+                await session.execute(
+                    select(TripSkip.student_id).where(
+                        TripSkip.student_id.in_(student_ids),
+                        TripSkip.skip_date == date.today(),
+                    )
+                )
+            ).all()
+        }
+        active = [sid for sid in student_ids if sid not in skipped_today]
+        if not active:
+            continue
+        users = await _parent_users_for_students(session, student_ids=active)
+        if not users:
+            continue
+
+        from app.services.comms import notify
+        from app.services.push_dispatch import drain_pending_push_outbox_ids
+
+        code = (
+            "transport.arrived_stop" if stage == "arrived"
+            else "transport.approaching_stop"
+        )
+        _, ids = await notify(
+            session,
+            tenant_id=trip.tenant_id,
+            template_code=code,
+            recipients=users,
+            context={"stop": s.name},
+            source_type="transport_trip",
+            source_id=trip.id,
+            kind="transport",
+        )
+        if ids:
+            await drain_pending_push_outbox_ids(session, ids)
+
+
+# ---- SSE-friendly view --------------------------------------------------
+
+
+async def trip_position_snapshot(
+    session: AsyncSession, trip_id: int,
+) -> Optional[dict]:
+    """Tiny payload the SSE stream emits every second-ish. Just the
+    fields a moving-on-map UI needs — no joins on stops or boardings."""
+    trip = (
+        await session.execute(select(Trip).where(Trip.id == trip_id))
+    ).scalar_one_or_none()
+    if trip is None:
+        return None
+    return {
+        "trip_id": trip.id,
+        "phase": trip.phase,
+        "last_lat": float(trip.last_lat) if trip.last_lat is not None else None,
+        "last_lng": float(trip.last_lng) if trip.last_lng is not None else None,
+        "last_speed_kph": (
+            float(trip.last_speed_kph) if trip.last_speed_kph is not None else None
+        ),
+        "last_ping_at": trip.last_ping_at.isoformat() if trip.last_ping_at else None,
+    }
+
+
+# ---- Transport fee invoicer ------------------------------------------------
+
+
+async def generate_transport_invoices(
+    session: AsyncSession,
+    *,
+    tenant_id: int,
+    year: int,
+    month: int,
+    due_day: int = 10,
+) -> dict:
+    """Bulk-create monthly transport invoices from
+    ``StudentTransport.fee_per_month``. Idempotent on
+    ``(student_id, structure_id, period_start)`` — re-running for the
+    same month is a no-op for students whose invoice already exists.
+
+    A synthetic FeeStructure ("Transport — YYYY-MM") is upserted per
+    tenant + month so the invoices link cleanly into the existing Fees
+    UI (parent's Fees screen + admin reports).
+    """
+    from datetime import date as _date
+    from decimal import Decimal as _Dec
+
+    from app.models.fees import (
+        FeeCategory,
+        FeeInvoice,
+        FeeInvoiceStatus,
+        FeeStructure,
+        FeeStructureFrequency,
+    )
+    from app.services.fees import _next_invoice_number
+
+    period_start = _date(year, month, 1)
+    period_end = (
+        _date(year + 1, 1, 1) if month == 12 else _date(year, month + 1, 1)
+    )
+    due_day = max(1, min(due_day, 28))
+    due_date = _date(year, month, due_day)
+
+    # Per-tenant Transport category — created on demand once.
+    category = (
+        await session.execute(
+            select(FeeCategory).where(
+                FeeCategory.tenant_id == tenant_id,
+                FeeCategory.code == "transport",
+            )
+        )
+    ).scalar_one_or_none()
+    if category is None:
+        category = FeeCategory(
+            tenant_id=tenant_id, code="transport", name="Transport",
+        )
+        session.add(category)
+        await session.flush()
+
+    # Structure per (year, month) — pricing is per allocation, so the
+    # structure's amount is a sentinel; the invoice carries the real
+    # per-student total.
+    structure_name = f"Transport — {year:04d}-{month:02d}"
+    structure = (
+        await session.execute(
+            select(FeeStructure).where(
+                FeeStructure.tenant_id == tenant_id,
+                FeeStructure.name == structure_name,
+            )
+        )
+    ).scalar_one_or_none()
+    if structure is None:
+        structure = FeeStructure(
+            tenant_id=tenant_id,
+            category_id=category.id,
+            class_def_id=None,
+            name=structure_name,
+            amount=_Dec("0"),
+            frequency=FeeStructureFrequency.MONTHLY.value,
+            due_day=due_day,
+        )
+        session.add(structure)
+        await session.flush()
+
+    allocations = list(
+        (
+            await session.execute(
+                select(StudentTransport).where(
+                    StudentTransport.is_active.is_(True),
+                    StudentTransport.fee_per_month > 0,
+                )
+            )
+        ).scalars().all()
+    )
+
+    created = 0
+    skipped = 0
+    for alloc in allocations:
+        existing = (
+            await session.execute(
+                select(FeeInvoice).where(
+                    FeeInvoice.student_id == alloc.student_id,
+                    FeeInvoice.structure_id == structure.id,
+                    FeeInvoice.period_start == period_start,
+                )
+            )
+        ).scalar_one_or_none()
+        if existing is not None:
+            skipped += 1
+            continue
+        total = _D(alloc.fee_per_month)
+        invoice = FeeInvoice(
+            tenant_id=tenant_id,
+            student_id=alloc.student_id,
+            structure_id=structure.id,
+            category_id=category.id,
+            invoice_number=_next_invoice_number(tenant_id),
+            period_start=period_start,
+            period_end=period_end,
+            due_date=due_date,
+            base_amount=total,
+            discount_amount=_Dec("0"),
+            late_fee_amount=_Dec("0"),
+            total_amount=total,
+            paid_amount=_Dec("0"),
+            status=FeeInvoiceStatus.PENDING.value,
+        )
+        session.add(invoice)
+        created += 1
+    await session.commit()
+    return {
+        "structure_id": structure.id,
+        "created": created,
+        "skipped": skipped,
+        "period_start": period_start.isoformat(),
+        "period_end": period_end.isoformat(),
     }
