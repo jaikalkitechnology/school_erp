@@ -8,7 +8,6 @@ import '../../core/settings_cubit.dart';
 import '../../theme/brand.dart';
 import '../calendar/calendar_page.dart';
 import '../directory/directory_page.dart';
-import '../driver/driver_page.dart';
 import '../library/library_catalog_page.dart';
 import '../messages/messages_page.dart';
 import '../notifications/notifications_page.dart';
@@ -26,12 +25,9 @@ class MorePage extends StatelessWidget {
   Widget build(BuildContext context) {
     final settings = context.watch<SettingsCubit>().state;
     final s = settings.strings;
-    final auth = context.watch<AuthCubit>().state;
-    final roles = auth is AuthAuthenticated ? auth.user.roles : const <String>[];
-    // Bus / driver functionality is gated to one role only — the
-    // school's transport_manager. Senior staff still manage routes /
-    // buses through the admin web, not via this mobile shell.
-    final showDriver = roles.contains('transport_manager');
+    // The parent MorePage is now strictly parent-facing. A
+    // transport_manager has their own TransportShell (Bus + More tabs)
+    // — they never see this screen, so no role gating needed here.
     return Scaffold(
       appBar: AppBar(title: Text(s.tabMore)),
       body: RefreshIndicator(
@@ -43,15 +39,6 @@ class MorePage extends StatelessWidget {
         },
         child: ListView(
           children: [
-          if (showDriver)
-            _Tile(
-              icon: Icons.directions_bus_filled_outlined,
-              label: 'Bus',
-              subtitle: 'Start a trip · live tracking',
-              onTap: () => Navigator.of(context).push(
-                MaterialPageRoute(builder: (_) => const DriverPage()),
-              ),
-            ),
           _Tile(
             icon: Icons.badge_outlined,
             label: 'Student profile',

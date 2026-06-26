@@ -4,15 +4,20 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../core/auth_cubit.dart';
 import '../teacher/teacher_shell.dart';
 import 'home_shell.dart';
+import 'transport_shell.dart';
 
 /// Picks the right shell based on the logged-in user's primary role.
 ///
-/// Parent → HomeShell (the existing parent app surface).
-/// Teacher-shaped roles (class_teacher / subject_teacher / coordinator /
-/// vice_principal / principal) → TeacherShell.
-///
-/// Anyone else (eg. accountant who only ever uses the admin web) sees
-/// the HomeShell too as a safe fallback — it'll just have empty data.
+///   * Parent                       → HomeShell (dashboard, attendance,
+///                                     fees, homework, more).
+///   * Teacher-shaped roles
+///     (class_teacher / subject_teacher / coordinator / vice_principal /
+///     principal)                   → TeacherShell.
+///   * transport_manager            → TransportShell — a stripped-down
+///                                     2-tab shell with just the Bus
+///                                     screen + a More tab. No
+///                                     attendance / fees / homework.
+///   * Anyone else (eg. accountant) → HomeShell fallback.
 class RoleHome extends StatelessWidget {
   const RoleHome({super.key});
 
@@ -34,12 +39,18 @@ class RoleHome extends StatelessWidget {
           );
         }
         final roles = state.user.roles.toSet();
-        final isTeacher = roles.any(_teacherRoles.contains);
-        // Parent role wins if present (parents who also happen to be
-        // staff would get the parent shell — the staff features are on
-        // the admin web).
+        // Parent role wins over any other (parents who also happen to be
+        // staff get the parent shell — staff workflows live on the admin
+        // web).
         if (roles.contains('parent')) return const HomeShell();
-        if (isTeacher) return const TeacherShell();
+        // Transport-only operators get a dedicated, stripped shell.
+        // Checked BEFORE teacher / fallback so a user holding only
+        // transport_manager doesn't accidentally fall into the parent
+        // shell with empty data.
+        if (roles.contains('transport_manager')) {
+          return const TransportShell();
+        }
+        if (roles.any(_teacherRoles.contains)) return const TeacherShell();
         return const HomeShell();
       },
     );
