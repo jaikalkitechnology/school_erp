@@ -190,7 +190,34 @@ async def replace_stops_route(
 async def list_allocations_route(
     route_id: int, session: AsyncSession = Depends(tenant_scoped_session)
 ):
-    return await list_allocations_for_route(session, route_id)
+    """Enriched with student_name so the driver app's Boarding scan
+    list can render usable rows in a single round-trip."""
+    from app.models.parent import Student
+
+    rows = await list_allocations_for_route(session, route_id)
+    if not rows:
+        return []
+    sids = [r.student_id for r in rows]
+    names = dict(
+        (
+            await session.execute(
+                select(Student.id, Student.full_name).where(Student.id.in_(sids))
+            )
+        ).all()
+    )
+    return [
+        AllocationRead(
+            id=r.id,
+            student_id=r.student_id,
+            student_name=names.get(r.student_id),
+            route_id=r.route_id,
+            pickup_stop_id=r.pickup_stop_id,
+            drop_stop_id=r.drop_stop_id,
+            fee_per_month=r.fee_per_month,
+            is_active=r.is_active,
+        )
+        for r in rows
+    ]
 
 
 @router.post("/allocations", response_model=AllocationRead)
@@ -527,3 +554,169 @@ async def generate_monthly_transport_invoices_route(
         month=payload.month,
         due_day=payload.due_day,
     )
+
+
+# ---- Parent-accessible SSE stream of the child's trip GPS pings ---------
+
+
+@parent_router.get("/children/{student_id}/transport/stream")
+async def parent_trip_stream_route(
+    student_id: int,
+    principal: AuthPrincipal = Depends(_parent),
+    session: AsyncSession = Depends(platform_session),
+):
+    """Server-Sent Events feed of GPS frames for the child's currently-
+    in-progress trip. The parent app subscribes when the live trip is
+    detected and stops the bus marker on the map between frames.
+
+    Mirrors the staff-side ``/trips/{id}/stream`` endpoint, but with a
+    parent-link check so a malicious parent can't peek into another
+    family's trip. Returns 404 if there's no active trip for the
+    child's route — caller should fall back to the polling endpoint.
+    """
+    import asyncio
+    import json
+    from fastapi.responses import StreamingResponse
+    from datetime import date
+
+    from app.models.transport import (
+        Route, StudentTransport, Trip, TripPhase,
+    )
+    from app.services.transport import trip_position_snapshot
+
+    parent = (
+        await session.execute(select(Parent).where(Parent.user_id == principal.user_id))
+    ).scalar_one_or_none()
+    if parent is None:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN, detail="Not a parent account",
+        )
+    linked = (
+        await session.execute(
+            select(ParentChildMapping.id).where(
+                ParentChildMapping.parent_id == parent.id,
+                ParentChildMapping.student_id == student_id,
+            )
+        )
+    ).scalar_one_or_none()
+    if linked is None:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN, detail="Child not linked",
+        )
+
+    alloc = (
+        await session.execute(
+            select(StudentTransport).where(StudentTransport.student_id == student_id)
+        )
+    ).scalar_one_or_none()
+    if alloc is None or alloc.route_id is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="No bus allocated",
+        )
+
+    trip = (
+        await session.execute(
+            select(Trip).where(
+                Trip.route_id == alloc.route_id,
+                Trip.trip_date == date.today(),
+                Trip.phase.in_(
+                    [TripPhase.IN_PROGRESS.value, TripPhase.SCHEDULED.value]
+                ),
+            ).order_by(Trip.id.desc()).limit(1)
+        )
+    ).scalar_one_or_none()
+    if trip is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="No trip today",
+        )
+
+    trip_id = trip.id
+
+    async def event_stream():
+        last_payload: dict | None = None
+        for _ in range(30 * 60):
+            snap = await trip_position_snapshot(session, trip_id)
+            if snap is None:
+                break
+            if snap != last_payload:
+                yield f"data: {json.dumps(snap)}\n\n".encode("utf-8")
+                last_payload = snap
+            if snap.get("phase") not in {"in_progress", "scheduled"}:
+                yield b"event: end\ndata: {}\n\n"
+                break
+            await asyncio.sleep(1)
+
+    return StreamingResponse(
+        event_stream(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "X-Accel-Buffering": "no",
+        },
+    )
+
+
+# ---- Parent: route stops (lat/lng polyline for the map) -----------------
+
+
+@parent_router.get("/children/{student_id}/transport/route-geometry")
+async def parent_route_geometry_route(
+    student_id: int,
+    principal: AuthPrincipal = Depends(_parent),
+    session: AsyncSession = Depends(platform_session),
+):
+    """Lightweight payload feeding the Google Maps polyline on the
+    parent's Bus page: ordered stops with lat/lng so the client can
+    draw the route without needing a Directions API call."""
+    from app.models.transport import Stop, StudentTransport
+
+    parent = (
+        await session.execute(select(Parent).where(Parent.user_id == principal.user_id))
+    ).scalar_one_or_none()
+    if parent is None:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN, detail="Not a parent account",
+        )
+    linked = (
+        await session.execute(
+            select(ParentChildMapping.id).where(
+                ParentChildMapping.parent_id == parent.id,
+                ParentChildMapping.student_id == student_id,
+            )
+        )
+    ).scalar_one_or_none()
+    if linked is None:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN, detail="Child not linked",
+        )
+    alloc = (
+        await session.execute(
+            select(StudentTransport).where(StudentTransport.student_id == student_id)
+        )
+    ).scalar_one_or_none()
+    if alloc is None or alloc.route_id is None:
+        return {"stops": []}
+    stops = list(
+        (
+            await session.execute(
+                select(Stop)
+                .where(Stop.route_id == alloc.route_id)
+                .order_by(Stop.sequence)
+            )
+        ).scalars().all()
+    )
+    return {
+        "route_id": alloc.route_id,
+        "pickup_stop_id": alloc.pickup_stop_id,
+        "drop_stop_id": alloc.drop_stop_id,
+        "stops": [
+            {
+                "id": s.id,
+                "name": s.name,
+                "sequence": s.sequence,
+                "lat": float(s.latitude) if s.latitude is not None else None,
+                "lng": float(s.longitude) if s.longitude is not None else None,
+            }
+            for s in stops
+        ],
+    }

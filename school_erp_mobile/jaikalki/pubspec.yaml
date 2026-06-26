@@ -37,6 +37,9 @@ dependencies:
   pdf: ^3.11.1
   permission_handler: ^11.3.1
   geolocator: ^13.0.1
+  # Transport / bus tracking
+  google_maps_flutter: ^2.9.0       # Parent map view + admin live fleet
+  flutter_background_service: ^5.0.10  # Driver foreground GPS pinger
   image_picker: ^1.1.2
   file_picker: ^8.1.2
   path_provider: ^2.1.4

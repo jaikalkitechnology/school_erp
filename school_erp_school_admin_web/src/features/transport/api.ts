@@ -184,3 +184,21 @@ export const addFuel = async (p: Partial<Fuel> & { bus_id: number; fueled_on: st
   (await api.post<Fuel>(`${base}/fuel`, p)).data;
 export const listFuel = async (busId: number) =>
   (await api.get<Fuel[]>(`${base}/buses/${busId}/fuel`)).data;
+
+// ---- Phase 26: monthly transport invoice generator -----------------------
+
+export interface MonthlyInvoiceResult {
+  structure_id: number;
+  created: number;
+  skipped: number;
+  period_start: string;
+  period_end: string;
+}
+
+export const generateMonthlyTransportInvoices = async (p: {
+  year: number;
+  month: number;
+  due_day?: number;
+}) =>
+  (await api.post<MonthlyInvoiceResult>(`${base}/invoices/generate-monthly`, p))
+    .data;

@@ -38,6 +38,14 @@ android {
         versionName = flutter.versionName
         // multiDex is required when desugaring is on with minSdk < 21.
         multiDexEnabled = true
+
+        // Resolves the ${MAPS_API_KEY} placeholder in AndroidManifest.xml.
+        // Override by passing -PMAPS_API_KEY=AIza... to gradle, or by
+        // adding `MAPS_API_KEY=AIza...` to ~/.gradle/gradle.properties.
+        // Without a real key the map renders a blank gray canvas with
+        // "For development purposes only" — Maps SDK won't draw tiles.
+        manifestPlaceholders["MAPS_API_KEY"] =
+            (project.findProperty("MAPS_API_KEY") as String?) ?: "PASTE_GOOGLE_MAPS_KEY_HERE"
     }
 
     buildTypes {

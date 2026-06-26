@@ -240,6 +240,20 @@ class ParentRepository {
     );
   }
 
+  /// Ordered stops for the child's allocated route. Used by the
+  /// parent's Google Maps view to draw the route polyline + stop
+  /// markers without needing a Directions API call.
+  Future<RouteGeometry> routeGeometry(int studentId) async {
+    try {
+      final res = await _api.dio.get<Map<String, dynamic>>(
+        '/v1/parent/children/$studentId/transport/route-geometry',
+      );
+      return RouteGeometry.fromJson(res.data ?? const {});
+    } on DioException {
+      return const RouteGeometry(stops: []);
+    }
+  }
+
   Future<Map<String, dynamic>> initiatePayment({
     required int invoiceId,
     required int studentId,
@@ -1159,4 +1173,49 @@ double? _toDoubleOrNullParent(dynamic v) {
   if (v is num) return v.toDouble();
   if (v is String) return double.tryParse(v);
   return null;
+}
+
+class RouteGeometry {
+  const RouteGeometry({
+    this.routeId,
+    this.pickupStopId,
+    this.dropStopId,
+    required this.stops,
+  });
+  final int? routeId;
+  final int? pickupStopId;
+  final int? dropStopId;
+  final List<RouteStopPoint> stops;
+
+  factory RouteGeometry.fromJson(Map<String, dynamic> j) => RouteGeometry(
+        routeId: (j['route_id'] as num?)?.toInt(),
+        pickupStopId: (j['pickup_stop_id'] as num?)?.toInt(),
+        dropStopId: (j['drop_stop_id'] as num?)?.toInt(),
+        stops: ((j['stops'] as List<dynamic>?) ?? const [])
+            .map((e) => RouteStopPoint.fromJson(e as Map<String, dynamic>))
+            .toList(),
+      );
+}
+
+class RouteStopPoint {
+  const RouteStopPoint({
+    required this.id,
+    required this.name,
+    required this.sequence,
+    required this.lat,
+    required this.lng,
+  });
+  final int id;
+  final String name;
+  final int sequence;
+  final double? lat;
+  final double? lng;
+
+  factory RouteStopPoint.fromJson(Map<String, dynamic> j) => RouteStopPoint(
+        id: (j['id'] as num?)?.toInt() ?? 0,
+        name: (j['name'] as String?) ?? '',
+        sequence: (j['sequence'] as num?)?.toInt() ?? 0,
+        lat: (j['lat'] as num?)?.toDouble(),
+        lng: (j['lng'] as num?)?.toDouble(),
+      );
 }
