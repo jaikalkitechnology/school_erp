@@ -14,6 +14,7 @@ import '../notifications/notifications_page.dart';
 import '../profile/student_profile_page.dart';
 import '../results/result_cards_page.dart';
 import '../settings/settings_page.dart';
+import '../transport/transport_page.dart';
 
 /// "More" tab — overflow drawer for less-frequent features. Each row
 /// pushes a full-screen page so the bottom nav stays uncluttered.
@@ -51,6 +52,14 @@ class MorePage extends StatelessWidget {
             icon: Icons.event_outlined,
             label: 'Calendar',
             onTap: () => _open(context, 'Calendar', const CalendarPage()),
+          ),
+          _Tile(
+            icon: Icons.directions_bus_outlined,
+            label: 'Transport',
+            subtitle: 'Bus route, driver, live tracking',
+            onTap: () => Navigator.of(context).push(
+              MaterialPageRoute(builder: (_) => const TransportPage()),
+            ),
           ),
           _Tile(
             icon: Icons.menu_book_outlined,
@@ -112,10 +121,16 @@ class MorePage extends StatelessWidget {
 }
 
 class _Tile extends StatelessWidget {
-  const _Tile({required this.icon, required this.label, required this.onTap});
+  const _Tile({
+    required this.icon,
+    required this.label,
+    required this.onTap,
+    this.subtitle,
+  });
 
   final IconData icon;
   final String label;
+  final String? subtitle;
   final VoidCallback onTap;
 
   @override
@@ -123,6 +138,7 @@ class _Tile extends StatelessWidget {
     return ListTile(
       leading: Icon(icon, color: JaikalkiBrand.saffron),
       title: Text(label),
+      subtitle: subtitle == null ? null : Text(subtitle!),
       trailing: const Icon(Icons.chevron_right, color: JaikalkiBrand.textSecondary),
       onTap: onTap,
     );
