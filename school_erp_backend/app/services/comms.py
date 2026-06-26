@@ -105,6 +105,37 @@ _DEFAULTS: list[dict] = [
         "body_en": "{{start}} → {{end}}. {{remarks}}",
         "channels": [Channel.IN_APP.value, Channel.PUSH.value],
     },
+    # ---- Transport (Phase 18 / 26) ----
+    {
+        "code": "transport.bus_departed",
+        "subject_en": "Bus on the way",
+        "body_en": "The bus for {{route}} has started its {{direction}} trip.",
+        "channels": [Channel.IN_APP.value, Channel.PUSH.value],
+    },
+    {
+        "code": "transport.approaching_stop",
+        "subject_en": "Bus approaching",
+        "body_en": "Bus is approaching {{stop}}.",
+        "channels": [Channel.IN_APP.value, Channel.PUSH.value],
+    },
+    {
+        "code": "transport.arrived_stop",
+        "subject_en": "Bus arrived",
+        "body_en": "Bus has arrived at {{stop}}.",
+        "channels": [Channel.IN_APP.value, Channel.PUSH.value],
+    },
+    {
+        "code": "transport.boarded",
+        "subject_en": "Child boarded the bus",
+        "body_en": "{{student}} boarded the bus at {{time}}.",
+        "channels": [Channel.IN_APP.value, Channel.PUSH.value],
+    },
+    {
+        "code": "transport.dropped",
+        "subject_en": "Child dropped off",
+        "body_en": "{{student}} got off the bus at {{time}}.",
+        "channels": [Channel.IN_APP.value, Channel.PUSH.value],
+    },
 ]
 
 

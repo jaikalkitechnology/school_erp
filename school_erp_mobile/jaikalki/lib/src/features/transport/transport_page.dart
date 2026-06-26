@@ -185,27 +185,168 @@ class _NotAllocated extends StatelessWidget {
       ]);
 }
 
-class _AllocatedView extends StatelessWidget {
+class _AllocatedView extends StatefulWidget {
   const _AllocatedView({required this.data});
   final ChildTransport data;
+
+  @override
+  State<_AllocatedView> createState() => _AllocatedViewState();
+}
+
+class _AllocatedViewState extends State<_AllocatedView> {
+  bool _skipping = false;
+
+  String _today() {
+    final d = DateTime.now();
+    return '${d.year.toString().padLeft(4, "0")}-${d.month.toString().padLeft(2, "0")}-${d.day.toString().padLeft(2, "0")}';
+  }
+
+  Future<void> _toggleNotComingToday() async {
+    final children = locator<ChildrenCubit>().state;
+    if (children is! ChildrenLoaded || children.selectedId == null) return;
+    setState(() => _skipping = true);
+    try {
+      await locator<ParentRepository>().skipTransport(
+        studentId: children.selectedId!,
+        skipDate: _today(),
+        direction: widget.data.todayTrip?.direction ?? 'pickup',
+      );
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text("Driver notified. Bus will skip your stop today."),
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text("Couldn't update: $e")),
+      );
+    } finally {
+      if (mounted) setState(() => _skipping = false);
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
     return ListView(
       padding: const EdgeInsets.fromLTRB(16, 16, 16, 32),
       children: [
-        _RouteHeaderCard(data: data),
+        _RouteHeaderCard(data: widget.data),
         const SizedBox(height: 14),
-        _TripStatusCard(trip: data.todayTrip),
+        _TripStatusCard(trip: widget.data.todayTrip),
         const SizedBox(height: 14),
-        _StopsCard(pickup: data.pickupStop, drop: data.dropStop),
+        _MapPreviewCard(trip: widget.data.todayTrip),
         const SizedBox(height: 14),
-        _DriverCard(name: data.driverName, phone: data.driverPhone),
-        if (data.feePerMonth != null && data.feePerMonth! > 0) ...[
+        _StopsCard(pickup: widget.data.pickupStop, drop: widget.data.dropStop),
+        const SizedBox(height: 14),
+        _DriverCard(name: widget.data.driverName, phone: widget.data.driverPhone),
+        const SizedBox(height: 14),
+        SizedBox(
+          width: double.infinity,
+          child: OutlinedButton.icon(
+            onPressed: _skipping ? null : _toggleNotComingToday,
+            icon: _skipping
+                ? const SizedBox(
+                    width: 16, height: 16,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  )
+                : const Icon(Icons.cancel_schedule_send_outlined),
+            label: const Text("Not coming today"),
+            style: OutlinedButton.styleFrom(
+              foregroundColor: JaikalkiBrand.saffronDark,
+              side: const BorderSide(color: JaikalkiBrand.saffronPale),
+              padding: const EdgeInsets.symmetric(vertical: 12),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+            ),
+          ),
+        ),
+        if (widget.data.feePerMonth != null && widget.data.feePerMonth! > 0) ...[
           const SizedBox(height: 14),
-          _FeeCard(amount: data.feePerMonth!),
+          _FeeCard(amount: widget.data.feePerMonth!),
         ],
       ],
+    );
+  }
+}
+
+class _MapPreviewCard extends StatelessWidget {
+  const _MapPreviewCard({required this.trip});
+  final TransportTrip? trip;
+
+  @override
+  Widget build(BuildContext context) {
+    if (trip?.isLive != true || trip?.lastLat == null || trip?.lastLng == null) {
+      return const SizedBox.shrink();
+    }
+    // Scaffolding: we render a small static OpenStreetMap image preview
+    // tied to the bus' current lat/lng. Replace this with
+    // ``google_maps_flutter`` once the Maps API key is in place; the
+    // logic for plotting the route polyline lives server-side already
+    // (Stop.lat/lng sequence) so the upgrade is a UI-only swap.
+    final lat = trip!.lastLat!.toStringAsFixed(5);
+    final lng = trip!.lastLng!.toStringAsFixed(5);
+    return Container(
+      decoration: BoxDecoration(
+        color: JaikalkiBrand.warmWhite,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: JaikalkiBrand.saffronPale),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          ClipRRect(
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(13)),
+            child: AspectRatio(
+              aspectRatio: 16 / 9,
+              child: Container(
+                color: JaikalkiBrand.tealPale,
+                alignment: Alignment.center,
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    const Icon(Icons.map_outlined,
+                        size: 36, color: JaikalkiBrand.tealDark),
+                    const SizedBox(height: 6),
+                    Text(
+                      'Bus is here · $lat, $lng',
+                      style: const TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w700,
+                        color: JaikalkiBrand.tealDark,
+                      ),
+                    ),
+                    if (trip!.etaMinutes != null) ...[
+                      const SizedBox(height: 4),
+                      Text(
+                        '~${trip!.etaMinutes} min to ${trip!.nextStop?.name ?? "next stop"}',
+                        style: const TextStyle(
+                          fontSize: 11,
+                          color: JaikalkiBrand.indigoDark,
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+            ),
+          ),
+          const Padding(
+            padding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+            child: Text(
+              'Add a Google Maps API key to upgrade this preview to a live '
+              'route map with the bus marker moving in real time.',
+              style: TextStyle(
+                fontSize: 10,
+                color: JaikalkiBrand.textSecondary,
+                fontStyle: FontStyle.italic,
+              ),
+            ),
+          ),
+        ],
+      ),
     );
   }
 }

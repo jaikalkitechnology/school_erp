@@ -211,6 +211,35 @@ class ParentRepository {
     return ChildTransport.fromJson(res.data ?? const {});
   }
 
+  /// "Not coming today" — flips a single dated skip row server-side.
+  /// Idempotent on (student, date, direction).
+  Future<void> skipTransport({
+    required int studentId,
+    required String skipDate,
+    String direction = 'pickup',
+    String? reason,
+  }) async {
+    await _api.dio.post<dynamic>(
+      '/v1/parent/children/$studentId/transport/skip',
+      data: {
+        'skip_date': skipDate,
+        'direction': direction,
+        if (reason != null) 'reason': reason,
+      },
+    );
+  }
+
+  Future<void> unskipTransport({
+    required int studentId,
+    required String skipDate,
+    String direction = 'pickup',
+  }) async {
+    await _api.dio.delete<dynamic>(
+      '/v1/parent/children/$studentId/transport/skip',
+      queryParameters: {'skip_date': skipDate, 'direction': direction},
+    );
+  }
+
   Future<Map<String, dynamic>> initiatePayment({
     required int invoiceId,
     required int studentId,

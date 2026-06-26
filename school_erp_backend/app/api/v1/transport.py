@@ -335,3 +335,191 @@ async def parent_transport_route(
     if linked is None:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Child not linked")
     return await parent_transport(session, student_id)
+
+
+# ===========================================================================
+# Phase 26 — skip toggle / SSE stream / transport invoicer.
+# ===========================================================================
+
+
+# ---- "Not coming today" toggle (parent app) ------------------------------
+
+
+class _SkipBody(__import__("pydantic").BaseModel):
+    skip_date: str
+    direction: str = "pickup"
+    reason: __import__("typing").Optional[str] = None
+
+
+@parent_router.post(
+    "/children/{student_id}/transport/skip",
+    status_code=status.HTTP_201_CREATED,
+)
+async def parent_skip_route(
+    student_id: int,
+    payload: _SkipBody,
+    principal: AuthPrincipal = Depends(_parent),
+    session: AsyncSession = Depends(platform_session),
+):
+    """Parent flips "not coming today" for a single date + direction.
+    Idempotent — re-tapping with the same date just updates the reason.
+    """
+    from datetime import date as _date
+    from app.services.transport import upsert_skip
+
+    parent = (
+        await session.execute(select(Parent).where(Parent.user_id == principal.user_id))
+    ).scalar_one_or_none()
+    if parent is None:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Not a parent account")
+    linked = (
+        await session.execute(
+            select(ParentChildMapping.id).where(
+                ParentChildMapping.parent_id == parent.id,
+                ParentChildMapping.student_id == student_id,
+            )
+        )
+    ).scalar_one_or_none()
+    if linked is None:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Child not linked")
+    try:
+        d = _date.fromisoformat(payload.skip_date)
+    except ValueError:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="bad skip_date")
+    row = await upsert_skip(
+        session,
+        tenant_id=principal.tenant_id,
+        student_id=student_id,
+        skip_date=d,
+        direction=payload.direction,
+        reason=payload.reason,
+    )
+    return {"id": row.id, "skip_date": row.skip_date.isoformat(),
+            "direction": row.direction, "reason": row.reason}
+
+
+@parent_router.delete(
+    "/children/{student_id}/transport/skip",
+    status_code=status.HTTP_204_NO_CONTENT,
+)
+async def parent_unskip_route(
+    student_id: int,
+    skip_date: str,
+    direction: str = "pickup",
+    principal: AuthPrincipal = Depends(_parent),
+    session: AsyncSession = Depends(platform_session),
+):
+    """Undo a skip — parent changed their mind."""
+    from datetime import date as _date
+    from app.services.transport import remove_skip
+
+    try:
+        d = _date.fromisoformat(skip_date)
+    except ValueError:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="bad skip_date")
+    await remove_skip(
+        session, student_id=student_id, skip_date=d, direction=direction,
+    )
+
+
+# ---- Driver app: today's skip list -------------------------------------
+
+
+@router.get("/routes/{route_id}/skips")
+async def driver_skip_list_route(
+    route_id: int,
+    principal: AuthPrincipal = Depends(_driver_or_staff),
+    session: AsyncSession = Depends(tenant_scoped_session),
+):
+    """Driver pulls this before / during a trip to know which students
+    to bypass at their assigned stop today."""
+    from app.services.transport import list_skips_for_today
+
+    rows = await list_skips_for_today(session, route_id=route_id)
+    return [
+        {
+            "student_id": r.student_id,
+            "skip_date": r.skip_date.isoformat(),
+            "direction": r.direction,
+            "reason": r.reason,
+        }
+        for r in rows
+    ]
+
+
+# ---- SSE stream of trip GPS pings ---------------------------------------
+
+
+@router.get("/trips/{trip_id}/stream")
+async def trip_stream_route(
+    trip_id: int,
+    session: AsyncSession = Depends(tenant_scoped_session),
+):
+    """Server-Sent Events — emits a tiny ``data: {...}\\n\\n`` payload
+    every ~1 s while the trip is in progress so the parent's map can
+    move smoothly instead of snapping every 30 s. Auto-stops when the
+    trip's phase leaves ``in_progress``.
+
+    Drop the 30 s poll on the parent side and just consume this — but
+    keep the poll as a fallback for very old browsers / sketchy
+    proxies that strip SSE.
+    """
+    import asyncio
+    import json
+    from fastapi.responses import StreamingResponse
+    from app.services.transport import trip_position_snapshot
+
+    async def event_stream():
+        last_payload: dict | None = None
+        # Cap at 30 minutes per connection so an idle stream doesn't
+        # squat a worker forever.
+        for _ in range(30 * 60):
+            snap = await trip_position_snapshot(session, trip_id)
+            if snap is None:
+                break
+            if snap != last_payload:
+                yield f"data: {json.dumps(snap)}\n\n".encode("utf-8")
+                last_payload = snap
+            if snap.get("phase") not in {"in_progress", "scheduled"}:
+                # Trip finished — let the client know and close.
+                yield b"event: end\ndata: {}\n\n"
+                break
+            await asyncio.sleep(1)
+    return StreamingResponse(
+        event_stream(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "X-Accel-Buffering": "no",  # disable nginx buffering
+        },
+    )
+
+
+# ---- Admin: monthly transport-invoice generator -------------------------
+
+
+class _InvoiceBody(__import__("pydantic").BaseModel):
+    year: int
+    month: int
+    due_day: int = 10
+
+
+@router.post("/invoices/generate-monthly")
+async def generate_monthly_transport_invoices_route(
+    payload: _InvoiceBody,
+    principal: AuthPrincipal = Depends(_school_admin),
+    session: AsyncSession = Depends(tenant_scoped_session),
+):
+    """One-click: spin up a FeeInvoice per StudentTransport allocation
+    using ``fee_per_month``. Idempotent on (student, structure, period)
+    — re-running for the same month is a no-op for rows already
+    invoiced. Result feeds straight into the parent's Fees screen."""
+    from app.services.transport import generate_transport_invoices
+
+    return await generate_transport_invoices(
+        session,
+        tenant_id=principal.tenant_id,
+        year=payload.year,
+        month=payload.month,
+        due_day=payload.due_day,
+    )

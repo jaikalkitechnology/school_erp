@@ -8,6 +8,7 @@ import '../../core/settings_cubit.dart';
 import '../../theme/brand.dart';
 import '../calendar/calendar_page.dart';
 import '../directory/directory_page.dart';
+import '../driver/driver_page.dart';
 import '../library/library_catalog_page.dart';
 import '../messages/messages_page.dart';
 import '../notifications/notifications_page.dart';
@@ -25,6 +26,16 @@ class MorePage extends StatelessWidget {
   Widget build(BuildContext context) {
     final settings = context.watch<SettingsCubit>().state;
     final s = settings.strings;
+    final auth = context.watch<AuthCubit>().state;
+    final roles = auth is AuthAuthenticated ? auth.user.roles : const <String>[];
+    // Anyone with a transport-staff role (or senior school staff) gets
+    // the Driver entry point on More so they can run trips from the
+    // same Flutter binary as the parent app.
+    const _transportStaffRoles = {
+      'transport_manager', 'school_admin', 'principal',
+      'vice_principal', 'coordinator',
+    };
+    final showDriver = roles.any(_transportStaffRoles.contains);
     return Scaffold(
       appBar: AppBar(title: Text(s.tabMore)),
       body: RefreshIndicator(
@@ -36,6 +47,15 @@ class MorePage extends StatelessWidget {
         },
         child: ListView(
           children: [
+          if (showDriver)
+            _Tile(
+              icon: Icons.local_taxi_outlined,
+              label: 'Driver',
+              subtitle: 'Start a trip · live tracking',
+              onTap: () => Navigator.of(context).push(
+                MaterialPageRoute(builder: (_) => const DriverPage()),
+              ),
+            ),
           _Tile(
             icon: Icons.badge_outlined,
             label: 'Student profile',

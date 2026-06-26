@@ -186,6 +186,31 @@ class TripBoarding(TenantBase):
     captured_by_user_id = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
 
 
+class TripSkip(TenantBase):
+    """Parent's "not coming today" opt-out, scoped to a single date +
+    direction. The driver app reads this so it knows to skip the
+    student at the assigned stop; the push notifier reads it so we
+    don't ping the parent with bus-arrived alerts they don't care
+    about. One row per (student, date, direction)."""
+
+    __tablename__ = "transport_trip_skips"
+    __table_args__ = (
+        UniqueConstraint(
+            "student_id", "skip_date", "direction",
+            name="uq_trip_skip_unique",
+        ),
+        Index("ix_trip_skips_date_student", "skip_date", "student_id"),
+        {"mysql_engine": "InnoDB", "mysql_charset": "utf8mb4"},
+    )
+
+    student_id = Column(
+        Integer, ForeignKey("students.id", ondelete="CASCADE"), nullable=False,
+    )
+    skip_date = Column(Date, nullable=False)
+    direction = Column(String(10), nullable=False, default=TripDirection.PICKUP.value)
+    reason = Column(String(255), nullable=True)
+
+
 class MaintenanceLog(TenantBase):
     __tablename__ = "transport_maintenance_logs"
     __table_args__ = (
