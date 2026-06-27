@@ -720,3 +720,323 @@ async def parent_route_geometry_route(
             for s in stops
         ],
     }
+
+
+# ===========================================================================
+# Phase 26.3 — trip history, pickup/drop status, admin live map dashboard.
+# ===========================================================================
+
+
+# ---- Parent: trip history for a child -----------------------------------
+
+
+@parent_router.get("/children/{student_id}/transport/trips")
+async def parent_trip_history_route(
+    student_id: int,
+    limit: int = 30,
+    principal: AuthPrincipal = Depends(_parent),
+    session: AsyncSession = Depends(platform_session),
+):
+    """Last ``limit`` trips on the child's route — completed +
+    in-progress — newest first. Used by the Trip History page on the
+    parent app so they can review yesterday / last week's runs."""
+    from app.models.transport import Route, StudentTransport, Trip
+
+    parent = (
+        await session.execute(
+            select(Parent).where(Parent.user_id == principal.user_id)
+        )
+    ).scalar_one_or_none()
+    if parent is None:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN, detail="Not a parent account",
+        )
+    linked = (
+        await session.execute(
+            select(ParentChildMapping.id).where(
+                ParentChildMapping.parent_id == parent.id,
+                ParentChildMapping.student_id == student_id,
+            )
+        )
+    ).scalar_one_or_none()
+    if linked is None:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN, detail="Child not linked",
+        )
+    alloc = (
+        await session.execute(
+            select(StudentTransport).where(StudentTransport.student_id == student_id)
+        )
+    ).scalar_one_or_none()
+    if alloc is None:
+        return []
+
+    trips = list(
+        (
+            await session.execute(
+                select(Trip)
+                .where(Trip.route_id == alloc.route_id)
+                .order_by(Trip.trip_date.desc(), Trip.id.desc())
+                .limit(max(1, min(limit, 100)))
+            )
+        ).scalars().all()
+    )
+    if not trips:
+        return []
+    route = (
+        await session.execute(select(Route).where(Route.id == alloc.route_id))
+    ).scalar_one_or_none()
+    route_name = route.name if route else None
+
+    # Pull this child's boarding events for the listed trips in one go
+    # so the response carries pickup + drop status per row.
+    from app.models.transport import TripBoarding
+
+    trip_ids = [t.id for t in trips]
+    boarding_rows = list(
+        (
+            await session.execute(
+                select(TripBoarding).where(
+                    TripBoarding.trip_id.in_(trip_ids),
+                    TripBoarding.student_id == student_id,
+                )
+            )
+        ).scalars().all()
+    )
+    events_by_trip: dict[int, list[dict]] = {}
+    for b in boarding_rows:
+        events_by_trip.setdefault(b.trip_id, []).append({
+            "event": b.event,
+            "captured_at": b.captured_at.isoformat() if b.captured_at else None,
+            "stop_id": b.stop_id,
+        })
+
+    return [
+        {
+            "id": t.id,
+            "route_id": t.route_id,
+            "route_name": route_name,
+            "trip_date": t.trip_date.isoformat(),
+            "direction": t.direction,
+            "phase": t.phase,
+            "started_at": t.started_at.isoformat() if t.started_at else None,
+            "completed_at": t.completed_at.isoformat() if t.completed_at else None,
+            "boardings": events_by_trip.get(t.id, []),
+        }
+        for t in trips
+    ]
+
+
+# ---- Parent: today's pickup / drop status for the child -----------------
+
+
+@parent_router.get(
+    "/children/{student_id}/transport/today-status",
+)
+async def parent_today_status_route(
+    student_id: int,
+    principal: AuthPrincipal = Depends(_parent),
+    session: AsyncSession = Depends(platform_session),
+):
+    """Latest pickup + drop boarding events for the child on today's
+    trips. Drives the "Boarded at 08:14" / "Dropped at 14:32" status
+    pill on the parent's bus screen."""
+    from datetime import date as _date
+
+    from app.models.transport import (
+        StudentTransport, Trip, TripBoarding,
+    )
+
+    parent = (
+        await session.execute(
+            select(Parent).where(Parent.user_id == principal.user_id)
+        )
+    ).scalar_one_or_none()
+    if parent is None:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN, detail="Not a parent account",
+        )
+    linked = (
+        await session.execute(
+            select(ParentChildMapping.id).where(
+                ParentChildMapping.parent_id == parent.id,
+                ParentChildMapping.student_id == student_id,
+            )
+        )
+    ).scalar_one_or_none()
+    if linked is None:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN, detail="Child not linked",
+        )
+    alloc = (
+        await session.execute(
+            select(StudentTransport).where(StudentTransport.student_id == student_id)
+        )
+    ).scalar_one_or_none()
+    if alloc is None:
+        return {"events": []}
+
+    trip_ids = list(
+        (
+            await session.execute(
+                select(Trip.id).where(
+                    Trip.route_id == alloc.route_id,
+                    Trip.trip_date == _date.today(),
+                )
+            )
+        ).scalars().all()
+    )
+    if not trip_ids:
+        return {"events": []}
+    events = list(
+        (
+            await session.execute(
+                select(TripBoarding)
+                .where(
+                    TripBoarding.trip_id.in_(trip_ids),
+                    TripBoarding.student_id == student_id,
+                )
+                .order_by(TripBoarding.captured_at.asc())
+            )
+        ).scalars().all()
+    )
+    return {
+        "events": [
+            {
+                "trip_id": e.trip_id,
+                "event": e.event,
+                "stop_id": e.stop_id,
+                "captured_at": e.captured_at.isoformat() if e.captured_at else None,
+            }
+            for e in events
+        ],
+    }
+
+
+# ---- Admin: live multi-bus map dashboard ---------------------------------
+
+
+@router.get("/trips/live")
+async def admin_live_trips_route(
+    session: AsyncSession = Depends(tenant_scoped_session),
+):
+    """Snapshot of every trip currently ``in_progress`` — enough to
+    plot a single multi-bus map on the admin web. One round-trip
+    instead of one-per-bus."""
+    from datetime import date as _date
+
+    from app.models.transport import Bus, Driver, Route, Trip, TripPhase
+
+    trips = list(
+        (
+            await session.execute(
+                select(Trip).where(
+                    Trip.trip_date == _date.today(),
+                    Trip.phase == TripPhase.IN_PROGRESS.value,
+                )
+                .order_by(Trip.id.desc())
+            )
+        ).scalars().all()
+    )
+    if not trips:
+        return []
+    route_ids = {t.route_id for t in trips}
+    routes = {
+        r.id: r for r in (
+            await session.execute(
+                select(Route).where(Route.id.in_(route_ids))
+            )
+        ).scalars().all()
+    }
+    bus_ids = {r.bus_id for r in routes.values() if r.bus_id is not None}
+    driver_ids = {r.driver_id for r in routes.values() if r.driver_id is not None}
+    buses = {
+        b.id: b for b in (
+            (await session.execute(select(Bus).where(Bus.id.in_(bus_ids)))).scalars().all()
+            if bus_ids else []
+        )
+    } if bus_ids else {}
+    drivers = {
+        d.id: d for d in (
+            (await session.execute(select(Driver).where(Driver.id.in_(driver_ids)))).scalars().all()
+            if driver_ids else []
+        )
+    } if driver_ids else {}
+
+    out = []
+    for t in trips:
+        r = routes.get(t.route_id)
+        b = buses.get(r.bus_id) if r and r.bus_id else None
+        d = drivers.get(r.driver_id) if r and r.driver_id else None
+        out.append({
+            "trip_id": t.id,
+            "route_id": t.route_id,
+            "route_name": r.name if r else None,
+            "bus_registration": b.registration_number if b else None,
+            "driver_name": d.full_name if d else None,
+            "driver_phone": d.phone if d else None,
+            "direction": t.direction,
+            "phase": t.phase,
+            "last_lat": float(t.last_lat) if t.last_lat is not None else None,
+            "last_lng": float(t.last_lng) if t.last_lng is not None else None,
+            "last_speed_kph": (
+                float(t.last_speed_kph) if t.last_speed_kph is not None else None
+            ),
+            "last_ping_at": t.last_ping_at.isoformat() if t.last_ping_at else None,
+            "started_at": t.started_at.isoformat() if t.started_at else None,
+        })
+    return out
+
+
+# ---- Admin: trip history -------------------------------------------------
+
+
+@router.get("/trips/history")
+async def admin_trip_history_route(
+    days_back: int = 14,
+    session: AsyncSession = Depends(tenant_scoped_session),
+):
+    """Recent trips across every route — newest first. Powers the
+    admin Trip History tab on the Transport page."""
+    from datetime import date as _date, timedelta
+
+    from app.models.transport import Bus, Driver, Route, Trip
+
+    since = _date.today() - timedelta(days=max(1, min(days_back, 60)))
+    trips = list(
+        (
+            await session.execute(
+                select(Trip)
+                .where(Trip.trip_date >= since)
+                .order_by(Trip.trip_date.desc(), Trip.id.desc())
+                .limit(200)
+            )
+        ).scalars().all()
+    )
+    if not trips:
+        return []
+    route_ids = {t.route_id for t in trips}
+    routes = {
+        r.id: r for r in (
+            await session.execute(
+                select(Route).where(Route.id.in_(route_ids))
+            )
+        ).scalars().all()
+    }
+    return [
+        {
+            "id": t.id,
+            "trip_date": t.trip_date.isoformat(),
+            "direction": t.direction,
+            "phase": t.phase,
+            "route_id": t.route_id,
+            "route_name": routes.get(t.route_id).name if routes.get(t.route_id) else None,
+            "started_at": t.started_at.isoformat() if t.started_at else None,
+            "completed_at": t.completed_at.isoformat() if t.completed_at else None,
+            "duration_minutes": (
+                int(((t.completed_at or t.started_at) - t.started_at).total_seconds() / 60)
+                if t.started_at and t.completed_at else None
+            ),
+        }
+        for t in trips
+    ]

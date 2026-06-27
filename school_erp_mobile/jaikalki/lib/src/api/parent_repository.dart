@@ -240,6 +240,41 @@ class ParentRepository {
     );
   }
 
+  /// Last N completed + in-progress trips on the child's route.
+  /// Each row carries the child's boarding events for that trip so the
+  /// Trip History page can show "Boarded at Stop A · 08:14" inline.
+  Future<List<TransportTripHistoryRow>> transportTripHistory(
+    int studentId, {
+    int limit = 30,
+  }) async {
+    try {
+      final res = await _api.dio.get<List<dynamic>>(
+        '/v1/parent/children/$studentId/transport/trips',
+        queryParameters: {'limit': limit},
+      );
+      return (res.data ?? const [])
+          .map((e) =>
+              TransportTripHistoryRow.fromJson(e as Map<String, dynamic>))
+          .toList();
+    } on DioException {
+      return const [];
+    }
+  }
+
+  /// The child's pickup + drop boarding events for today only.
+  /// Drives the "Boarded at 08:14" / "Dropped at 14:32" pill on the
+  /// parent's bus screen.
+  Future<TransportTodayStatus> transportTodayStatus(int studentId) async {
+    try {
+      final res = await _api.dio.get<Map<String, dynamic>>(
+        '/v1/parent/children/$studentId/transport/today-status',
+      );
+      return TransportTodayStatus.fromJson(res.data ?? const {});
+    } on DioException {
+      return const TransportTodayStatus(events: []);
+    }
+  }
+
   /// Ordered stops for the child's allocated route. Used by the
   /// parent's Google Maps view to draw the route polyline + stop
   /// markers without needing a Directions API call.
@@ -1217,5 +1252,90 @@ class RouteStopPoint {
         sequence: (j['sequence'] as num?)?.toInt() ?? 0,
         lat: (j['lat'] as num?)?.toDouble(),
         lng: (j['lng'] as num?)?.toDouble(),
+      );
+}
+
+class TransportTripHistoryRow {
+  const TransportTripHistoryRow({
+    required this.id,
+    required this.routeId,
+    required this.routeName,
+    required this.tripDate,
+    required this.direction,
+    required this.phase,
+    required this.startedAt,
+    required this.completedAt,
+    required this.boardings,
+  });
+
+  final int id;
+  final int? routeId;
+  final String? routeName;
+  final String tripDate;
+  final String? direction;
+  /// scheduled / in_progress / completed / cancelled
+  final String phase;
+  final String? startedAt;
+  final String? completedAt;
+  final List<TripBoardingEvent> boardings;
+
+  factory TransportTripHistoryRow.fromJson(Map<String, dynamic> j) =>
+      TransportTripHistoryRow(
+        id: (j['id'] as num?)?.toInt() ?? 0,
+        routeId: (j['route_id'] as num?)?.toInt(),
+        routeName: j['route_name'] as String?,
+        tripDate: (j['trip_date'] as String?) ?? '',
+        direction: j['direction'] as String?,
+        phase: (j['phase'] as String?) ?? 'scheduled',
+        startedAt: j['started_at'] as String?,
+        completedAt: j['completed_at'] as String?,
+        boardings: ((j['boardings'] as List<dynamic>?) ?? const [])
+            .map((e) => TripBoardingEvent.fromJson(e as Map<String, dynamic>))
+            .toList(),
+      );
+}
+
+class TripBoardingEvent {
+  const TripBoardingEvent({
+    required this.event,
+    required this.capturedAt,
+    required this.stopId,
+  });
+  /// boarded / deboarded / no_show
+  final String event;
+  final String? capturedAt;
+  final int? stopId;
+
+  factory TripBoardingEvent.fromJson(Map<String, dynamic> j) =>
+      TripBoardingEvent(
+        event: (j['event'] as String?) ?? '',
+        capturedAt: j['captured_at'] as String?,
+        stopId: (j['stop_id'] as num?)?.toInt(),
+      );
+}
+
+class TransportTodayStatus {
+  const TransportTodayStatus({required this.events});
+  final List<TripBoardingEvent> events;
+
+  TripBoardingEvent? get latestBoarded {
+    for (final e in events.reversed) {
+      if (e.event == 'boarded') return e;
+    }
+    return null;
+  }
+
+  TripBoardingEvent? get latestDropped {
+    for (final e in events.reversed) {
+      if (e.event == 'deboarded') return e;
+    }
+    return null;
+  }
+
+  factory TransportTodayStatus.fromJson(Map<String, dynamic> j) =>
+      TransportTodayStatus(
+        events: ((j['events'] as List<dynamic>?) ?? const [])
+            .map((e) => TripBoardingEvent.fromJson(e as Map<String, dynamic>))
+            .toList(),
       );
 }
