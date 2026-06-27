@@ -1,4 +1,5 @@
-<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
     <!-- Required on Android 13+ (API 33) so the OS actually shows
          heads-up / lock-screen notifications. FCM still delivers
          without this, but the user sees nothing. -->
@@ -69,16 +70,18 @@
             android:value="2" />
 
         <!-- flutter_background_service plugin foreground service.
-             Without this <service> declaration the plugin's
-             startService() throws on Android 14+ because the OS can't
-             find a service to bind to. The class name is owned by the
-             plugin; foregroundServiceType MUST include "location" so
-             Android allows the FOREGROUND_SERVICE_LOCATION permission
-             we declared above. -->
+             The plugin ships its own <service> declaration in its
+             AndroidManifest. We don't redeclare it (manifest merger
+             conflicts on android:exported), but we DO override
+             android:foregroundServiceType so the OS allows the
+             FOREGROUND_SERVICE_LOCATION permission we declared above
+             — Android 14+ rejects the service start otherwise.
+             tools:replace tells the manifest merger this attribute
+             should win over the plugin's default ("dataSync"). -->
         <service
             android:name="id.flutter.flutter_background_service.BackgroundService"
             android:foregroundServiceType="location"
-            android:exported="false" />
+            tools:replace="android:foregroundServiceType" />
     </application>
     <!-- Required to query activities that can process text, see:
          https://developer.android.com/training/package-visibility and
