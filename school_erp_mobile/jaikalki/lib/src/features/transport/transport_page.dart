@@ -11,6 +11,7 @@ import '../../api/trip_stream.dart';
 import '../../core/children_cubit.dart';
 import '../../core/service_locator.dart';
 import '../../theme/brand.dart';
+import 'trip_history_page.dart';
 
 /// Phase 18 — parent-facing bus tracking screen.
 ///
@@ -34,6 +35,7 @@ class _TransportPageState extends State<TransportPage>
   StreamSubscription<ChildrenState>? _childrenSub;
   Future<ChildTransport>? _future;
   Future<RouteGeometry>? _geometryFuture;
+  Future<TransportTodayStatus>? _statusFuture;
   int? _loadedFor;
   Timer? _poll;
   StreamSubscription<TripPositionFrame>? _streamSub;
@@ -85,6 +87,8 @@ class _TransportPageState extends State<TransportPage>
     setState(() {
       _future = locator<ParentRepository>().transport(studentId);
       _geometryFuture = locator<ParentRepository>().routeGeometry(studentId);
+      _statusFuture =
+          locator<ParentRepository>().transportTodayStatus(studentId);
     });
     _future!.then((_) => _restartLiveStreamIfNeeded(studentId))
         .catchError((_) {});
@@ -173,6 +177,7 @@ class _TransportPageState extends State<TransportPage>
                     data: data,
                     liveFrame: _liveFrame,
                     geometryFuture: _geometryFuture,
+                    statusFuture: _statusFuture,
                   );
                 },
               ),
@@ -226,10 +231,12 @@ class _AllocatedView extends StatefulWidget {
     required this.data,
     required this.liveFrame,
     required this.geometryFuture,
+    required this.statusFuture,
   });
   final ChildTransport data;
   final TripPositionFrame? liveFrame;
   final Future<RouteGeometry>? geometryFuture;
+  final Future<TransportTodayStatus>? statusFuture;
 
   @override
   State<_AllocatedView> createState() => _AllocatedViewState();
@@ -276,6 +283,8 @@ class _AllocatedViewState extends State<_AllocatedView> {
       children: [
         _RouteHeaderCard(data: widget.data),
         const SizedBox(height: 14),
+        _TodayStatusCard(statusFuture: widget.statusFuture),
+        const SizedBox(height: 14),
         _TripStatusCard(
           trip: widget.data.todayTrip,
           liveFrame: widget.liveFrame,
@@ -319,7 +328,109 @@ class _AllocatedViewState extends State<_AllocatedView> {
           const SizedBox(height: 14),
           _FeeCard(amount: widget.data.feePerMonth!),
         ],
+        const SizedBox(height: 14),
+        OutlinedButton.icon(
+          onPressed: () => Navigator.of(context).push(
+            MaterialPageRoute(builder: (_) => const TripHistoryPage()),
+          ),
+          icon: const Icon(Icons.history),
+          label: const Text('Trip history'),
+          style: OutlinedButton.styleFrom(
+            foregroundColor: JaikalkiBrand.indigoDark,
+            side: const BorderSide(color: JaikalkiBrand.saffronPale),
+            padding: const EdgeInsets.symmetric(vertical: 12),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+            ),
+          ),
+        ),
       ],
+    );
+  }
+}
+
+class _TodayStatusCard extends StatelessWidget {
+  const _TodayStatusCard({required this.statusFuture});
+  final Future<TransportTodayStatus>? statusFuture;
+
+  String _hm(String? iso) {
+    if (iso == null) return '';
+    try {
+      final dt = DateTime.parse(iso).toLocal();
+      return '${dt.hour.toString().padLeft(2, "0")}:${dt.minute.toString().padLeft(2, "0")}';
+    } catch (_) {
+      return '';
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return FutureBuilder<TransportTodayStatus>(
+      future: statusFuture,
+      builder: (context, snap) {
+        final data = snap.data ?? const TransportTodayStatus(events: []);
+        if (data.events.isEmpty) return const SizedBox.shrink();
+        final boarded = data.latestBoarded;
+        final dropped = data.latestDropped;
+        return Container(
+          padding: const EdgeInsets.all(14),
+          decoration: BoxDecoration(
+            color: JaikalkiBrand.tealPale.withOpacity(0.45),
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(color: JaikalkiBrand.tealDark.withOpacity(0.3)),
+          ),
+          child: Row(
+            children: [
+              const Icon(Icons.verified_outlined,
+                  color: JaikalkiBrand.tealDark),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      "TODAY'S STATUS",
+                      style: TextStyle(
+                        fontSize: 10,
+                        fontWeight: FontWeight.w800,
+                        letterSpacing: 1.0,
+                        color: JaikalkiBrand.textSecondary,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    if (boarded != null)
+                      Text(
+                        'Boarded at ${_hm(boarded.capturedAt)}',
+                        style: const TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w700,
+                          color: JaikalkiBrand.indigoDark,
+                        ),
+                      ),
+                    if (dropped != null)
+                      Text(
+                        'Dropped at ${_hm(dropped.capturedAt)}',
+                        style: const TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w700,
+                          color: JaikalkiBrand.indigoDark,
+                        ),
+                      ),
+                    if (boarded == null && dropped == null)
+                      const Text(
+                        'Bus has not yet reached your stop.',
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: JaikalkiBrand.textSecondary,
+                        ),
+                      ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        );
+      },
     );
   }
 }

@@ -17,9 +17,11 @@ import {
   listBuses,
   listDrivers,
   listFuel,
+  listLiveTrips,
   listMaintenance,
   listRoutes,
   listStops,
+  listTripHistory,
   pingTrip,
   replaceStops,
   startTrip,
@@ -29,7 +31,7 @@ import {
   type TripPhase,
 } from "./api";
 
-const TABS = ["Fleet", "Routes", "Live trip", "Billing", "Logs"] as const;
+const TABS = ["Fleet", "Routes", "Live map", "Live trip", "Billing", "History", "Logs"] as const;
 type Tab = (typeof TABS)[number];
 
 const PHASE_TONE: Record<TripPhase, string> = {
@@ -72,8 +74,10 @@ export function TransportPage() {
       </nav>
       {tab === "Fleet" && <FleetPanel />}
       {tab === "Routes" && <RoutesPanel />}
+      {tab === "Live map" && <LiveMapPanel />}
       {tab === "Live trip" && <LiveTripPanel />}
       {tab === "Billing" && <BillingPanel />}
+      {tab === "History" && <TripHistoryPanel />}
       {tab === "Logs" && <LogsPanel />}
     </div>
   );
@@ -818,6 +822,202 @@ function BillingPanel() {
           </CardContent>
         </Card>
       )}
+    </div>
+  );
+}
+
+// ---- Live multi-bus map (Phase 26.3 — fleet dashboard) -----------------
+
+function LiveMapPanel() {
+  const { data: trips = [], refetch } = useQuery({
+    queryKey: ["transport-live-trips"],
+    queryFn: listLiveTrips,
+    refetchInterval: 10_000,
+  });
+
+  return (
+    <div className="space-y-4">
+      <Card>
+        <CardHeader className="flex flex-row items-center justify-between">
+          <div>
+            <CardTitle className="flex items-center gap-2">
+              <MapPin className="h-5 w-5" /> Live fleet
+            </CardTitle>
+            <CardDescription>
+              Every bus currently on a trip. Auto-refreshes every 10 s.
+            </CardDescription>
+          </div>
+          <Button variant="outline" size="sm" onClick={() => refetch()}>
+            Refresh
+          </Button>
+        </CardHeader>
+        <CardContent>
+          {trips.length === 0 ? (
+            <p className="text-sm text-muted-foreground">
+              No buses are running right now.
+            </p>
+          ) : (
+            <table className="w-full text-sm">
+              <thead className="border-b text-left text-xs uppercase tracking-wider text-muted-foreground">
+                <tr>
+                  <th className="px-2 py-2">Route</th>
+                  <th className="px-2 py-2">Bus</th>
+                  <th className="px-2 py-2">Driver</th>
+                  <th className="px-2 py-2">Position</th>
+                  <th className="px-2 py-2">Speed</th>
+                  <th className="px-2 py-2">Last ping</th>
+                </tr>
+              </thead>
+              <tbody>
+                {trips.map((t) => (
+                  <tr key={t.trip_id} className="border-b last:border-b-0">
+                    <td className="px-2 py-2 font-medium text-indigo-dark">
+                      {t.route_name ?? `Route #${t.route_id}`}
+                    </td>
+                    <td className="px-2 py-2 font-mono text-xs">
+                      {t.bus_registration ?? "—"}
+                    </td>
+                    <td className="px-2 py-2">
+                      <p>{t.driver_name ?? "—"}</p>
+                      {t.driver_phone && (
+                        <p className="font-mono text-xs text-muted-foreground">
+                          {t.driver_phone}
+                        </p>
+                      )}
+                    </td>
+                    <td className="px-2 py-2 font-mono text-xs">
+                      {t.last_lat != null && t.last_lng != null ? (
+                        <a
+                          href={`https://maps.google.com/?q=${t.last_lat},${t.last_lng}`}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="text-teal-dark underline"
+                        >
+                          {t.last_lat.toFixed(4)}, {t.last_lng.toFixed(4)}
+                        </a>
+                      ) : (
+                        "Awaiting GPS"
+                      )}
+                    </td>
+                    <td className="px-2 py-2 font-mono text-xs">
+                      {t.last_speed_kph != null
+                        ? `${t.last_speed_kph.toFixed(0)} km/h`
+                        : "—"}
+                    </td>
+                    <td className="px-2 py-2 font-mono text-xs">
+                      {t.last_ping_at
+                        ? new Date(t.last_ping_at).toLocaleTimeString()
+                        : "—"}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
+
+// ---- Trip history (Phase 26.3) ------------------------------------------
+
+function TripHistoryPanel() {
+  const [days, setDays] = useState(14);
+  const { data: trips = [], isLoading } = useQuery({
+    queryKey: ["transport-trip-history", days],
+    queryFn: () => listTripHistory(days),
+  });
+
+  return (
+    <div className="space-y-4">
+      <Card>
+        <CardHeader className="flex flex-row items-center justify-between">
+          <div>
+            <CardTitle className="flex items-center gap-2">
+              <MapPin className="h-5 w-5" /> Recent trips
+            </CardTitle>
+            <CardDescription>
+              Last {days} day{days === 1 ? "" : "s"} of trips across every
+              route.
+            </CardDescription>
+          </div>
+          <div className="flex items-center gap-2">
+            <Label>Days</Label>
+            <Input
+              type="number"
+              min={1}
+              max={60}
+              value={days}
+              onChange={(e) => setDays(Number(e.target.value) || days)}
+              className="w-20"
+            />
+          </div>
+        </CardHeader>
+        <CardContent>
+          {isLoading ? (
+            <p className="text-sm text-muted-foreground">Loading…</p>
+          ) : trips.length === 0 ? (
+            <p className="text-sm text-muted-foreground">
+              No trips in this window.
+            </p>
+          ) : (
+            <table className="w-full text-sm">
+              <thead className="border-b text-left text-xs uppercase tracking-wider text-muted-foreground">
+                <tr>
+                  <th className="px-2 py-2">Date</th>
+                  <th className="px-2 py-2">Route</th>
+                  <th className="px-2 py-2">Direction</th>
+                  <th className="px-2 py-2">Status</th>
+                  <th className="px-2 py-2">Start</th>
+                  <th className="px-2 py-2">End</th>
+                  <th className="px-2 py-2">Duration</th>
+                </tr>
+              </thead>
+              <tbody>
+                {trips.map((t) => (
+                  <tr key={t.id} className="border-b last:border-b-0">
+                    <td className="px-2 py-2 font-mono text-xs">
+                      {t.trip_date}
+                    </td>
+                    <td className="px-2 py-2 font-medium text-indigo-dark">
+                      {t.route_name ?? `Route #${t.route_id}`}
+                    </td>
+                    <td className="px-2 py-2 capitalize">
+                      {t.direction ?? "—"}
+                    </td>
+                    <td className="px-2 py-2">
+                      <span
+                        className={cn(
+                          "rounded-full px-2 py-0.5 text-[11px] uppercase",
+                          PHASE_TONE[t.phase],
+                        )}
+                      >
+                        {t.phase}
+                      </span>
+                    </td>
+                    <td className="px-2 py-2 font-mono text-xs">
+                      {t.started_at
+                        ? new Date(t.started_at).toLocaleTimeString()
+                        : "—"}
+                    </td>
+                    <td className="px-2 py-2 font-mono text-xs">
+                      {t.completed_at
+                        ? new Date(t.completed_at).toLocaleTimeString()
+                        : "—"}
+                    </td>
+                    <td className="px-2 py-2 font-mono text-xs">
+                      {t.duration_minutes != null
+                        ? `${t.duration_minutes} min`
+                        : "—"}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+        </CardContent>
+      </Card>
     </div>
   );
 }

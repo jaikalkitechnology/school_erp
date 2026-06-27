@@ -202,3 +202,41 @@ export const generateMonthlyTransportInvoices = async (p: {
 }) =>
   (await api.post<MonthlyInvoiceResult>(`${base}/invoices/generate-monthly`, p))
     .data;
+
+// ---- Phase 26.3: admin live multi-bus map + trip history -----------------
+
+export interface LiveTrip {
+  trip_id: number;
+  route_id: number;
+  route_name: string | null;
+  bus_registration: string | null;
+  driver_name: string | null;
+  driver_phone: string | null;
+  direction: string | null;
+  phase: TripPhase;
+  last_lat: number | null;
+  last_lng: number | null;
+  last_speed_kph: number | null;
+  last_ping_at: string | null;
+  started_at: string | null;
+}
+
+export const listLiveTrips = async () =>
+  (await api.get<LiveTrip[]>(`${base}/trips/live`)).data;
+
+export interface TripHistoryRow {
+  id: number;
+  trip_date: string;
+  direction: string | null;
+  phase: TripPhase;
+  route_id: number;
+  route_name: string | null;
+  started_at: string | null;
+  completed_at: string | null;
+  duration_minutes: number | null;
+}
+
+export const listTripHistory = async (daysBack = 14) =>
+  (await api.get<TripHistoryRow[]>(`${base}/trips/history`, {
+    params: { days_back: daysBack },
+  })).data;
