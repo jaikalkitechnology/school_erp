@@ -15,6 +15,7 @@ import {
   createRoute,
   generateMonthlyTransportInvoices,
   listBuses,
+  listDriverCandidates,
   listDrivers,
   listFuel,
   listLiveTrips,
@@ -106,16 +107,45 @@ function FleetPanel() {
   const [drvName, setDrvName] = useState("");
   const [drvPhone, setDrvPhone] = useState("");
   const [drvLicense, setDrvLicense] = useState("");
+  // Selected candidate user — the transport_manager account this
+  // Driver row will be linked to. Without it the driver app can't
+  // tell *which* routes belong to *this* logged-in user.
+  const [drvUserId, setDrvUserId] = useState<string>("");
+  const { data: candidates = [] } = useQuery({
+    queryKey: ["transport-driver-candidates"],
+    queryFn: listDriverCandidates,
+  });
+
   const newDriver = useMutation({
     mutationFn: () =>
-      createDriver({ full_name: drvName, phone: drvPhone, license_number: drvLicense }),
+      createDriver({
+        full_name: drvName,
+        phone: drvPhone,
+        license_number: drvLicense,
+        user_id: drvUserId ? Number(drvUserId) : undefined,
+      } as any),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["transport-drivers"] });
+      qc.invalidateQueries({ queryKey: ["transport-driver-candidates"] });
       setDrvName("");
       setDrvPhone("");
       setDrvLicense("");
+      setDrvUserId("");
     },
   });
+
+  // Auto-fill the name / phone fields when the admin picks a candidate
+  // so the most common case ("create transport_manager user → fleet
+  // driver row") is one click of typing.
+  function pickCandidate(uid: string) {
+    setDrvUserId(uid);
+    if (!uid) return;
+    const c = candidates.find((x) => String(x.user_id) === uid);
+    if (c) {
+      if (!drvName) setDrvName(c.full_name);
+      if (!drvPhone && c.phone) setDrvPhone(c.phone);
+    }
+  }
 
   return (
     <div className="grid gap-6 md:grid-cols-2">
@@ -151,32 +181,100 @@ function FleetPanel() {
       <Card>
         <CardHeader>
           <CardTitle>Drivers</CardTitle>
-          <CardDescription>{drivers.length} drivers</CardDescription>
+          <CardDescription>
+            {drivers.length} driver{drivers.length === 1 ? "" : "s"}.
+            Each Driver row is linked to a transport_manager user
+            account so the driver app shows only the routes assigned
+            to <em>that</em> login.
+          </CardDescription>
         </CardHeader>
         <CardContent>
           <ul className="divide-y divide-saffron-pale">
             {drivers.map((d) => (
               <li key={d.id} className="flex items-center justify-between py-2 text-sm">
-                <span className="font-medium text-indigo-dark">{d.full_name}</span>
-                <span className="text-xs text-muted-foreground">{d.phone ?? "—"}</span>
-                <span className="rounded bg-teal-pale px-2 py-0.5 text-xs text-teal-dark">{d.status}</span>
+                <span className="font-medium text-indigo-dark">
+                  {d.full_name}
+                  {d.user_id == null && (
+                    <span className="ml-2 rounded bg-marigold-pale px-1.5 py-0.5 text-[10px] font-bold uppercase text-marigold-dark">
+                      no login
+                    </span>
+                  )}
+                </span>
+                <span className="text-xs text-muted-foreground">
+                  {d.phone ?? "—"}
+                </span>
+                <span className="rounded bg-teal-pale px-2 py-0.5 text-xs text-teal-dark">
+                  {d.status}
+                </span>
               </li>
             ))}
           </ul>
-          <div className="mt-3 grid grid-cols-4 gap-2">
-            <Input placeholder="Name" value={drvName} onChange={(e) => setDrvName(e.target.value)} />
-            <Input placeholder="Phone" value={drvPhone} onChange={(e) => setDrvPhone(e.target.value)} />
-            <Input
-              placeholder="License #"
-              value={drvLicense}
-              onChange={(e) => setDrvLicense(e.target.value)}
-            />
+
+          <div className="mt-4 space-y-2 rounded-md border border-saffron-pale p-3">
+            <Label className="text-xs uppercase tracking-wide">
+              Add a driver
+            </Label>
+
+            {/* Step 1 — pick the user account this Driver row maps to. */}
+            <div className="space-y-1.5">
+              <Label>Driver account (transport_manager user)</Label>
+              <select
+                className="h-9 w-full rounded border border-input bg-transparent px-2 text-sm"
+                value={drvUserId}
+                onChange={(e) => pickCandidate(e.target.value)}
+              >
+                <option value="">— select a user —</option>
+                {candidates
+                  .filter((c) => !c.already_a_driver)
+                  .map((c) => (
+                    <option key={c.user_id} value={c.user_id}>
+                      {c.full_name}
+                      {c.phone ? ` · ${c.phone}` : ""}
+                    </option>
+                  ))}
+              </select>
+              {candidates.length === 0 ? (
+                <p className="text-xs text-muted-foreground">
+                  No transport_manager users yet. Create one on{" "}
+                  <strong>Users &amp; credentials</strong> with role
+                  "transport_manager" first.
+                </p>
+              ) : candidates.every((c) => c.already_a_driver) ? (
+                <p className="text-xs text-muted-foreground">
+                  Every transport_manager user already has a Driver row.
+                </p>
+              ) : null}
+            </div>
+
+            {/* Step 2 — confirm / override the details that get
+                copied onto the Driver row. */}
+            <div className="grid grid-cols-3 gap-2">
+              <Input
+                placeholder="Name"
+                value={drvName}
+                onChange={(e) => setDrvName(e.target.value)}
+              />
+              <Input
+                placeholder="Phone"
+                value={drvPhone}
+                onChange={(e) => setDrvPhone(e.target.value)}
+              />
+              <Input
+                placeholder="License #"
+                value={drvLicense}
+                onChange={(e) => setDrvLicense(e.target.value)}
+              />
+            </div>
             <Button
               onClick={() => newDriver.mutate()}
-              disabled={!drvName || !drvLicense || newDriver.isPending}
+              disabled={
+                !drvName || !drvLicense || !drvUserId ||
+                newDriver.isPending
+              }
+              className="w-full"
             >
               <Plus className="mr-1 h-4 w-4" />
-              Add
+              {newDriver.isPending ? "Saving…" : "Add driver + link login"}
             </Button>
           </div>
         </CardContent>

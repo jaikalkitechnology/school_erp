@@ -1221,3 +1221,59 @@ async def driver_routes_for_me_route(
         }
         for r in rows
     ]
+
+
+# ---- Fleet: candidate user accounts for a new Driver row ---------------
+
+
+@router.get("/drivers/candidates")
+async def driver_user_candidates_route(
+    principal: AuthPrincipal = Depends(_transport_staff),
+    session: AsyncSession = Depends(tenant_scoped_session),
+):
+    """Users in the tenant who hold the ``transport_manager`` role and
+    do NOT already have a Driver row pointing at them. Powers the
+    "Driver account" dropdown on the admin Fleet form so the admin
+    doesn't accidentally re-link the same user twice (the Driver model
+    doesn't enforce a unique on user_id; we enforce it here at the
+    suggestion level).
+    """
+    from app.models.auth import Role, User, UserRole
+    from app.models.transport import Driver
+
+    rows = list(
+        (
+            await session.execute(
+                select(User)
+                .join(UserRole, UserRole.user_id == User.id)
+                .join(Role, Role.id == UserRole.role_id)
+                .where(
+                    User.tenant_id == principal.tenant_id,
+                    User.is_active.is_(True),
+                    Role.code == "transport_manager",
+                )
+            )
+        ).unique().scalars().all()
+    )
+    if not rows:
+        return []
+    taken_ids = {
+        uid for (uid,) in (
+            await session.execute(
+                select(Driver.user_id).where(
+                    Driver.user_id.in_([u.id for u in rows]),
+                )
+            )
+        ).all()
+        if uid is not None
+    }
+    return [
+        {
+            "user_id": u.id,
+            "full_name": u.full_name,
+            "phone": u.phone,
+            "email": u.email,
+            "already_a_driver": u.id in taken_ids,
+        }
+        for u in rows
+    ]
