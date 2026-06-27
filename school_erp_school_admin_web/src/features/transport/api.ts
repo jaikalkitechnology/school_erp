@@ -240,3 +240,16 @@ export const listTripHistory = async (daysBack = 14) =>
   (await api.get<TripHistoryRow[]>(`${base}/trips/history`, {
     params: { days_back: daysBack },
   })).data;
+
+// ---- Phase 26.5: link Driver row to a transport_manager user account ---
+
+export interface DriverCandidate {
+  user_id: number;
+  full_name: string;
+  phone: string | null;
+  email: string | null;
+  already_a_driver: boolean;
+}
+
+export const listDriverCandidates = async () =>
+  (await api.get<DriverCandidate[]>(`${base}/drivers/candidates`)).data;
