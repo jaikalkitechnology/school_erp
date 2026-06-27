@@ -14,6 +14,7 @@ import {
   createDriver,
   createRoute,
   generateMonthlyTransportInvoices,
+  listAllAllocations,
   listBuses,
   listDriverCandidates,
   listDrivers,
@@ -28,13 +29,14 @@ import {
   startTrip,
   tripView,
   upsertAllocation,
+  type AllocationOverviewRow,
   type TripDirection,
   type TripPhase,
 } from "./api";
 import { listStudents } from "@/features/students/api";
 import { api } from "@/lib/api";
 
-const TABS = ["Fleet", "Routes", "Live map", "Live trip", "Billing", "History", "Logs"] as const;
+const TABS = ["Fleet", "Routes", "Students", "Live map", "Live trip", "Billing", "History", "Logs"] as const;
 type Tab = (typeof TABS)[number];
 
 const PHASE_TONE: Record<TripPhase, string> = {
@@ -77,6 +79,7 @@ export function TransportPage() {
       </nav>
       {tab === "Fleet" && <FleetPanel />}
       {tab === "Routes" && <RoutesPanel />}
+      {tab === "Students" && <StudentsAssignedPanel />}
       {tab === "Live map" && <LiveMapPanel />}
       {tab === "Live trip" && <LiveTripPanel />}
       {tab === "Billing" && <BillingPanel />}
@@ -1290,5 +1293,329 @@ function RouteRosterCard({ routeId }: { routeId: number }) {
         )}
       </CardContent>
     </Card>
+  );
+}
+
+// ---- Students tab — full bus roster + Assign dialog -----------------
+
+function StudentsAssignedPanel() {
+  const qc = useQueryClient();
+  const { data: allocations = [], isLoading } = useQuery({
+    queryKey: ["transport-all-allocations"],
+    queryFn: listAllAllocations,
+  });
+  const { data: routes = [] } = useQuery({
+    queryKey: ["transport-routes"],
+    queryFn: listRoutes,
+  });
+
+  const [assignOpen, setAssignOpen] = useState(false);
+  const [filterRoute, setFilterRoute] = useState<string>("");
+  const [search, setSearch] = useState("");
+
+  const remove = useMutation({
+    mutationFn: deleteAllocation,
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["transport-all-allocations"] });
+      qc.invalidateQueries({ queryKey: ["transport-routes"] });
+    },
+  });
+
+  // Group rows by bus / route so the admin sees "Bus KA-01-1234 →
+  // these 12 students, Bus KA-02-5678 → these 9 students, …".
+  const filtered = allocations.filter((r) => {
+    if (filterRoute && String(r.route_id) !== filterRoute) return false;
+    if (!search) return true;
+    const q = search.toLowerCase();
+    return (
+      r.student_name.toLowerCase().includes(q) ||
+      (r.admission_number ?? "").toLowerCase().includes(q) ||
+      (r.parent_phone ?? "").includes(q) ||
+      (r.bus_registration ?? "").toLowerCase().includes(q) ||
+      (r.driver_name ?? "").toLowerCase().includes(q)
+    );
+  });
+
+  const grouped = filtered.reduce(
+    (acc, r) => {
+      const key = `${r.route_id}`;
+      if (!acc[key]) {
+        acc[key] = {
+          route_id: r.route_id,
+          route_name: r.route_name,
+          route_code: r.route_code,
+          bus_registration: r.bus_registration,
+          driver_name: r.driver_name,
+          driver_phone: r.driver_phone,
+          rows: [] as AllocationOverviewRow[],
+        };
+      }
+      acc[key].rows.push(r);
+      return acc;
+    },
+    {} as Record<
+      string,
+      {
+        route_id: number;
+        route_name: string | null;
+        route_code: string | null;
+        bus_registration: string | null;
+        driver_name: string | null;
+        driver_phone: string | null;
+        rows: AllocationOverviewRow[];
+      }
+    >,
+  );
+
+  return (
+    <div className="space-y-4">
+      <Card>
+        <CardHeader className="flex flex-row items-center justify-between">
+          <div>
+            <CardTitle className="flex items-center gap-2">
+              <BusIcon className="h-5 w-5" /> Students on buses
+            </CardTitle>
+            <CardDescription>
+              {allocations.length} student
+              {allocations.length === 1 ? "" : "s"} currently assigned to a
+              bus across {Object.keys(grouped).length} route
+              {Object.keys(grouped).length === 1 ? "" : "s"}.
+            </CardDescription>
+          </div>
+          <Button onClick={() => setAssignOpen(true)}>
+            <Plus className="mr-1 h-4 w-4" /> Assign student to bus
+          </Button>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          <div className="flex flex-wrap items-center gap-2">
+            <Input
+              placeholder="Search by student / admission / parent phone / bus / driver…"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              className="max-w-md"
+            />
+            <select
+              className="h-9 rounded border border-input bg-transparent px-2 text-sm"
+              value={filterRoute}
+              onChange={(e) => setFilterRoute(e.target.value)}
+            >
+              <option value="">All routes</option>
+              {routes.map((r) => (
+                <option key={r.id} value={r.id}>
+                  {r.code} · {r.name}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          {isLoading ? (
+            <p className="text-sm text-muted-foreground">Loading…</p>
+          ) : allocations.length === 0 ? (
+            <p className="text-sm text-muted-foreground">
+              No students assigned to any bus yet. Click{" "}
+              <strong>Assign student to bus</strong> to add the first one.
+            </p>
+          ) : Object.keys(grouped).length === 0 ? (
+            <p className="text-sm text-muted-foreground">
+              No matches for the current filter.
+            </p>
+          ) : (
+            Object.values(grouped).map((g) => (
+              <div
+                key={g.route_id}
+                className="rounded-md border border-saffron-pale"
+              >
+                <div className="flex flex-wrap items-center justify-between gap-2 border-b border-saffron-pale bg-saffron-pale/30 px-3 py-2">
+                  <div>
+                    <p className="font-semibold text-indigo-dark">
+                      {g.route_code ? `${g.route_code} · ` : ""}
+                      {g.route_name ?? `Route #${g.route_id}`}
+                    </p>
+                    <p className="text-xs text-muted-foreground">
+                      Bus {g.bus_registration ?? "—"} · Driver{" "}
+                      {g.driver_name ?? "not assigned"}
+                      {g.driver_phone ? ` · ${g.driver_phone}` : ""}
+                    </p>
+                  </div>
+                  <span className="rounded-full bg-teal-pale px-2 py-0.5 text-xs font-bold text-teal-dark">
+                    {g.rows.length} student{g.rows.length === 1 ? "" : "s"}
+                  </span>
+                </div>
+                <table className="w-full text-sm">
+                  <thead className="text-left text-xs uppercase tracking-wide text-muted-foreground">
+                    <tr>
+                      <th className="px-3 py-2">Student</th>
+                      <th>Parent</th>
+                      <th>Pickup</th>
+                      <th>Drop</th>
+                      <th>Fee /mo</th>
+                      <th></th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {g.rows.map((r) => (
+                      <tr
+                        key={r.allocation_id}
+                        className="border-t last:border-b-0"
+                      >
+                        <td className="px-3 py-2">
+                          <p className="font-medium text-indigo-dark">
+                            {r.student_name}
+                          </p>
+                          <p className="font-mono text-xs text-muted-foreground">
+                            {r.admission_number ?? `#${r.student_id}`}
+                          </p>
+                        </td>
+                        <td className="font-mono text-xs">
+                          {r.parent_phone ?? "—"}
+                        </td>
+                        <td className="text-xs">
+                          {r.pickup_stop_name ?? "—"}
+                        </td>
+                        <td className="text-xs">
+                          {r.drop_stop_name ?? "—"}
+                        </td>
+                        <td className="font-mono text-xs">
+                          ₹{Number(r.fee_per_month).toFixed(0)}
+                        </td>
+                        <td className="text-right">
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => remove.mutate(r.student_id)}
+                            disabled={remove.isPending}
+                          >
+                            ✕
+                          </Button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            ))
+          )}
+        </CardContent>
+      </Card>
+
+      {assignOpen && (
+        <AssignStudentDialog
+          routes={routes}
+          onClose={() => setAssignOpen(false)}
+          onSaved={() => {
+            qc.invalidateQueries({
+              queryKey: ["transport-all-allocations"],
+            });
+            qc.invalidateQueries({ queryKey: ["transport-routes"] });
+            setAssignOpen(false);
+          }}
+        />
+      )}
+    </div>
+  );
+}
+
+function AssignStudentDialog({
+  routes,
+  onClose,
+  onSaved,
+}: {
+  routes: { id: number; code: string; name: string }[];
+  onClose: () => void;
+  onSaved: () => void;
+}) {
+  const [routeId, setRouteId] = useState<string>("");
+  const [studentId, setStudentId] = useState<string>("");
+  const [pickupId, setPickupId] = useState<string>("");
+  const [fee, setFee] = useState("0");
+
+  const { data: stops = [] } = useQuery({
+    queryKey: ["transport-stops", routeId || null],
+    queryFn: () => listStops(Number(routeId)),
+    enabled: routeId !== "",
+  });
+
+  const save = useMutation({
+    mutationFn: () =>
+      upsertAllocation({
+        student_id: Number(studentId),
+        route_id: Number(routeId),
+        pickup_stop_id: pickupId ? Number(pickupId) : undefined,
+        fee_per_month: Number(fee) || 0,
+      }),
+    onSuccess: onSaved,
+  });
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+      <div className="w-full max-w-lg rounded-lg bg-background p-5 shadow-xl">
+        <div className="mb-3 flex items-center justify-between">
+          <h2 className="text-lg font-semibold text-indigo-dark">
+            Assign student to bus
+          </h2>
+          <Button variant="ghost" size="sm" onClick={onClose}>
+            ✕
+          </Button>
+        </div>
+        <div className="space-y-3">
+          <div className="space-y-1.5">
+            <Label>Bus / Route</Label>
+            <select
+              className="h-9 w-full rounded border border-input bg-transparent px-2 text-sm"
+              value={routeId}
+              onChange={(e) => {
+                setRouteId(e.target.value);
+                setPickupId("");
+              }}
+            >
+              <option value="">— pick a route —</option>
+              {routes.map((r) => (
+                <option key={r.id} value={r.id}>
+                  {r.code} · {r.name}
+                </option>
+              ))}
+            </select>
+          </div>
+          <StudentPicker value={studentId} onChange={setStudentId} />
+          <div className="grid grid-cols-2 gap-2">
+            <div className="space-y-1.5">
+              <Label>Pickup stop</Label>
+              <select
+                className="h-9 w-full rounded border border-input bg-transparent px-2 text-sm"
+                value={pickupId}
+                onChange={(e) => setPickupId(e.target.value)}
+                disabled={!routeId}
+              >
+                <option value="">— pick a stop —</option>
+                {stops.map((s) => (
+                  <option key={s.id} value={s.id}>
+                    {s.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div className="space-y-1.5">
+              <Label>Monthly fee (₹)</Label>
+              <Input
+                type="number"
+                value={fee}
+                onChange={(e) => setFee(e.target.value)}
+              />
+            </div>
+          </div>
+          <div className="flex justify-end gap-2 pt-2">
+            <Button variant="ghost" onClick={onClose}>
+              Cancel
+            </Button>
+            <Button
+              onClick={() => save.mutate()}
+              disabled={!routeId || !studentId || save.isPending}
+            >
+              {save.isPending ? "Saving…" : "Assign to bus"}
+            </Button>
+          </div>
+        </div>
+      </div>
+    </div>
   );
 }
