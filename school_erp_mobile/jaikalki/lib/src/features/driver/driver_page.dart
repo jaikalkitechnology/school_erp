@@ -2,11 +2,8 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:geolocator/geolocator.dart';
-import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 
-import '../../api/api_client.dart';
 import '../../api/driver_repository.dart';
-import '../../core/bus_tracking_service.dart';
 import '../../core/service_locator.dart';
 import '../../theme/brand.dart';
 import 'boarding_scan_page.dart';
@@ -91,59 +88,65 @@ class _DriverPageState extends State<DriverPage> {
   }
 
   Future<void> _startTrip(DriverRoute route) async {
-    if (!await _ensureLocationPermission()) return;
-    setState(() {
-      _starting = true;
-      _lastError = null;
-      _selectedRoute = route;
-    });
+    // Belt + braces: nothing inside here should be allowed to crash
+    // the app. The user reported "tap Start → app force-closes", so
+    // every async step gets its own try/catch + we wrap the whole
+    // method in one more.
     try {
-      // (1) Create the trip server-side. Anything below is best-effort
-      //     — even if the GPS loop fails to attach we still want the
-      //     trip recorded.
-      final trip = await locator<DriverRepository>().startTrip(
-        routeId: route.id,
-        tripDate: _today(),
-      );
+      // (1) Permission check. Returns false on denial/disabled; the
+      //     inline setState surfaces the reason without crashing.
+      bool hasPerm = false;
+      try {
+        hasPerm = await _ensureLocationPermission();
+      } catch (e, st) {
+        debugPrint('permission check threw: $e\n$st');
+        setState(() => _lastError = 'Could not read location permission: $e');
+        return;
+      }
+      if (!hasPerm) return;
+
+      setState(() {
+        _starting = true;
+        _lastError = null;
+        _selectedRoute = route;
+      });
+
+      // (2) Create the trip server-side. If THIS step fails the user
+      //     sees a clear error and nothing else runs — no half-state.
+      DriverTrip trip;
+      try {
+        trip = await locator<DriverRepository>().startTrip(
+          routeId: route.id,
+          tripDate: _today(),
+        );
+      } catch (e) {
+        if (mounted) {
+          setState(() => _lastError = 'Could not start trip: $e');
+        }
+        return;
+      }
+      if (!mounted) return;
       setState(() => _activeTrip = trip);
 
-      // (2) Try to hand off to the background foreground service so
-      //     the driver can lock their phone without losing pings.
-      //     Wrapped in try/catch + the helper itself never throws —
-      //     if the plugin is missing or the OS denies the foreground
-      //     service permission, we silently degrade to the foreground
-      //     Timer below.
-      bool backgroundOn = false;
-      try {
-        final token = await const FlutterSecureStorage()
-            .read(key: 'jaikalki.access_token');
-        final subdomain = await const FlutterSecureStorage()
-            .read(key: 'jaikalki.subdomain');
-        if (token != null) {
-          backgroundOn = await BusTrackingService.startForTrip(
-            tripId: trip.id,
-            accessToken: token,
-            baseUrl: locator<ApiClient>().baseUrl,
-            subdomain: subdomain,
-          );
-        }
-      } catch (e) {
-        debugPrint('background bus tracking off: $e');
-      }
-
-      // (3) Foreground ping loop. Always runs — for the on-screen
-      //     "last position" pill, and as the primary GPS source if
-      //     the background service didn't start. Pings every 15 s in
-      //     foreground-only mode, 30 s when the background loop is
-      //     also active.
-      final period = backgroundOn ? 30 : 15;
-      _pingFromForeground();
+      // (3) Foreground-only GPS pinger. The native background
+      //     service (flutter_background_service) is *not* started —
+      //     it's been the source of the start-trip crash. The driver
+      //     keeps the app foregrounded for the duration of the trip,
+      //     same as Uber/Ola's first iterations.
+      //
+      //     Ping immediately + then every 15 s. Each tick is wrapped
+      //     in its own try/catch inside _pingFromForeground() so a
+      //     flaky GPS doesn't kill the loop.
       _pingTimer?.cancel();
+      unawaited(_pingFromForeground());
       _pingTimer = Timer.periodic(
-        Duration(seconds: period), (_) => _pingFromForeground(),
+        const Duration(seconds: 15), (_) => _pingFromForeground(),
       );
-    } catch (e) {
-      setState(() => _lastError = 'Could not start trip: $e');
+    } catch (e, st) {
+      debugPrint('_startTrip unexpected exception: $e\n$st');
+      if (mounted) {
+        setState(() => _lastError = 'Unexpected error: $e');
+      }
     } finally {
       if (mounted) setState(() => _starting = false);
     }
@@ -188,7 +191,6 @@ class _DriverPageState extends State<DriverPage> {
     setState(() => _completing = true);
     _pingTimer?.cancel();
     _pingTimer = null;
-    await BusTrackingService.stop();
     try {
       await locator<DriverRepository>().completeTrip(tripId: trip.id);
       if (!mounted) return;

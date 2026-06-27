@@ -30,6 +30,8 @@ import {
   type TripDirection,
   type TripPhase,
 } from "./api";
+import { listStudents } from "@/features/students/api";
+import { api } from "@/lib/api";
 
 const TABS = ["Fleet", "Routes", "Live map", "Live trip", "Billing", "History", "Logs"] as const;
 type Tab = (typeof TABS)[number];
@@ -249,6 +251,9 @@ function RoutesPanel() {
       }),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["transport-routes"] });
+      qc.invalidateQueries({
+        queryKey: ["transport-route-allocations", activeRoute],
+      });
       setStudentId("");
       setFee("0");
     },
@@ -428,15 +433,19 @@ function RoutesPanel() {
           </Card>
           <Card>
             <CardHeader>
-              <CardTitle>Allocate student</CardTitle>
+              <CardTitle>Assign student to this bus</CardTitle>
+              <CardDescription>
+                Pick a student, choose their pickup stop + monthly fee.
+                Each student can be on one route at a time — re-assigning
+                overwrites the previous row.
+              </CardDescription>
             </CardHeader>
-            <CardContent className="space-y-2">
-              <div className="grid grid-cols-3 gap-2">
-                <Input
-                  placeholder="Student ID"
-                  value={studentId}
-                  onChange={(e) => setStudentId(e.target.value)}
-                />
+            <CardContent className="space-y-3">
+              <StudentPicker
+                value={studentId}
+                onChange={setStudentId}
+              />
+              <div className="grid grid-cols-2 gap-2">
                 <select
                   className="h-9 rounded border border-input bg-transparent px-2 text-sm"
                   value={pickupId}
@@ -447,14 +456,24 @@ function RoutesPanel() {
                     <option key={s.id} value={s.id}>{s.name}</option>
                   ))}
                 </select>
-                <Input placeholder="Fee /mo" value={fee} onChange={(e) => setFee(e.target.value)} />
+                <Input
+                  placeholder="Fee /mo (₹)"
+                  type="number"
+                  value={fee}
+                  onChange={(e) => setFee(e.target.value)}
+                />
               </div>
-              <Button onClick={() => allocate.mutate()} disabled={!studentId || allocate.isPending}>
+              <Button
+                onClick={() => allocate.mutate()}
+                disabled={!studentId || allocate.isPending}
+              >
                 <MapPin className="mr-1 h-4 w-4" />
-                Save allocation
+                {allocate.isPending ? "Saving…" : "Assign to bus"}
               </Button>
             </CardContent>
           </Card>
+
+          <RouteRosterCard routeId={activeRoute!} />
         </div>
       )}
     </div>
@@ -1019,5 +1038,159 @@ function TripHistoryPanel() {
         </CardContent>
       </Card>
     </div>
+  );
+}
+
+// ---- Student picker + route roster (Phase 26.4) -------------------------
+
+function StudentPicker({
+  value,
+  onChange,
+}: {
+  value: string;
+  onChange: (id: string) => void;
+}) {
+  const [q, setQ] = useState("");
+  const [open, setOpen] = useState(false);
+  const { data: hits = [] } = useQuery({
+    queryKey: ["transport-student-search", q],
+    queryFn: () => listStudents({ q, limit: 12 }),
+    enabled: q.trim().length >= 2,
+  });
+  const rows = (hits as any).rows ?? (hits as any).items ?? hits;
+  return (
+    <div className="space-y-1">
+      <Label>Student</Label>
+      <div className="relative">
+        <Input
+          placeholder={value ? `Selected #${value}` : "Search by name or admission #…"}
+          value={q}
+          onChange={(e) => {
+            setQ(e.target.value);
+            setOpen(true);
+          }}
+          onFocus={() => setOpen(true)}
+        />
+        {open && q.trim().length >= 2 && rows.length > 0 && (
+          <ul className="absolute z-10 mt-1 max-h-64 w-full overflow-auto rounded-md border bg-background shadow-md">
+            {rows.map((s: any) => (
+              <li
+                key={s.id}
+                className="cursor-pointer px-3 py-2 text-sm hover:bg-saffron-pale"
+                onClick={() => {
+                  onChange(String(s.id));
+                  setQ(`${s.full_name} (${s.admission_number ?? s.id})`);
+                  setOpen(false);
+                }}
+              >
+                <p className="font-medium text-indigo-dark">{s.full_name}</p>
+                <p className="font-mono text-xs text-muted-foreground">
+                  {s.admission_number ?? `#${s.id}`}
+                  {s.section_id ? ` · Section ${s.section_id}` : ""}
+                </p>
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
+    </div>
+  );
+}
+
+interface AllocationRow {
+  id: number;
+  student_id: number;
+  student_name: string | null;
+  pickup_stop_id: number | null;
+  drop_stop_id: number | null;
+  fee_per_month: number;
+}
+
+const fetchAllocations = async (routeId: number) =>
+  (await api.get<AllocationRow[]>(
+    `/v1/school-admin/transport/routes/${routeId}/allocations`,
+  )).data;
+
+const deleteAllocation = async (studentId: number) => {
+  await api.delete(`/v1/school-admin/transport/allocations/${studentId}`);
+};
+
+function RouteRosterCard({ routeId }: { routeId: number }) {
+  const qc = useQueryClient();
+  const { data: rows = [], isLoading } = useQuery({
+    queryKey: ["transport-route-allocations", routeId],
+    queryFn: () => fetchAllocations(routeId),
+  });
+  const remove = useMutation({
+    mutationFn: deleteAllocation,
+    onSuccess: () => {
+      qc.invalidateQueries({
+        queryKey: ["transport-route-allocations", routeId],
+      });
+      qc.invalidateQueries({ queryKey: ["transport-routes"] });
+    },
+  });
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle>Bus roster</CardTitle>
+        <CardDescription>
+          {rows.length} student{rows.length === 1 ? "" : "s"} currently on this
+          bus. Click ✕ to remove an allocation.
+        </CardDescription>
+      </CardHeader>
+      <CardContent>
+        {isLoading ? (
+          <p className="text-sm text-muted-foreground">Loading…</p>
+        ) : rows.length === 0 ? (
+          <p className="text-sm text-muted-foreground">
+            No students assigned to this bus yet. Use the form on the left to
+            add one.
+          </p>
+        ) : (
+          <table className="w-full text-sm">
+            <thead className="border-b text-left text-xs uppercase tracking-wide text-muted-foreground">
+              <tr>
+                <th className="py-2">Student</th>
+                <th>Pickup</th>
+                <th>Fee /mo</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody>
+              {rows.map((r) => (
+                <tr key={r.id} className="border-b last:border-b-0">
+                  <td className="py-2">
+                    <p className="font-medium text-indigo-dark">
+                      {r.student_name ?? `Student #${r.student_id}`}
+                    </p>
+                    <p className="font-mono text-xs text-muted-foreground">
+                      #{r.student_id}
+                    </p>
+                  </td>
+                  <td className="font-mono text-xs">
+                    {r.pickup_stop_id ?? "—"}
+                  </td>
+                  <td className="font-mono text-xs">
+                    ₹{Number(r.fee_per_month).toFixed(0)}
+                  </td>
+                  <td className="text-right">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => remove.mutate(r.student_id)}
+                      disabled={remove.isPending}
+                    >
+                      ✕
+                    </Button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
+      </CardContent>
+    </Card>
   );
 }
