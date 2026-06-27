@@ -111,6 +111,35 @@ class DriverRepository {
       },
     );
   }
+
+  /// Driver's full student roster across every route — used by the
+  /// Students tab. Each row carries parent / emergency contact +
+  /// medical info + today's skip flag.
+  Future<List<DriverStudent>> students() async {
+    try {
+      final res = await _api.dio.get<List<dynamic>>(
+        '/v1/school-admin/transport/driver/students',
+      );
+      return (res.data ?? const [])
+          .map((e) => DriverStudent.fromJson(e as Map<String, dynamic>))
+          .toList();
+    } on DioException {
+      return const [];
+    }
+  }
+
+  Future<List<TransportStopSimple>> routeStops(int routeId) async {
+    try {
+      final res = await _api.dio.get<List<dynamic>>(
+        '/v1/school-admin/transport/routes/$routeId/stops',
+      );
+      return (res.data ?? const [])
+          .map((e) => TransportStopSimple.fromJson(e as Map<String, dynamic>))
+          .toList();
+    } on DioException {
+      return const [];
+    }
+  }
 }
 
 class DriverRoute {
@@ -203,5 +232,86 @@ class DriverAllocation {
         routeId: (j['route_id'] as num?)?.toInt() ?? 0,
         pickupStopId: (j['pickup_stop_id'] as num?)?.toInt(),
         dropStopId: (j['drop_stop_id'] as num?)?.toInt(),
+      );
+}
+
+class DriverStudent {
+  const DriverStudent({
+    required this.allocationId,
+    required this.studentId,
+    required this.studentName,
+    required this.admissionNumber,
+    required this.rollNo,
+    required this.parentPhone,
+    required this.emergencyPhone,
+    required this.address,
+    required this.medicalConditions,
+    required this.allergies,
+    required this.routeId,
+    required this.routeName,
+    required this.pickupStopName,
+    required this.dropStopName,
+    required this.skippedToday,
+  });
+
+  final int allocationId;
+  final int studentId;
+  final String studentName;
+  final String? admissionNumber;
+  final String? rollNo;
+  final String? parentPhone;
+  final String? emergencyPhone;
+  final String? address;
+  final String? medicalConditions;
+  final String? allergies;
+  final int routeId;
+  final String? routeName;
+  final String? pickupStopName;
+  final String? dropStopName;
+  final bool skippedToday;
+
+  factory DriverStudent.fromJson(Map<String, dynamic> j) => DriverStudent(
+        allocationId: (j['allocation_id'] as num?)?.toInt() ?? 0,
+        studentId: (j['student_id'] as num?)?.toInt() ?? 0,
+        studentName: (j['student_name'] as String?) ?? '',
+        admissionNumber: j['admission_number'] as String?,
+        rollNo: j['roll_no'] as String?,
+        parentPhone: j['parent_phone'] as String?,
+        emergencyPhone: j['emergency_phone'] as String?,
+        address: j['address'] as String?,
+        medicalConditions: j['medical_conditions'] as String?,
+        allergies: j['allergies'] as String?,
+        routeId: (j['route_id'] as num?)?.toInt() ?? 0,
+        routeName: j['route_name'] as String?,
+        pickupStopName: j['pickup_stop_name'] as String?,
+        dropStopName: j['drop_stop_name'] as String?,
+        skippedToday: (j['skipped_today'] as bool?) ?? false,
+      );
+}
+
+class TransportStopSimple {
+  const TransportStopSimple({
+    required this.id,
+    required this.name,
+    required this.sequence,
+    required this.latitude,
+    required this.longitude,
+    required this.scheduledArrival,
+  });
+  final int id;
+  final String name;
+  final int sequence;
+  final double? latitude;
+  final double? longitude;
+  final String? scheduledArrival;
+
+  factory TransportStopSimple.fromJson(Map<String, dynamic> j) =>
+      TransportStopSimple(
+        id: (j['id'] as num?)?.toInt() ?? 0,
+        name: (j['name'] as String?) ?? '',
+        sequence: (j['sequence'] as num?)?.toInt() ?? 0,
+        latitude: (j['latitude'] as num?)?.toDouble(),
+        longitude: (j['longitude'] as num?)?.toDouble(),
+        scheduledArrival: j['scheduled_arrival'] as String?,
       );
 }
