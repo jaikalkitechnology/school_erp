@@ -1040,3 +1040,99 @@ async def admin_trip_history_route(
         }
         for t in trips
     ]
+
+
+# ---- Driver app: full student roster across every route -----------------
+
+
+@router.get("/driver/students")
+async def driver_student_roster_route(
+    session: AsyncSession = Depends(tenant_scoped_session),
+):
+    """One row per StudentTransport allocation across every route — used
+    by the bus driver's Students tab to render parent contact, stop
+    name, and today's skip status without per-route fan-out."""
+    from datetime import date as _date
+
+    from app.models.parent import Student
+    from app.models.transport import (
+        Route, Stop, StudentTransport, TripSkip,
+    )
+
+    allocs = list(
+        (
+            await session.execute(
+                select(StudentTransport)
+                .where(StudentTransport.is_active.is_(True))
+                .order_by(StudentTransport.route_id)
+            )
+        ).scalars().all()
+    )
+    if not allocs:
+        return []
+
+    student_ids = [a.student_id for a in allocs]
+    route_ids = {a.route_id for a in allocs}
+    stop_ids = {a.pickup_stop_id for a in allocs if a.pickup_stop_id}
+    stop_ids |= {a.drop_stop_id for a in allocs if a.drop_stop_id}
+
+    students = {
+        s.id: s for s in (
+            await session.execute(
+                select(Student).where(Student.id.in_(student_ids))
+            )
+        ).scalars().all()
+    }
+    routes = {
+        r.id: r for r in (
+            await session.execute(
+                select(Route).where(Route.id.in_(route_ids))
+            )
+        ).scalars().all()
+    }
+    stops = {
+        s.id: s for s in (
+            (await session.execute(select(Stop).where(Stop.id.in_(stop_ids)))).scalars().all()
+            if stop_ids else []
+        )
+    } if stop_ids else {}
+
+    skipped_today = {
+        sid for (sid,) in (
+            await session.execute(
+                select(TripSkip.student_id).where(
+                    TripSkip.student_id.in_(student_ids),
+                    TripSkip.skip_date == _date.today(),
+                )
+            )
+        ).all()
+    }
+
+    out = []
+    for a in allocs:
+        s = students.get(a.student_id)
+        if s is None:
+            continue
+        r = routes.get(a.route_id)
+        out.append({
+            "allocation_id": a.id,
+            "student_id": s.id,
+            "student_name": s.full_name,
+            "admission_number": s.admission_number,
+            "roll_no": s.roll_no,
+            "class_id": s.class_def_id,
+            "section_id": s.section_id,
+            "parent_phone": s.parent_phone,
+            "emergency_phone": s.emergency_phone,
+            "address": s.address,
+            "medical_conditions": s.medical_conditions,
+            "allergies": s.allergies,
+            "route_id": a.route_id,
+            "route_name": r.name if r else None,
+            "pickup_stop_name": stops[a.pickup_stop_id].name
+                if a.pickup_stop_id and a.pickup_stop_id in stops else None,
+            "drop_stop_name": stops[a.drop_stop_id].name
+                if a.drop_stop_id and a.drop_stop_id in stops else None,
+            "skipped_today": s.id in skipped_today,
+        })
+    return out

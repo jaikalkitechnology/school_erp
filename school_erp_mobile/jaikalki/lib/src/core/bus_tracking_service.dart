@@ -36,49 +36,82 @@ class BusTrackingService {
   static const String _serviceNotifBody =
       'Posting your location to the school every 15 s.';
 
+  /// True once configure() has succeeded. Reset on every cold start.
+  /// We track this so [startForTrip] can skip the plugin entirely if
+  /// init() blew up (eg. plugin missing on the device, manifest
+  /// service entry stripped by ProGuard, OS doesn't grant the
+  /// foreground-service permission) — instead of crashing the driver
+  /// app, we let the foreground Timer.periodic in DriverPage continue
+  /// to ping. Tracking is fine.
+  static bool _configured = false;
+
   static Future<void> init() async {
-    final svc = FlutterBackgroundService();
-    await svc.configure(
-      androidConfiguration: AndroidConfiguration(
-        onStart: _onServiceStart,
-        autoStart: false,
-        isForegroundMode: true,
-        notificationChannelId: _serviceNotifId,
-        initialNotificationTitle: _serviceNotifTitle,
-        initialNotificationContent: _serviceNotifBody,
-        foregroundServiceNotificationId: 9911,
-        foregroundServiceTypes: const [
-          AndroidForegroundType.location,
-        ],
-      ),
-      iosConfiguration: IosConfiguration(
-        autoStart: false,
-        onForeground: _onServiceStart,
-      ),
-    );
+    try {
+      final svc = FlutterBackgroundService();
+      await svc.configure(
+        androidConfiguration: AndroidConfiguration(
+          onStart: _onServiceStart,
+          autoStart: false,
+          isForegroundMode: true,
+          notificationChannelId: _serviceNotifId,
+          initialNotificationTitle: _serviceNotifTitle,
+          initialNotificationContent: _serviceNotifBody,
+          foregroundServiceNotificationId: 9911,
+          foregroundServiceTypes: const [
+            AndroidForegroundType.location,
+          ],
+        ),
+        iosConfiguration: IosConfiguration(
+          autoStart: false,
+          onForeground: _onServiceStart,
+        ),
+      );
+      _configured = true;
+    } catch (e, st) {
+      // Swallow + log: a misconfigured / missing native side must not
+      // stop the app from booting. The driver shell still works in
+      // foreground-only mode.
+      debugPrint('BusTrackingService.init failed: $e\n$st');
+      _configured = false;
+    }
   }
 
-  static Future<void> startForTrip({
+  /// Returns true if the background service was successfully kicked
+  /// off; false if we failed (caller can degrade to a foreground-only
+  /// timer in that case). Never throws.
+  static Future<bool> startForTrip({
     required int tripId,
     required String accessToken,
     required String baseUrl,
     String? subdomain,
   }) async {
-    final svc = FlutterBackgroundService();
-    final isRunning = await svc.isRunning();
-    if (!isRunning) {
-      await svc.startService();
+    if (!_configured) return false;
+    try {
+      final svc = FlutterBackgroundService();
+      final isRunning = await svc.isRunning();
+      if (!isRunning) {
+        await svc.startService();
+      }
+      svc.invoke('config', {
+        'trip_id': tripId,
+        'access_token': accessToken,
+        'base_url': baseUrl,
+        if (subdomain != null) 'subdomain': subdomain,
+      });
+      return true;
+    } catch (e, st) {
+      debugPrint('BusTrackingService.startForTrip failed: $e\n$st');
+      return false;
     }
-    svc.invoke('config', {
-      'trip_id': tripId,
-      'access_token': accessToken,
-      'base_url': baseUrl,
-      if (subdomain != null) 'subdomain': subdomain,
-    });
   }
 
   static Future<void> stop() async {
-    FlutterBackgroundService().invoke('stop');
+    if (!_configured) return;
+    try {
+      FlutterBackgroundService().invoke('stop');
+    } catch (e) {
+      debugPrint('BusTrackingService.stop failed: $e');
+    }
   }
 }
 

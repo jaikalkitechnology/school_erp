@@ -67,6 +67,18 @@
         <meta-data
             android:name="flutterEmbedding"
             android:value="2" />
+
+        <!-- flutter_background_service plugin foreground service.
+             Without this <service> declaration the plugin's
+             startService() throws on Android 14+ because the OS can't
+             find a service to bind to. The class name is owned by the
+             plugin; foregroundServiceType MUST include "location" so
+             Android allows the FOREGROUND_SERVICE_LOCATION permission
+             we declared above. -->
+        <service
+            android:name="id.flutter.flutter_background_service.BackgroundService"
+            android:foregroundServiceType="location"
+            android:exported="false" />
     </application>
     <!-- Required to query activities that can process text, see:
          https://developer.android.com/training/package-visibility and

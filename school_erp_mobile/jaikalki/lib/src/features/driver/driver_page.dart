@@ -98,33 +98,49 @@ class _DriverPageState extends State<DriverPage> {
       _selectedRoute = route;
     });
     try {
+      // (1) Create the trip server-side. Anything below is best-effort
+      //     — even if the GPS loop fails to attach we still want the
+      //     trip recorded.
       final trip = await locator<DriverRepository>().startTrip(
         routeId: route.id,
         tripDate: _today(),
       );
       setState(() => _activeTrip = trip);
 
-      // Hand off the GPS loop to the background foreground service
-      // so the driver can lock their phone without losing pings.
-      final token = await const FlutterSecureStorage()
-          .read(key: 'jaikalki.access_token');
-      final subdomain = await const FlutterSecureStorage()
-          .read(key: 'jaikalki.subdomain');
-      if (token != null) {
-        await BusTrackingService.startForTrip(
-          tripId: trip.id,
-          accessToken: token,
-          baseUrl: locator<ApiClient>().baseUrl,
-          subdomain: subdomain,
-        );
+      // (2) Try to hand off to the background foreground service so
+      //     the driver can lock their phone without losing pings.
+      //     Wrapped in try/catch + the helper itself never throws —
+      //     if the plugin is missing or the OS denies the foreground
+      //     service permission, we silently degrade to the foreground
+      //     Timer below.
+      bool backgroundOn = false;
+      try {
+        final token = await const FlutterSecureStorage()
+            .read(key: 'jaikalki.access_token');
+        final subdomain = await const FlutterSecureStorage()
+            .read(key: 'jaikalki.subdomain');
+        if (token != null) {
+          backgroundOn = await BusTrackingService.startForTrip(
+            tripId: trip.id,
+            accessToken: token,
+            baseUrl: locator<ApiClient>().baseUrl,
+            subdomain: subdomain,
+          );
+        }
+      } catch (e) {
+        debugPrint('background bus tracking off: $e');
       }
 
-      // Also keep a foreground ping so the on-screen "last position"
-      // pill in this page updates without waiting for the next
-      // background tick.
+      // (3) Foreground ping loop. Always runs — for the on-screen
+      //     "last position" pill, and as the primary GPS source if
+      //     the background service didn't start. Pings every 15 s in
+      //     foreground-only mode, 30 s when the background loop is
+      //     also active.
+      final period = backgroundOn ? 30 : 15;
       _pingFromForeground();
+      _pingTimer?.cancel();
       _pingTimer = Timer.periodic(
-        const Duration(seconds: 30), (_) => _pingFromForeground(),
+        Duration(seconds: period), (_) => _pingFromForeground(),
       );
     } catch (e) {
       setState(() => _lastError = 'Could not start trip: $e');
@@ -134,18 +150,36 @@ class _DriverPageState extends State<DriverPage> {
   }
 
   Future<void> _pingFromForeground() async {
-    // Best-effort screen-update ping. The real every-15-s ping happens
-    // in the BusTrackingService background isolate.
+    final trip = _activeTrip;
+    if (trip == null) return;
     try {
-      final pos = await Geolocator.getLastKnownPosition()
-          .timeout(const Duration(seconds: 5));
-      if (pos != null && mounted) {
-        setState(() {
-          _lastPosition = pos;
-          _lastError = null;
-        });
-      }
-    } catch (_) {/* silent */}
+      // Live reading, not the cached last-known, so the timestamp on
+      // the server is fresh. 5 s ceiling so a flaky GPS doesn't stall
+      // the timer.
+      final pos = await Geolocator.getCurrentPosition(
+        locationSettings: const LocationSettings(
+          accuracy: LocationAccuracy.high,
+          timeLimit: Duration(seconds: 5),
+        ),
+      );
+      if (!mounted) return;
+      setState(() {
+        _lastPosition = pos;
+        _lastError = null;
+      });
+      // Also POST it. If the background service is also running, the
+      // backend just upserts the latest lat/lng/timestamp — no harm
+      // in two pings/min for a single trip.
+      await locator<DriverRepository>().pingTrip(
+        tripId: trip.id,
+        lat: pos.latitude,
+        lng: pos.longitude,
+        speedKph: pos.speed * 3.6,
+      );
+    } catch (_) {
+      // Silent — next tick will retry. Don't blow up the UI for one
+      // missed reading.
+    }
   }
 
   Future<void> _endTrip() async {

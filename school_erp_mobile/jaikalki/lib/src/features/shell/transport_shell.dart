@@ -5,18 +5,27 @@ import 'package:go_router/go_router.dart';
 import '../../core/auth_cubit.dart';
 import '../../theme/brand.dart';
 import '../driver/driver_page.dart';
+import '../driver/driver_routes_page.dart';
+import '../driver/driver_students_page.dart';
+import '../messages/messages_page.dart';
 import '../notifications/notifications_page.dart';
 import '../settings/settings_page.dart';
 
 /// Bottom-nav shell shown when a user logs in with ``transport_manager``
 /// as their role. Strips every parent / teacher surface — no
-/// attendance, no fees, no homework. Just the bus screen and an
-/// account drawer.
+/// attendance, no fees, no homework.
 ///
-/// Two tabs:
-///   1. **Bus** — DriverPage (today's routes, start trip, GPS pinger,
-///      end trip).
-///   2. **More** — notifications, settings, sign out.
+/// Five tabs cover the bus driver ↔ parent coordination loop:
+///   1. **Bus**       — today's routes, start trip, GPS pinger, end
+///                       trip, boarding scan.
+///   2. **Students**  — full roster across every assigned route with
+///                       parent + emergency contact, allergies,
+///                       address, today's skip flag, call / SMS.
+///   3. **Routes**    — every route with stops, tap a stop to open
+///                       its lat/lng in Google Maps.
+///   4. **Messages**  — 1-on-1 chat threads with parents (existing
+///                       MessagesPage; same backend as the parent app).
+///   5. **More**      — notifications, settings, sign out.
 class TransportShell extends StatefulWidget {
   const TransportShell({super.key});
 
@@ -31,6 +40,9 @@ class _TransportShellState extends State<TransportShell> {
   Widget build(BuildContext context) {
     const pages = [
       DriverPage(),
+      DriverStudentsPage(),
+      DriverRoutesPage(),
+      MessagesPage(),
       _TransportMorePage(),
     ];
     return BlocListener<AuthCubit, AuthState>(
@@ -49,6 +61,21 @@ class _TransportShellState extends State<TransportShell> {
               icon: Icon(Icons.directions_bus_outlined),
               selectedIcon: Icon(Icons.directions_bus_filled),
               label: 'Bus',
+            ),
+            NavigationDestination(
+              icon: Icon(Icons.groups_outlined),
+              selectedIcon: Icon(Icons.groups),
+              label: 'Students',
+            ),
+            NavigationDestination(
+              icon: Icon(Icons.alt_route_outlined),
+              selectedIcon: Icon(Icons.alt_route),
+              label: 'Routes',
+            ),
+            NavigationDestination(
+              icon: Icon(Icons.chat_bubble_outline),
+              selectedIcon: Icon(Icons.chat_bubble),
+              label: 'Messages',
             ),
             NavigationDestination(
               icon: Icon(Icons.more_horiz_outlined),
