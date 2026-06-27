@@ -16,9 +16,12 @@ class DriverRepository {
   final ApiClient _api;
 
   Future<List<DriverRoute>> routes() async {
+    // The logged-in driver only sees their own routes — backend
+    // filters by Driver.user_id == principal.user_id. Senior staff
+    // still get every route from the same endpoint.
     try {
       final res = await _api.dio.get<List<dynamic>>(
-        '/v1/school-admin/transport/routes',
+        '/v1/school-admin/transport/driver/routes',
       );
       return (res.data ?? const [])
           .map((e) => DriverRoute.fromJson(e as Map<String, dynamic>))

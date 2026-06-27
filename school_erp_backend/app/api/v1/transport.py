@@ -1136,3 +1136,88 @@ async def driver_student_roster_route(
             "skipped_today": s.id in skipped_today,
         })
     return out
+
+
+# ---- Driver: only my own routes -----------------------------------------
+
+
+@router.get("/driver/routes")
+async def driver_routes_for_me_route(
+    principal: AuthPrincipal = Depends(_reader),
+    session: AsyncSession = Depends(tenant_scoped_session),
+):
+    """Only the routes assigned to the logged-in driver — found via
+    Driver.user_id == principal.user_id. Falls back to every route in
+    the tenant for senior staff (school_admin / principal / coordinator)
+    so the same endpoint powers both the dispatcher view and the
+    individual driver shell.
+
+    Mirrors list_routes response shape so the driver app can swap
+    GET /routes → GET /driver/routes with no other client-side
+    changes."""
+    from sqlalchemy import func as _func
+
+    from app.models.transport import Driver, Route, StudentTransport, Stop
+
+    is_driver_only = principal.has_role("transport_manager") and not (
+        principal.has_role("school_admin")
+        or principal.has_role("principal")
+        or principal.has_role("vice_principal")
+        or principal.has_role("coordinator")
+    )
+
+    if is_driver_only:
+        driver = (
+            await session.execute(
+                select(Driver).where(Driver.user_id == principal.user_id)
+            )
+        ).scalar_one_or_none()
+        if driver is None:
+            # No Driver row linked to this user — nothing to drive yet.
+            return []
+        rows = list(
+            (
+                await session.execute(
+                    select(Route)
+                    .where(Route.driver_id == driver.id)
+                    .order_by(Route.code)
+                )
+            ).scalars().all()
+        )
+    else:
+        # Senior staff: every route, same as the existing /routes endpoint.
+        rows = list(
+            (
+                await session.execute(select(Route).order_by(Route.code))
+            ).scalars().all()
+        )
+    if not rows:
+        return []
+    route_ids = [r.id for r in rows]
+    student_counts = dict(
+        (
+            await session.execute(
+                select(StudentTransport.route_id, _func.count(StudentTransport.id))
+                .where(StudentTransport.route_id.in_(route_ids))
+                .group_by(StudentTransport.route_id)
+            )
+        ).all()
+    )
+    stop_counts = dict(
+        (
+            await session.execute(
+                select(Stop.route_id, _func.count(Stop.id))
+                .where(Stop.route_id.in_(route_ids))
+                .group_by(Stop.route_id)
+            )
+        ).all()
+    )
+    return [
+        {
+            "id": r.id, "code": r.code, "name": r.name, "bus_id": r.bus_id,
+            "driver_id": r.driver_id, "is_active": r.is_active,
+            "student_count": int(student_counts.get(r.id, 0)),
+            "stop_count": int(stop_counts.get(r.id, 0)),
+        }
+        for r in rows
+    ]

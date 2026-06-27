@@ -6,7 +6,6 @@ import 'package:hive_flutter/hive_flutter.dart';
 
 import 'src/app.dart';
 import 'src/core/auth_cubit.dart';
-import 'src/core/bus_tracking_service.dart';
 import 'src/core/push_service.dart';
 import 'src/core/service_locator.dart';
 import 'src/core/settings_cubit.dart';
@@ -28,11 +27,9 @@ Future<void> main() async {
   // Kick off FCM token registration in the background; we don't block
   // startup on it.
   unawaited(PushService.instance.start());
-  // Register the driver background-service handler. The service stays
-  // dormant until DriverPage calls startForTrip(); registering up
-  // front lets the OS resume the foreground service on next boot if
-  // a trip was in flight when the phone died.
-  unawaited(BusTrackingService.init());
+  // (BusTrackingService background isolate disabled — see
+  //  driver_page.dart for the rationale. Driver pings GPS in the
+  //  foreground only.)
   runApp(const JaikalkiApp());
 }
 

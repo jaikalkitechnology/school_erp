@@ -69,19 +69,13 @@
             android:name="flutterEmbedding"
             android:value="2" />
 
-        <!-- flutter_background_service plugin foreground service.
-             The plugin ships its own <service> declaration in its
-             AndroidManifest. We don't redeclare it (manifest merger
-             conflicts on android:exported), but we DO override
-             android:foregroundServiceType so the OS allows the
-             FOREGROUND_SERVICE_LOCATION permission we declared above
-             — Android 14+ rejects the service start otherwise.
-             tools:replace tells the manifest merger this attribute
-             should win over the plugin's default ("dataSync"). -->
-        <service
-            android:name="id.flutter.flutter_background_service.BackgroundService"
-            android:foregroundServiceType="location"
-            tools:replace="android:foregroundServiceType" />
+        <!-- flutter_background_service is currently disabled
+             (BusTrackingService.init isn't called from main.dart).
+             The plugin's own <service> entry still merges in from its
+             own manifest, which is harmless if we never invoke
+             startService(). We don't override foregroundServiceType
+             any more — the manifest merger conflict that caused
+             "processDebugMainManifest failed" is gone. -->
     </application>
     <!-- Required to query activities that can process text, see:
          https://developer.android.com/training/package-visibility and
