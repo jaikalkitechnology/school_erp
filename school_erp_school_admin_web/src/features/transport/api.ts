@@ -253,3 +253,30 @@ export interface DriverCandidate {
 
 export const listDriverCandidates = async () =>
   (await api.get<DriverCandidate[]>(`${base}/drivers/candidates`)).data;
+
+// ---- Phase 26.6: full allocation roster (admin Students tab) ----------
+
+export interface AllocationOverviewRow {
+  allocation_id: number;
+  student_id: number;
+  student_name: string;
+  admission_number: string | null;
+  section_id: number | null;
+  parent_phone: string | null;
+  route_id: number;
+  route_name: string | null;
+  route_code: string | null;
+  bus_id: number | null;
+  bus_registration: string | null;
+  driver_id: number | null;
+  driver_name: string | null;
+  driver_phone: string | null;
+  pickup_stop_id: number | null;
+  pickup_stop_name: string | null;
+  drop_stop_id: number | null;
+  drop_stop_name: string | null;
+  fee_per_month: number;
+}
+
+export const listAllAllocations = async () =>
+  (await api.get<AllocationOverviewRow[]>(`${base}/allocations`)).data;

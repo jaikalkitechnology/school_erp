@@ -1277,3 +1277,112 @@ async def driver_user_candidates_route(
         }
         for u in rows
     ]
+
+
+# ---- Admin overview: every allocation across every route ----------------
+
+
+@router.get("/allocations")
+async def list_all_allocations_route(
+    session: AsyncSession = Depends(tenant_scoped_session),
+):
+    """One row per active StudentTransport allocation in the tenant.
+    Each row carries the student name + admission number + parent
+    phone + pickup/drop stop names + route name + bus registration +
+    driver name, so the admin Students tab can render the full
+    coordination table without N+1.
+
+    Differs from the driver-side endpoint by:
+      • Showing every route (no Driver.user_id filter).
+      • Including bus_registration + driver_name on every row.
+      • Not surfacing today's skip flag (admin doesn't need it).
+    """
+    from app.models.parent import Student
+    from app.models.transport import (
+        Bus, Driver, Route, Stop, StudentTransport,
+    )
+
+    allocs = list(
+        (
+            await session.execute(
+                select(StudentTransport)
+                .where(StudentTransport.is_active.is_(True))
+                .order_by(StudentTransport.route_id)
+            )
+        ).scalars().all()
+    )
+    if not allocs:
+        return []
+
+    sids = [a.student_id for a in allocs]
+    route_ids = {a.route_id for a in allocs}
+    stop_ids = {a.pickup_stop_id for a in allocs if a.pickup_stop_id}
+    stop_ids |= {a.drop_stop_id for a in allocs if a.drop_stop_id}
+
+    students = {
+        s.id: s for s in (
+            await session.execute(
+                select(Student).where(Student.id.in_(sids))
+            )
+        ).scalars().all()
+    }
+    routes = {
+        r.id: r for r in (
+            await session.execute(
+                select(Route).where(Route.id.in_(route_ids))
+            )
+        ).scalars().all()
+    }
+    bus_ids = {r.bus_id for r in routes.values() if r.bus_id}
+    driver_ids = {r.driver_id for r in routes.values() if r.driver_id}
+    buses = (
+        {b.id: b for b in (
+            await session.execute(select(Bus).where(Bus.id.in_(bus_ids)))
+        ).scalars().all()}
+        if bus_ids else {}
+    )
+    drivers = (
+        {d.id: d for d in (
+            await session.execute(select(Driver).where(Driver.id.in_(driver_ids)))
+        ).scalars().all()}
+        if driver_ids else {}
+    )
+    stops = (
+        {s.id: s for s in (
+            await session.execute(select(Stop).where(Stop.id.in_(stop_ids)))
+        ).scalars().all()}
+        if stop_ids else {}
+    )
+
+    out = []
+    for a in allocs:
+        s = students.get(a.student_id)
+        if s is None:
+            continue
+        r = routes.get(a.route_id)
+        b = buses.get(r.bus_id) if r and r.bus_id else None
+        d = drivers.get(r.driver_id) if r and r.driver_id else None
+        out.append({
+            "allocation_id": a.id,
+            "student_id": s.id,
+            "student_name": s.full_name,
+            "admission_number": s.admission_number,
+            "section_id": s.section_id,
+            "parent_phone": s.parent_phone,
+            "route_id": a.route_id,
+            "route_name": r.name if r else None,
+            "route_code": r.code if r else None,
+            "bus_id": r.bus_id if r else None,
+            "bus_registration": b.registration_number if b else None,
+            "driver_id": r.driver_id if r else None,
+            "driver_name": d.full_name if d else None,
+            "driver_phone": d.phone if d else None,
+            "pickup_stop_id": a.pickup_stop_id,
+            "pickup_stop_name": stops[a.pickup_stop_id].name
+                if a.pickup_stop_id and a.pickup_stop_id in stops else None,
+            "drop_stop_id": a.drop_stop_id,
+            "drop_stop_name": stops[a.drop_stop_id].name
+                if a.drop_stop_id and a.drop_stop_id in stops else None,
+            "fee_per_month": float(a.fee_per_month or 0),
+        })
+    return out
