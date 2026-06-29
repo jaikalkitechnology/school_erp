@@ -290,15 +290,19 @@ class _AllocatedViewState extends State<_AllocatedView> {
           liveFrame: widget.liveFrame,
         ),
         const SizedBox(height: 14),
-        if (widget.data.todayTrip?.isLive == true)
-          _LiveMapCard(
-            liveFrame: widget.liveFrame,
-            fallback: widget.data.todayTrip,
-            geometryFuture: widget.geometryFuture,
-            pickup: widget.data.pickupStop,
-            drop: widget.data.dropStop,
-          ),
-        if (widget.data.todayTrip?.isLive == true) const SizedBox(height: 14),
+        // Map is always visible — even when there's no live trip we
+        // still show the route polyline + pickup / drop markers so the
+        // parent can see where their child boards and gets off. When
+        // a trip is live the bus marker shows up and the camera
+        // recenters on every SSE frame.
+        _LiveMapCard(
+          liveFrame: widget.liveFrame,
+          fallback: widget.data.todayTrip,
+          geometryFuture: widget.geometryFuture,
+          pickup: widget.data.pickupStop,
+          drop: widget.data.dropStop,
+        ),
+        const SizedBox(height: 14),
         _StopsCard(pickup: widget.data.pickupStop, drop: widget.data.dropStop),
         const SizedBox(height: 14),
         _DriverCard(name: widget.data.driverName, phone: widget.data.driverPhone),
@@ -1072,9 +1076,8 @@ class _LiveMapCardState extends State<_LiveMapCard> {
 
   @override
   Widget build(BuildContext context) {
-    final lat = widget.liveFrame?.lat ?? widget.fallback?.lastLat;
-    final lng = widget.liveFrame?.lng ?? widget.fallback?.lastLng;
-    if (lat == null || lng == null) return const SizedBox.shrink();
+    final busLat = widget.liveFrame?.lat ?? widget.fallback?.lastLat;
+    final busLng = widget.liveFrame?.lng ?? widget.fallback?.lastLng;
 
     return FutureBuilder<RouteGeometry>(
       future: widget.geometryFuture,
@@ -1084,56 +1087,98 @@ class _LiveMapCardState extends State<_LiveMapCard> {
           for (final s in geometry.stops)
             if (s.lat != null && s.lng != null) LatLng(s.lat!, s.lng!),
         ];
+
+        // Camera target priority: bus → pickup → drop → first stop.
+        // If we have nothing geo-tagged we render an empty-state card
+        // instead of an unusable grey map.
+        double? centerLat = busLat;
+        double? centerLng = busLng;
+        if (centerLat == null || centerLng == null) {
+          centerLat = widget.pickup?.latitude ?? widget.drop?.latitude;
+          centerLng = widget.pickup?.longitude ?? widget.drop?.longitude;
+        }
+        if (centerLat == null || centerLng == null) {
+          if (polylinePts.isNotEmpty) {
+            centerLat = polylinePts.first.latitude;
+            centerLng = polylinePts.first.longitude;
+          }
+        }
+        if (centerLat == null || centerLng == null) {
+          return Container(
+            height: 140,
+            decoration: BoxDecoration(
+              color: JaikalkiBrand.saffronPale,
+              borderRadius: BorderRadius.circular(16),
+            ),
+            alignment: Alignment.center,
+            child: const Padding(
+              padding: EdgeInsets.all(16),
+              child: Text(
+                "No location data yet — the route map will appear once "
+                "the school adds GPS coordinates to your child's stops.",
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  color: JaikalkiBrand.saffronDarker,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ),
+          );
+        }
+
+        final markers = <Marker>{
+          if (busLat != null && busLng != null)
+            Marker(
+              markerId: const MarkerId('bus'),
+              position: LatLng(busLat, busLng),
+              icon: BitmapDescriptor.defaultMarkerWithHue(
+                  BitmapDescriptor.hueAzure),
+              infoWindow: const InfoWindow(title: 'Bus'),
+            ),
+          if (widget.pickup?.latitude != null &&
+              widget.pickup?.longitude != null)
+            Marker(
+              markerId: const MarkerId('pickup'),
+              position: LatLng(
+                widget.pickup!.latitude!,
+                widget.pickup!.longitude!,
+              ),
+              icon: BitmapDescriptor.defaultMarkerWithHue(
+                  BitmapDescriptor.hueOrange),
+              infoWindow: InfoWindow(
+                title: 'Pickup · ${widget.pickup!.name}',
+              ),
+            ),
+          if (widget.drop?.latitude != null &&
+              widget.drop?.longitude != null)
+            Marker(
+              markerId: const MarkerId('drop'),
+              position: LatLng(
+                widget.drop!.latitude!,
+                widget.drop!.longitude!,
+              ),
+              icon: BitmapDescriptor.defaultMarkerWithHue(
+                  BitmapDescriptor.hueGreen),
+              infoWindow: InfoWindow(
+                title: 'Drop · ${widget.drop!.name}',
+              ),
+            ),
+        };
+
         return ClipRRect(
           borderRadius: BorderRadius.circular(16),
           child: SizedBox(
             height: 220,
             child: GoogleMap(
               initialCameraPosition: CameraPosition(
-                target: LatLng(lat, lng),
+                target: LatLng(centerLat, centerLng),
                 zoom: 14,
               ),
               onMapCreated: (c) => _controller = c,
               myLocationButtonEnabled: false,
               zoomControlsEnabled: false,
               compassEnabled: false,
-              markers: {
-                Marker(
-                  markerId: const MarkerId('bus'),
-                  position: LatLng(lat, lng),
-                  icon: BitmapDescriptor.defaultMarkerWithHue(
-                      BitmapDescriptor.hueAzure),
-                  infoWindow: const InfoWindow(title: 'Bus'),
-                ),
-                if (widget.pickup?.latitude != null &&
-                    widget.pickup?.longitude != null)
-                  Marker(
-                    markerId: const MarkerId('pickup'),
-                    position: LatLng(
-                      widget.pickup!.latitude!,
-                      widget.pickup!.longitude!,
-                    ),
-                    icon: BitmapDescriptor.defaultMarkerWithHue(
-                        BitmapDescriptor.hueOrange),
-                    infoWindow: InfoWindow(
-                      title: 'Pickup · ${widget.pickup!.name}',
-                    ),
-                  ),
-                if (widget.drop?.latitude != null &&
-                    widget.drop?.longitude != null)
-                  Marker(
-                    markerId: const MarkerId('drop'),
-                    position: LatLng(
-                      widget.drop!.latitude!,
-                      widget.drop!.longitude!,
-                    ),
-                    icon: BitmapDescriptor.defaultMarkerWithHue(
-                        BitmapDescriptor.hueGreen),
-                    infoWindow: InfoWindow(
-                      title: 'Drop · ${widget.drop!.name}',
-                    ),
-                  ),
-              },
+              markers: markers,
               polylines: {
                 if (polylinePts.length >= 2)
                   Polyline(

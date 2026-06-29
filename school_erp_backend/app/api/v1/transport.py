@@ -1386,3 +1386,89 @@ async def list_all_allocations_route(
             "fee_per_month": float(a.fee_per_month or 0),
         })
     return out
+
+
+# ---- Driver: my own profile ---------------------------------------------
+
+
+@router.get("/driver/me")
+async def driver_me_route(
+    principal: AuthPrincipal = Depends(_reader),
+    session: AsyncSession = Depends(tenant_scoped_session),
+):
+    """Full profile for the logged-in driver — combines the User row +
+    the Driver row + the routes / buses they're assigned to. Powers
+    the "Profile" page on the driver app's More tab.
+
+    If the user is senior staff (school_admin / principal / …) we
+    return their User profile only — no Driver row — so the same
+    endpoint works for everyone with read access to Transport."""
+    from app.models.auth import User
+    from app.models.transport import Bus, Driver, Route
+
+    user = (
+        await session.execute(
+            select(User).where(User.id == principal.user_id)
+        )
+    ).scalar_one_or_none()
+    if user is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="User not found",
+        )
+
+    driver = (
+        await session.execute(
+            select(Driver).where(Driver.user_id == principal.user_id)
+        )
+    ).scalar_one_or_none()
+
+    routes_out: list[dict] = []
+    bus_regs: list[str] = []
+    if driver is not None:
+        routes = list(
+            (
+                await session.execute(
+                    select(Route).where(Route.driver_id == driver.id)
+                )
+            ).scalars().all()
+        )
+        bus_ids = {r.bus_id for r in routes if r.bus_id}
+        buses = (
+            {b.id: b for b in (
+                await session.execute(select(Bus).where(Bus.id.in_(bus_ids)))
+            ).scalars().all()}
+            if bus_ids else {}
+        )
+        for r in routes:
+            b = buses.get(r.bus_id) if r.bus_id else None
+            routes_out.append({
+                "id": r.id,
+                "code": r.code,
+                "name": r.name,
+                "bus_registration": b.registration_number if b else None,
+            })
+            if b and b.registration_number:
+                bus_regs.append(b.registration_number)
+
+    return {
+        "user_id": user.id,
+        "full_name": user.full_name,
+        "phone": user.phone,
+        "email": user.email,
+        "tenant_id": user.tenant_id,
+        "is_active": user.is_active,
+        "roles": principal.roles,
+        "driver": None if driver is None else {
+            "id": driver.id,
+            "full_name": driver.full_name,
+            "phone": driver.phone,
+            "license_number": driver.license_number,
+            "license_expiry": (
+                driver.license_expiry.isoformat()
+                if driver.license_expiry else None
+            ),
+            "status": driver.status,
+        },
+        "assigned_routes": routes_out,
+        "assigned_buses": sorted(set(bus_regs)),
+    }

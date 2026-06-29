@@ -5,7 +5,9 @@ import 'package:go_router/go_router.dart';
 import '../../core/auth_cubit.dart';
 import '../../theme/brand.dart';
 import '../driver/driver_page.dart';
+import '../driver/driver_profile_page.dart';
 import '../driver/driver_routes_page.dart';
+import '../driver/driver_stops_map_page.dart';
 import '../driver/driver_students_page.dart';
 import '../messages/messages_page.dart';
 import '../notifications/notifications_page.dart';
@@ -101,6 +103,45 @@ class _TransportMorePage extends StatelessWidget {
       appBar: AppBar(title: const Text('More')),
       body: ListView(
         children: [
+          ListTile(
+            leading: const Icon(Icons.person_outline,
+                color: JaikalkiBrand.saffron),
+            title: const Text('My profile'),
+            subtitle: const Text(
+              'Driver details, license, assigned routes & buses',
+              style: TextStyle(
+                fontSize: 12,
+                color: JaikalkiBrand.textSecondary,
+              ),
+            ),
+            trailing: const Icon(Icons.chevron_right,
+                color: JaikalkiBrand.textSecondary),
+            onTap: () => Navigator.of(context).push(
+              MaterialPageRoute(
+                builder: (_) => const DriverProfilePage(),
+              ),
+            ),
+          ),
+          ListTile(
+            leading: const Icon(Icons.map_outlined,
+                color: JaikalkiBrand.saffron),
+            title: const Text('Route map'),
+            subtitle: const Text(
+              'See every stop on each route on a map',
+              style: TextStyle(
+                fontSize: 12,
+                color: JaikalkiBrand.textSecondary,
+              ),
+            ),
+            trailing: const Icon(Icons.chevron_right,
+                color: JaikalkiBrand.textSecondary),
+            onTap: () => Navigator.of(context).push(
+              MaterialPageRoute(
+                builder: (_) => const DriverStopsMapPage(),
+              ),
+            ),
+          ),
+          const Divider(height: 0),
           ListTile(
             leading: const Icon(Icons.notifications_outlined,
                 color: JaikalkiBrand.saffron),
