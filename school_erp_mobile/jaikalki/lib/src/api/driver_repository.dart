@@ -143,6 +143,22 @@ class DriverRepository {
       return const [];
     }
   }
+
+  /// Logged-in driver's full profile: User row + Driver row + every
+  /// route / bus they're assigned to. Powers the Profile page on the
+  /// More tab.
+  Future<DriverProfile?> driverMe() async {
+    try {
+      final res = await _api.dio.get<Map<String, dynamic>>(
+        '/v1/school-admin/transport/driver/me',
+      );
+      final data = res.data;
+      if (data == null) return null;
+      return DriverProfile.fromJson(data);
+    } on DioException {
+      return null;
+    }
+  }
 }
 
 class DriverRoute {
@@ -289,6 +305,101 @@ class DriverStudent {
         pickupStopName: j['pickup_stop_name'] as String?,
         dropStopName: j['drop_stop_name'] as String?,
         skippedToday: (j['skipped_today'] as bool?) ?? false,
+      );
+}
+
+class DriverProfile {
+  const DriverProfile({
+    required this.userId,
+    required this.fullName,
+    required this.phone,
+    required this.email,
+    required this.isActive,
+    required this.roles,
+    required this.driver,
+    required this.assignedRoutes,
+    required this.assignedBuses,
+  });
+
+  final int userId;
+  final String fullName;
+  final String? phone;
+  final String? email;
+  final bool isActive;
+  final List<String> roles;
+  final DriverRowProfile? driver;
+  final List<DriverAssignedRoute> assignedRoutes;
+  final List<String> assignedBuses;
+
+  factory DriverProfile.fromJson(Map<String, dynamic> j) => DriverProfile(
+        userId: (j['user_id'] as num?)?.toInt() ?? 0,
+        fullName: (j['full_name'] as String?) ?? '',
+        phone: j['phone'] as String?,
+        email: j['email'] as String?,
+        isActive: (j['is_active'] as bool?) ?? true,
+        roles: ((j['roles'] as List<dynamic>?) ?? const [])
+            .map((e) => e.toString())
+            .toList(),
+        driver: j['driver'] == null
+            ? null
+            : DriverRowProfile.fromJson(j['driver'] as Map<String, dynamic>),
+        assignedRoutes: ((j['assigned_routes'] as List<dynamic>?) ?? const [])
+            .map((e) =>
+                DriverAssignedRoute.fromJson(e as Map<String, dynamic>))
+            .toList(),
+        assignedBuses: ((j['assigned_buses'] as List<dynamic>?) ?? const [])
+            .map((e) => e.toString())
+            .toList(),
+      );
+}
+
+class DriverRowProfile {
+  const DriverRowProfile({
+    required this.id,
+    required this.fullName,
+    required this.phone,
+    required this.licenseNumber,
+    required this.licenseExpiry,
+    required this.status,
+  });
+
+  final int id;
+  final String fullName;
+  final String? phone;
+  final String? licenseNumber;
+  final String? licenseExpiry;
+  final String? status;
+
+  factory DriverRowProfile.fromJson(Map<String, dynamic> j) =>
+      DriverRowProfile(
+        id: (j['id'] as num?)?.toInt() ?? 0,
+        fullName: (j['full_name'] as String?) ?? '',
+        phone: j['phone'] as String?,
+        licenseNumber: j['license_number'] as String?,
+        licenseExpiry: j['license_expiry'] as String?,
+        status: j['status'] as String?,
+      );
+}
+
+class DriverAssignedRoute {
+  const DriverAssignedRoute({
+    required this.id,
+    required this.code,
+    required this.name,
+    required this.busRegistration,
+  });
+
+  final int id;
+  final String code;
+  final String name;
+  final String? busRegistration;
+
+  factory DriverAssignedRoute.fromJson(Map<String, dynamic> j) =>
+      DriverAssignedRoute(
+        id: (j['id'] as num?)?.toInt() ?? 0,
+        code: (j['code'] as String?) ?? '',
+        name: (j['name'] as String?) ?? '',
+        busRegistration: j['bus_registration'] as String?,
       );
 }
 
