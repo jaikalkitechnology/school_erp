@@ -234,10 +234,14 @@ ROLES: tuple[RoleSpec, ...] = (
         ),
     ),
     RoleSpec(
+        # NOTE: code stays "transport_manager" for backwards compat —
+        # mobile shells, transport endpoints, and Driver row linking
+        # all key on this string. Only the display name shown in the
+        # admin web's role picker is changing to "Bus Staff".
         code="transport_manager",
-        name="Transport Manager",
+        name="Bus Staff",
         level=4,
-        description="Manages buses, routes, drivers.",
+        description="Bus driver / conductor — runs the bus, marks pickup-drop, manages the route.",
         grants=(
             "user.read", "student.view.all", "parent.view.all",
             "transport.*", "communication.send.class", "communication.read",
