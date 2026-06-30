@@ -22,15 +22,22 @@ import 'transport_shell.dart';
 class RoleHome extends StatelessWidget {
   const RoleHome({super.key});
 
+  // Senior leadership roles all land on the same Principal dashboard
+  // shell. `management` is the trust / society tier; `hod` is the
+  // department head — both want the school-wide rollup view rather
+  // than the per-class teacher UI.
   static const _principalRoles = <String>{
+    'management',
     'principal',
     'vice_principal',
+    'hod',
   };
 
   static const _teacherRoles = <String>{
     'class_teacher',
     'subject_teacher',
     'coordinator',
+    'teacher', // generic Teacher code from the Phase 27 org chart
   };
 
   @override

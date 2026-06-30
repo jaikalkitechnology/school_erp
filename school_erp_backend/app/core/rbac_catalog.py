@@ -325,6 +325,88 @@ ROLES: tuple[RoleSpec, ...] = (
             "library.view",
         ),
     ),
+    # --- Phase 27: explicit role codes for the official school org chart.
+    # Some overlap with older codes intentionally — both old and new
+    # variants are accepted by the platform gate so existing tenants
+    # don't have to migrate user → role rows.
+    RoleSpec(
+        code="management",
+        name="Management",
+        level=9,
+        description="Trust / society management — top-level oversight.",
+        grants=(
+            "tenant.read", "tenant.audit",
+            "user.read", "student.view.all", "teacher.view.all",
+            "parent.view.all", "attendance.view.all", "exam.view.all",
+            "fee.view.all", "communication.send.all", "communication.read",
+            "transport.view.all", "hostel.view", "reports.*",
+        ),
+    ),
+    RoleSpec(
+        code="hod",
+        name="Head of Department",
+        level=6,
+        description="Owns a department / subject group.",
+        grants=(
+            "student.view.class", "teacher.view.all",
+            "attendance.view.class", "attendance.update",
+            "exam.view.class", "exam.grade",
+            "communication.send.class", "communication.read",
+            "timetable.view.all", "homework.view.class",
+            "reports.view",
+        ),
+    ),
+    RoleSpec(
+        code="office_admin",
+        name="Office Admin",
+        level=4,
+        description="Office administrator — admissions, records, day-to-day ops.",
+        grants=(
+            "user.read", "student.view.all", "parent.view.all",
+            "teacher.view.all", "communication.send.class",
+            "communication.read", "reports.view",
+        ),
+    ),
+    RoleSpec(
+        code="receptionist",
+        name="Receptionist",
+        level=2,
+        description="Front-desk reception — visitor flow + enquiries.",
+        grants=(
+            "user.read", "visitor.*", "communication.read",
+        ),
+    ),
+    RoleSpec(
+        code="accounts",
+        name="Accounts",
+        level=4,
+        description="Accounts team — fees + ledger.",
+        grants=(
+            "user.read", "student.view.all", "parent.view.all",
+            "fee.*", "communication.send.class", "communication.read",
+            "reports.view", "reports.export",
+        ),
+    ),
+    RoleSpec(
+        code="payroll",
+        name="Payroll",
+        level=4,
+        description="Payroll team — staff salary & deductions.",
+        grants=(
+            "user.read", "teacher.view.all",
+            "reports.view", "reports.export",
+        ),
+    ),
+    RoleSpec(
+        code="data_entry_operator",
+        name="Data Entry Operator",
+        level=2,
+        description="Data entry — student / fee / exam bulk import.",
+        grants=(
+            "user.read", "student.view.all", "parent.view.all",
+            "reports.view",
+        ),
+    ),
 )
 
 
