@@ -325,6 +325,30 @@ ROLES: tuple[RoleSpec, ...] = (
             "library.view",
         ),
     ),
+    # ---- Phase 27 org-chart additions ----
+    RoleSpec(
+        code="hod",
+        name="Head of Department",
+        level=6,
+        description="Owns a department / subject group. Supervises the teachers under it.",
+        grants=(
+            "student.view.class", "teacher.view.all",
+            "attendance.view.class", "attendance.update",
+            "exam.view.class", "exam.grade",
+            "communication.send.class", "communication.read",
+            "timetable.view.all", "homework.view.class",
+            "reports.view",
+        ),
+    ),
+    RoleSpec(
+        code="receptionist",
+        name="Receptionist",
+        level=2,
+        description="Front-desk reception — visitor flow + enquiries.",
+        grants=(
+            "user.read", "visitor.*", "communication.read",
+        ),
+    ),
 )
 
 
