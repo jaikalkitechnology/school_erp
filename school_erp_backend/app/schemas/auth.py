@@ -16,31 +16,11 @@ class LoginRequest(BaseModel):
         max_length=63,
         description="Optional explicit tenant when the request didn't come through a tenant subdomain.",
     )
-    # Where the login is being attempted from. ``admin_panel`` is the
-    # React admin web; ``mobile_app`` is the Flutter app. We use this
-    # to gate which roles may sign in from which surface (parents and
-    # students cannot use the admin web; back-office roles cannot use
-    # the mobile app). Old clients that don't send the field keep
-    # working — we default to the historical behaviour (no gate).
-    platform: Optional[str] = Field(
-        default=None,
-        description="'admin_panel' or 'mobile_app'. Optional for legacy clients.",
-    )
 
     @field_validator("identifier")
     @classmethod
     def _strip_identifier(cls, v: str) -> str:
         return v.strip().lower()
-
-    @field_validator("platform")
-    @classmethod
-    def _normalize_platform(cls, v: Optional[str]) -> Optional[str]:
-        if v is None:
-            return v
-        v = v.strip().lower()
-        if v not in {"admin_panel", "mobile_app"}:
-            return None
-        return v
 
 
 class TokenPair(BaseModel):
@@ -136,10 +116,6 @@ class LoginOtpVerifyBody(BaseModel):
     identifier: str = Field(min_length=3, max_length=180)
     subdomain: Optional[str] = Field(default=None, max_length=63)
     otp: str = Field(min_length=4, max_length=12)
-    platform: Optional[str] = Field(
-        default=None,
-        description="'admin_panel' or 'mobile_app'. Used to gate role access.",
-    )
 
 
 class DeviceRegisterRequest(BaseModel):

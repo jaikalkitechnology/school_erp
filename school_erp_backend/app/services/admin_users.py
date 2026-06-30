@@ -56,14 +56,6 @@ ASSIGNABLE_ROLES: set[str] = {
     "bus_staff",
     "supervisor",
     "visitor_desk",
-    # Phase 27 org-chart codes.
-    "management",
-    "hod",
-    "office_admin",
-    "receptionist",
-    "accounts",
-    "payroll",
-    "data_entry_operator",
 }
 
 
