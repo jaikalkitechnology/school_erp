@@ -49,11 +49,23 @@ const nav = [
   { to: "/settings", label: "Settings", icon: Settings },
 ];
 
+// Senior leadership roles see every page without needing the
+// per-page checklist on Users & credentials. Keep in sync with the
+// backend role catalogue (rbac_catalog.py).
+const FULL_ACCESS_ROLES = new Set([
+  "school_admin",
+  "super_admin",
+  "management",
+  "principal",
+  "vice_principal",
+]);
+
 /**
  * Filter the static nav by the granted_admin_pages list on the auth
- * user. school_admin and principal bypass the gate (full access);
- * everyone else only sees the entries the school-admin granted them
- * via the Users & credentials → Page access checklist.
+ * user. Senior leadership (school_admin / management / principal /
+ * vice_principal) bypass the gate (full access); everyone else only
+ * sees the entries the school-admin granted them via the Users &
+ * credentials → Page access checklist.
  *
  * Returning [] for a user with zero granted pages means the sidebar
  * collapses to just Sign out — they'll land on /access-denied via the
@@ -61,7 +73,7 @@ const nav = [
  * admin web; please use the mobile app instead".
  */
 function useFilteredNav(roles: string[], granted: string[]) {
-  const bypass = roles.includes("school_admin") || roles.includes("principal");
+  const bypass = roles.some((r) => FULL_ACCESS_ROLES.has(r));
   if (bypass) return nav;
   const granted_slugs = new Set(
     granted.map((s) => (s.startsWith("/") ? s.slice(1) : s)),

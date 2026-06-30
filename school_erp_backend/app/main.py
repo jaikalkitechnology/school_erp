@@ -39,9 +39,47 @@ async def _retention_loop() -> None:
         await asyncio.sleep(24 * 60 * 60)
 
 
+async def _sync_rbac_catalogue() -> None:
+    """On boot: replay the RBAC catalogue against every tenant. New
+    role codes added to ``rbac_catalog.ROLES`` (eg. Phase 27's
+    management / hod / office_admin / receptionist / accounts /
+    payroll / data_entry_operator) get an actual row in every
+    tenant's ``roles`` table so the admin Users panel can pick them
+    immediately, without a manual re-seed.
+
+    ``seed_rbac_for_tenant`` is idempotent — only missing rows get
+    inserted. Existing role grants are refreshed to match the
+    catalogue."""
+    from sqlalchemy import select
+
+    from app.database import AsyncSessionLocal
+    from app.models.tenant import Tenant
+    from app.services.seed import seed_rbac_for_tenant
+
+    try:
+        async with AsyncSessionLocal() as session:
+            tenant_ids = [
+                t for (t,) in (
+                    await session.execute(select(Tenant.id))
+                ).all()
+            ]
+            for tid in tenant_ids:
+                try:
+                    await seed_rbac_for_tenant(session, tid)
+                except Exception:
+                    log.exception("RBAC re-seed failed for tenant %s", tid)
+        log.info("RBAC catalogue synced for %s tenants", len(tenant_ids))
+    except Exception:
+        log.exception("RBAC catalogue sync failed")
+
+
 @asynccontextmanager
 async def lifespan(_: FastAPI):
     setup_upload_directory()
+    # Replay RBAC so new role codes shipped in the catalogue land in
+    # every tenant's roles table. Safe + idempotent — runs once per
+    # boot before traffic starts hitting the API.
+    await _sync_rbac_catalogue()
     # Daily notification retention sweep — keeps the inbox tidy.
     task = asyncio.create_task(_retention_loop())
     try:
