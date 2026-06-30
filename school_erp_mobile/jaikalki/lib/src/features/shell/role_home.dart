@@ -4,7 +4,6 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../core/auth_cubit.dart';
 import '../teacher/teacher_shell.dart';
 import 'home_shell.dart';
-import 'principal_shell.dart';
 import 'transport_shell.dart';
 
 /// Picks the right shell based on the logged-in user's primary role.
@@ -22,15 +21,12 @@ import 'transport_shell.dart';
 class RoleHome extends StatelessWidget {
   const RoleHome({super.key});
 
-  static const _principalRoles = <String>{
-    'principal',
-    'vice_principal',
-  };
-
   static const _teacherRoles = <String>{
     'class_teacher',
     'subject_teacher',
     'coordinator',
+    'vice_principal',
+    'principal',
   };
 
   @override
@@ -53,12 +49,6 @@ class RoleHome extends StatelessWidget {
         // shell with empty data.
         if (roles.contains('transport_manager')) {
           return const TransportShell();
-        }
-        // Principal / vice_principal get their own dashboard shell —
-        // checked BEFORE the teacher shell so a principal who also
-        // happens to teach a section still lands on the leadership UI.
-        if (roles.any(_principalRoles.contains)) {
-          return const PrincipalShell();
         }
         if (roles.any(_teacherRoles.contains)) return const TeacherShell();
         return const HomeShell();
