@@ -175,6 +175,7 @@ async def login_otp_verify(
         otp=payload.otp,
         user_agent=request.headers.get("user-agent"),
         ip_address=request.client.host if request.client else None,
+        platform=payload.platform,
     )
 
 

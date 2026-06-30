@@ -7,18 +7,19 @@ import { Label } from "@/components/ui/label";
 import { login as loginApi } from "@/lib/auth-api";
 import { useAuth } from "@/stores/auth";
 
+// Mirrors the backend ADMIN_PANEL_ROLES matrix in
+// app/services/auth.py. The backend is the source of truth — a
+// rejected role gets a 403 with the canonical error message — but we
+// keep this client-side allow list so a server with role bypass
+// (unset platform field) doesn't accidentally drop a parent / student
+// into the admin web.
 const SCHOOL_ROLES = new Set([
-  "school_admin",
-  "principal",
-  "vice_principal",
-  "coordinator",
-  "class_teacher",
-  "subject_teacher",
-  "accountant",
-  "librarian",
-  "transport_manager",
-  "hostel_warden",
-  "office_staff",
+  "school_admin", "super_admin", "supervisor",
+  "management", "principal", "vice_principal", "hod",
+  "office_admin", "office_staff", "receptionist", "visitor_desk",
+  "class_teacher", "subject_teacher", "coordinator", "teacher",
+  "librarian", "transport_manager", "hostel_warden",
+  "accountant", "accounts", "payroll", "data_entry_operator",
 ]);
 
 // Hosts that serve the school admin web itself rather than a per-tenant
@@ -68,7 +69,7 @@ export function LoginPage() {
       const res = await loginApi({ identifier, password, subdomain: cleanSubdomain });
       const allowed = res.user.roles.some((r) => SCHOOL_ROLES.has(r));
       if (!allowed) {
-        setError("This console is for school staff. Use the mobile app to sign in as parent/student.");
+        setError("You are not authorized to access the Admin Panel.");
         setSubmitting(false);
         return;
       }

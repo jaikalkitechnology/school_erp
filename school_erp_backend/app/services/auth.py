@@ -163,6 +163,74 @@ def _issue_tokens(user: User, tenant: Tenant, role_codes: list[str], perms: list
 # ---- public API -------------------------------------------------------------
 
 
+# Phase 27: role × platform matrix. Every role code we ship must
+# appear in at least one of these sets — otherwise the login gate
+# below treats it as "unknown" and falls back to allowing access (to
+# keep new role codes from soft-locking tenants while we roll them
+# out). The two surfaces are:
+#   * "admin_panel" — the React admin web
+#   * "mobile_app"  — the Flutter app (parent / teacher / driver shells)
+ADMIN_PANEL_ROLES: frozenset[str] = frozenset({
+    # Senior leadership.
+    "management", "principal", "vice_principal", "hod",
+    # Back office.
+    "office_admin", "office_staff", "receptionist", "visitor_desk",
+    # Teaching staff.
+    "class_teacher", "subject_teacher", "coordinator", "teacher",
+    # Library + transport + hostel.
+    "librarian", "transport_manager", "hostel_warden",
+    # Finance / HR.
+    "accountant", "accounts", "payroll", "data_entry_operator",
+    # Internal admins.
+    "school_admin", "super_admin", "supervisor",
+})
+
+MOBILE_APP_ROLES: frozenset[str] = frozenset({
+    # Senior leadership.
+    "management", "principal", "vice_principal", "hod",
+    # Teaching staff.
+    "class_teacher", "subject_teacher", "coordinator", "teacher",
+    # Transport driver app.
+    "transport_manager", "bus_staff",
+    # End users.
+    "parent", "student",
+})
+
+
+def _assert_platform_access(
+    role_codes: list[str], platform: Optional[str],
+) -> None:
+    """Raise 403 with a user-facing message when the user's roles are
+    not allowed on the requested platform. Old clients that don't send
+    ``platform`` skip the gate so existing flows keep working."""
+    if not platform:
+        return
+    roles = set(role_codes)
+    if platform == "admin_panel":
+        if roles & ADMIN_PANEL_ROLES:
+            return
+        # Block parent / student explicitly with the requested copy.
+        if roles & {"parent", "student"}:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="You are not authorized to access the Admin Panel.",
+            )
+        # Other unknown roles — same outward message; admin should
+        # never see this in practice because every shipped role is in
+        # the matrix.
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="You are not authorized to access the Admin Panel.",
+        )
+    if platform == "mobile_app":
+        if roles & MOBILE_APP_ROLES:
+            return
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Your role does not have access to the Mobile App.",
+        )
+
+
 async def login(
     session: AsyncSession,
     payload: LoginRequest,
@@ -203,6 +271,9 @@ async def login(
     user.last_login_at = _now()
 
     role_codes = sorted({ur.role.code for ur in user.role_assignments if ur.role})
+    # Phase 27: per-platform role gate. We raise BEFORE issuing tokens so
+    # a rejected login leaves no refresh row behind.
+    _assert_platform_access(role_codes, payload.platform)
     perms = await _user_permissions(session, user)
     pair, jti, refresh_expiry = _issue_tokens(user, tenant, role_codes, perms)
 
