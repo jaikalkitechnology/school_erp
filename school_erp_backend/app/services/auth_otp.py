@@ -264,7 +264,6 @@ async def verify_login_otp_and_issue_tokens(
     otp: str,
     user_agent: Optional[str] = None,
     ip_address: Optional[str] = None,
-    platform: Optional[str] = None,
 ):
     """Validate the OTP and mint a normal LoginResponse — same shape
     as ``/v1/auth/login``. Consumes the OTP row so the same code can't
@@ -274,7 +273,6 @@ async def verify_login_otp_and_issue_tokens(
     from app.models.auth import RefreshToken, UserRole
     from app.schemas.auth import LoginResponse
     from app.services.auth import (
-        _assert_platform_access,
         _issue_tokens,
         _user_permissions,
         build_current_user,
@@ -330,7 +328,6 @@ async def verify_login_otp_and_issue_tokens(
     ).unique().scalar_one()
 
     role_codes = sorted({ur.role.code for ur in user.role_assignments if ur.role})
-    _assert_platform_access(role_codes, platform)
     perms = await _user_permissions(session, user)
     pair, jti, refresh_expiry = _issue_tokens(user, tenant, role_codes, perms)
 

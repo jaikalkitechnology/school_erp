@@ -95,11 +95,6 @@ class AuthRepository {
           'identifier': identifier.trim().toLowerCase(),
           'password': password,
           'subdomain': subdomain.trim().toLowerCase(),
-          // Tell the backend this is the Flutter app so role × platform
-          // gating can reject office_admin / accounts / etc. with the
-          // canonical 'Your role does not have access to the Mobile
-          // App.' message.
-          'platform': 'mobile_app',
         },
       );
       final body = res.data!;
@@ -219,7 +214,6 @@ class AuthRepository {
           'identifier': identifier.trim().toLowerCase(),
           'subdomain': subdomain.trim().toLowerCase(),
           'otp': otp.trim(),
-          'platform': 'mobile_app',
         },
       );
       final body = res.data!;

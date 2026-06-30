@@ -5,10 +5,6 @@ export interface LoginPayload {
   identifier: string;
   password: string;
   subdomain?: string;
-  // Tell the backend this is the admin web so the role × platform
-  // gate can reject parent / student accounts with the canonical
-  // "You are not authorized to access the Admin Panel." message.
-  platform?: "admin_panel" | "mobile_app";
 }
 
 export interface TokenPair {
@@ -30,8 +26,7 @@ export async function login(payload: LoginPayload): Promise<LoginResponse> {
   // from a prior failed attempt would 404 at the tenant lookup.
   const headers: Record<string, string> = {};
   if (payload.subdomain) headers["X-Tenant-Subdomain"] = payload.subdomain;
-  const body: LoginPayload = { platform: "admin_panel", ...payload };
-  const { data } = await api.post<LoginResponse>("/v1/auth/login", body, { headers });
+  const { data } = await api.post<LoginResponse>("/v1/auth/login", payload, { headers });
   return data;
 }
 
