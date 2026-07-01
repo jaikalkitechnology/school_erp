@@ -1,5 +1,6 @@
 import { NavLink, Outlet, useNavigate } from "react-router-dom";
 import {
+  BookOpen,
   BookOpenCheck,
   Building,
   BarChart3,
@@ -9,6 +10,7 @@ import {
   CalendarCheck,
   CreditCard,
   GraduationCap,
+  Hand,
   Home,
   KeyRound,
   Layers,
@@ -17,6 +19,8 @@ import {
   LogOut,
   MessageCircle,
   Receipt,
+  ReceiptText,
+  RotateCcw,
   Settings,
   Users,
 } from "lucide-react";
@@ -41,7 +45,18 @@ const nav = [
   { to: "/report-cards", label: "Report cards", icon: FileText },
   { to: "/fees", label: "Fees", icon: Receipt },
   { to: "/communication", label: "Communication", icon: MessageCircle },
-  { to: "/library", label: "Library", icon: Library },
+  // ---- Library ---------------------------------------------------
+  // Each sub-section gets its own sidebar entry so it can be granted
+  // individually on the Users & credentials Page access checklist.
+  // A librarian can be given just Books + Issue + Return, or the
+  // full set, without spilling into unrelated modules.
+  { to: "/library", label: "Library dashboard", icon: Library },
+  { to: "/library-books", label: "Books", icon: BookOpen },
+  { to: "/library-categories", label: "Categories", icon: Layers },
+  { to: "/library-issue", label: "Issue books", icon: Hand },
+  { to: "/library-return", label: "Return books", icon: RotateCcw },
+  { to: "/library-fines", label: "Fine management", icon: ReceiptText },
+  { to: "/library-reports", label: "Library reports", icon: BarChart3 },
   { to: "/transport", label: "Transport", icon: Bus },
   { to: "/hostel", label: "Hostel", icon: Building },
   { to: "/reports", label: "Reports", icon: BarChart3 },

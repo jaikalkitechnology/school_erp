@@ -30,7 +30,16 @@ ADMIN_PAGES: tuple[tuple[str, str, str], ...] = (
     ("report-cards", "Report cards", "Academics"),
     ("fees", "Fees", "Finance"),
     ("communication", "Communication", "Comms"),
-    ("library", "Library", "Operations"),
+    # Library is split into 7 sub-pages so the school admin can grant
+    # (say) Issue + Return access without also handing over the whole
+    # catalogue. Slugs match the React route paths.
+    ("library", "Library dashboard", "Library"),
+    ("library-books", "Books", "Library"),
+    ("library-categories", "Categories", "Library"),
+    ("library-issue", "Issue books", "Library"),
+    ("library-return", "Return books", "Library"),
+    ("library-fines", "Fine management", "Library"),
+    ("library-reports", "Library reports", "Library"),
     ("transport", "Transport", "Operations"),
     ("hostel", "Hostel", "Operations"),
     ("reports", "Reports", "Insights"),
@@ -64,12 +73,20 @@ DEFAULT_PAGES_BY_ROLE: dict[str, tuple[str, ...]] = {
     "visitor_desk": ("dashboard", "students", "communication"),
 
     # --- Visible-but-narrow surfaces (contd.) ------------------------
-    # Librarian runs the library day-to-day: catalogue (Books,
-    # Categories), circulation (Issue / Return), and Fine Management
-    # all live inside /library. They also see the Overview so they
-    # can spot campus-wide events / holidays that affect due dates,
-    # and Reports so they can pull circulation stats.
-    "librarian": ("dashboard", "library", "reports"),
+    # Librarian runs the whole library module. Each Library sub-page
+    # is granted individually so the school admin can withhold, say,
+    # Fine management from a junior librarian without breaking the
+    # rest of their access.
+    "librarian": (
+        "dashboard",
+        "library",
+        "library-books",
+        "library-categories",
+        "library-issue",
+        "library-return",
+        "library-fines",
+        "library-reports",
+    ),
 
     # --- Mobile-app-only (no admin web sidebar at all) ----------------
     "class_teacher": (),
