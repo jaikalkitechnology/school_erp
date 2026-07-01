@@ -9,7 +9,13 @@ import { ExamsPage } from "@/features/exams/ExamsPage";
 import { FeesPage } from "@/features/fees/FeesPage";
 import { ReportCardsPage } from "@/features/report_cards/ReportCardsPage";
 import { HomeworkPage } from "@/features/homework/HomeworkPage";
-import { LibraryPage } from "@/features/library/LibraryPage";
+import { LibraryDashboardPage } from "@/features/library/LibraryDashboardPage";
+import { LibraryBooksPage } from "@/features/library/LibraryBooksPage";
+import { LibraryCategoriesPage } from "@/features/library/LibraryCategoriesPage";
+import { LibraryIssueBooksPage } from "@/features/library/LibraryIssueBooksPage";
+import { LibraryReturnBooksPage } from "@/features/library/LibraryReturnBooksPage";
+import { LibraryFineManagementPage } from "@/features/library/LibraryFineManagementPage";
+import { LibraryReportsPage } from "@/features/library/LibraryReportsPage";
 import { TimetablePage } from "@/features/timetable/TimetablePage";
 import { TransportPage } from "@/features/transport/TransportPage";
 import { HostelPage } from "@/features/hostel/HostelPage";
@@ -65,7 +71,13 @@ export const routes: RouteObject[] = [
       { path: "report-cards", element: <ReportCardsPage /> },
       { path: "fees", element: <FeesPage /> },
       { path: "communication", element: <CommunicationPage /> },
-      { path: "library", element: <LibraryPage /> },
+      { path: "library", element: <LibraryDashboardPage /> },
+      { path: "library-books", element: <LibraryBooksPage /> },
+      { path: "library-categories", element: <LibraryCategoriesPage /> },
+      { path: "library-issue", element: <LibraryIssueBooksPage /> },
+      { path: "library-return", element: <LibraryReturnBooksPage /> },
+      { path: "library-fines", element: <LibraryFineManagementPage /> },
+      { path: "library-reports", element: <LibraryReportsPage /> },
       { path: "transport", element: <TransportPage /> },
       { path: "hostel", element: <HostelPage /> },
       { path: "reports", element: <ReportsPage /> },
