@@ -63,10 +63,17 @@ DEFAULT_PAGES_BY_ROLE: dict[str, tuple[str, ...]] = {
     ),
     "visitor_desk": ("dashboard", "students", "communication"),
 
+    # --- Visible-but-narrow surfaces (contd.) ------------------------
+    # Librarian runs the library day-to-day: catalogue (Books,
+    # Categories), circulation (Issue / Return), and Fine Management
+    # all live inside /library. They also see the Overview so they
+    # can spot campus-wide events / holidays that affect due dates,
+    # and Reports so they can pull circulation stats.
+    "librarian": ("dashboard", "library", "reports"),
+
     # --- Mobile-app-only (no admin web sidebar at all) ----------------
     "class_teacher": (),
     "subject_teacher": (),
-    "librarian": (),
     "transport_manager": (),
     "hostel_warden": (),
     "bus_staff": (),

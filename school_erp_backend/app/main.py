@@ -71,6 +71,52 @@ async def _sync_rbac_catalogue() -> None:
     except Exception:
         log.exception("RBAC catalogue sync failed")
 
+    # Backfill: any user whose role has a non-empty default page set
+    # in DEFAULT_PAGES_BY_ROLE but whose granted_admin_pages is empty
+    # gets the default applied. This makes newly-added role → page
+    # defaults (e.g. Librarian → dashboard / library / reports)
+    # retroactively apply to users who were created before the
+    # default existed. Users who explicitly had their page grants
+    # customised are left alone (their granted_admin_pages is
+    # already non-empty).
+    try:
+        from app.core.admin_pages import DEFAULT_PAGES_BY_ROLE
+        from app.models.auth import Role, User, UserRole
+
+        async with AsyncSessionLocal() as session:
+            users_with_roles = (
+                await session.execute(
+                    select(User, Role.code)
+                    .join(UserRole, UserRole.user_id == User.id)
+                    .join(Role, Role.id == UserRole.role_id)
+                )
+            ).all()
+            touched = 0
+            by_user: dict[int, tuple[User, list[str]]] = {}
+            for user, code in users_with_roles:
+                if user.id not in by_user:
+                    by_user[user.id] = (user, [])
+                by_user[user.id][1].append(code)
+
+            for user, codes in by_user.values():
+                if user.granted_admin_pages:
+                    continue
+                slugs: set[str] = set()
+                for code in codes:
+                    for slug in DEFAULT_PAGES_BY_ROLE.get(code, ()):
+                        slugs.add(slug)
+                if not slugs:
+                    continue
+                user.granted_admin_pages = sorted(slugs)
+                touched += 1
+            if touched:
+                await session.commit()
+                log.info(
+                    "granted_admin_pages backfilled for %s users", touched,
+                )
+    except Exception:
+        log.exception("granted_admin_pages backfill failed")
+
 
 @asynccontextmanager
 async def lifespan(_: FastAPI):
