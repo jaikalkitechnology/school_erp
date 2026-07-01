@@ -9,7 +9,7 @@ import { LibraryHeader } from "./_shared";
 export function LibraryCategoriesPage() {
   const { data, isLoading } = useQuery({
     queryKey: ["library-reports"],
-    queryFn: () => import("./api").then((m) => m.reports()),
+    queryFn: reports,
   });
 
   return (
