@@ -71,14 +71,21 @@ async def _sync_rbac_catalogue() -> None:
     except Exception:
         log.exception("RBAC catalogue sync failed")
 
-    # Backfill: any user whose role has a non-empty default page set
-    # in DEFAULT_PAGES_BY_ROLE but whose granted_admin_pages is empty
-    # gets the default applied. This makes newly-added role → page
-    # defaults (e.g. Librarian → dashboard / library / reports)
-    # retroactively apply to users who were created before the
-    # default existed. Users who explicitly had their page grants
-    # customised are left alone (their granted_admin_pages is
-    # already non-empty).
+    # Backfill: refresh granted_admin_pages against the current
+    # DEFAULT_PAGES_BY_ROLE for any user we can safely treat as
+    # "still on defaults". This covers two cases:
+    #
+    #   1. User was created before their role had defaults —
+    #      granted_admin_pages is empty.
+    #   2. User was created when their role had an older default set
+    #      that has since evolved (eg. Librarian's default was once
+    #      ``[dashboard, library, reports]`` before the Library split
+    #      shipped seven new sub-page slugs). We detect the stale
+    #      default by checking that the user's current grants are a
+    #      subset of the union of every catalogued default for their
+    #      roles — meaning nothing was manually added by the school
+    #      admin. Manually-customised users (who have grants outside
+    #      the role defaults) are left alone.
     try:
         from app.core.admin_pages import DEFAULT_PAGES_BY_ROLE
         from app.models.auth import Role, User, UserRole
@@ -99,20 +106,26 @@ async def _sync_rbac_catalogue() -> None:
                 by_user[user.id][1].append(code)
 
             for user, codes in by_user.values():
-                if user.granted_admin_pages:
-                    continue
-                slugs: set[str] = set()
+                default_slugs: set[str] = set()
                 for code in codes:
                     for slug in DEFAULT_PAGES_BY_ROLE.get(code, ()):
-                        slugs.add(slug)
-                if not slugs:
+                        default_slugs.add(slug)
+                if not default_slugs:
                     continue
-                user.granted_admin_pages = sorted(slugs)
+                current = set(user.granted_admin_pages or [])
+                # Skip users whose grants include something outside
+                # the role defaults — they've been customised.
+                if current and not current.issubset(default_slugs):
+                    continue
+                target = sorted(default_slugs)
+                if list(current) and sorted(current) == target:
+                    continue
+                user.granted_admin_pages = target
                 touched += 1
             if touched:
                 await session.commit()
                 log.info(
-                    "granted_admin_pages backfilled for %s users", touched,
+                    "granted_admin_pages refreshed for %s users", touched,
                 )
     except Exception:
         log.exception("granted_admin_pages backfill failed")
