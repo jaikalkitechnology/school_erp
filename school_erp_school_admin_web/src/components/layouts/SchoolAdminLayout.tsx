@@ -64,20 +64,33 @@ const nav = [
   { to: "/settings", label: "Settings", icon: Settings },
 ];
 
+// Senior leadership sees every page without needing per-page grants.
+// Keep in sync with the backend role catalogue.
+const FULL_ACCESS_ROLES = new Set([
+  "school_admin",
+  "super_admin",
+  "principal",
+  "vice_principal",
+  "management",
+]);
+
 /**
- * Every logged-in staff user sees the full sidebar. The
- * per-page grant filter was making sidebars collapse to empty for
- * users whose ``granted_admin_pages`` hadn't been populated yet,
- * which was confusing — the request now is "show everything in the
- * sidebar" so we return the static nav verbatim.
+ * Role-scoped sidebar. Every entry is checked against the user's
+ * ``granted_admin_pages`` — so a librarian only sees the Library
+ * sub-pages that were granted to them via Users & credentials, a
+ * receptionist only sees the reception surfaces, and so on. Senior
+ * leadership bypasses the gate and sees everything.
  *
- * Backend-level role gates on individual endpoints still apply, so a
- * user who lands on a page they don't have permission for gets a
- * proper 403 from the API rather than an empty screen — this only
- * changes what appears in the sidebar.
+ * The slug in ``granted_admin_pages`` matches the sidebar route path
+ * with the leading slash stripped ("library-books" for "/library-books").
  */
-function useFilteredNav(_roles: string[], _granted: string[]) {
-  return nav;
+function useFilteredNav(roles: string[], granted: string[]) {
+  const bypass = roles.some((r) => FULL_ACCESS_ROLES.has(r));
+  if (bypass) return nav;
+  const granted_slugs = new Set(
+    granted.map((s) => (s.startsWith("/") ? s.slice(1) : s)),
+  );
+  return nav.filter((n) => granted_slugs.has(n.to.replace(/^\//, "")));
 }
 
 export function SchoolAdminLayout() {

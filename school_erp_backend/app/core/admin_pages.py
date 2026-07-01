@@ -73,12 +73,12 @@ DEFAULT_PAGES_BY_ROLE: dict[str, tuple[str, ...]] = {
     "visitor_desk": ("dashboard", "students", "communication"),
 
     # --- Visible-but-narrow surfaces (contd.) ------------------------
-    # Librarian runs the whole library module. Each Library sub-page
-    # is granted individually so the school admin can withhold, say,
-    # Fine management from a junior librarian without breaking the
-    # rest of their access.
+    # Librarian runs only the library module. Their sidebar is
+    # scoped to the seven Library sub-pages — no Overview, no other
+    # modules — so the login surface stays focused on their job.
+    # The school admin can still uncheck individual boxes (eg. hide
+    # Fine management from a junior librarian) on Users & credentials.
     "librarian": (
-        "dashboard",
         "library",
         "library-books",
         "library-categories",
