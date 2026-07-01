@@ -65,23 +65,19 @@ const nav = [
 ];
 
 /**
- * Filter the static nav by the granted_admin_pages list on the auth
- * user. school_admin and principal bypass the gate (full access);
- * everyone else only sees the entries the school-admin granted them
- * via the Users & credentials → Page access checklist.
+ * Every logged-in staff user sees the full sidebar. The
+ * per-page grant filter was making sidebars collapse to empty for
+ * users whose ``granted_admin_pages`` hadn't been populated yet,
+ * which was confusing — the request now is "show everything in the
+ * sidebar" so we return the static nav verbatim.
  *
- * Returning [] for a user with zero granted pages means the sidebar
- * collapses to just Sign out — they'll land on /access-denied via the
- * fallback route. UX-wise that tells the user "you can't use the
- * admin web; please use the mobile app instead".
+ * Backend-level role gates on individual endpoints still apply, so a
+ * user who lands on a page they don't have permission for gets a
+ * proper 403 from the API rather than an empty screen — this only
+ * changes what appears in the sidebar.
  */
-function useFilteredNav(roles: string[], granted: string[]) {
-  const bypass = roles.includes("school_admin") || roles.includes("principal");
-  if (bypass) return nav;
-  const granted_slugs = new Set(
-    granted.map((s) => (s.startsWith("/") ? s.slice(1) : s)),
-  );
-  return nav.filter((n) => granted_slugs.has(n.to.replace(/^\//, "")));
+function useFilteredNav(_roles: string[], _granted: string[]) {
+  return nav;
 }
 
 export function SchoolAdminLayout() {
