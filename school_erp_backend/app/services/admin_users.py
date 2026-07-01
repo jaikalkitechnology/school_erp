@@ -53,7 +53,6 @@ ASSIGNABLE_ROLES: set[str] = {
     "librarian",
     "transport_manager",
     "hostel_warden",
-    "bus_staff",
     "supervisor",
     "visitor_desk",
     # Phase 27 org-chart additions.
