@@ -9,23 +9,30 @@ import { LibraryHeader } from "./_shared";
 
 /** Shared component powering Authors + Publishers. They both live
  * as free-text strings on Book.author / Book.publisher — the CRUD
- * shape mirrors Categories: list, rename (bulk update), delete (bulk
- * null-out). This component takes the fetch + rename + delete
- * functions and renders the whole page. */
-export function NameListPage<T extends Record<string, unknown>>({
+ * shape mirrors Categories: list, rename (bulk update), delete
+ * (bulk null-out).
+ *
+ * The row type is generic; the caller passes small accessor
+ * callbacks (nameOf / countOf) so we don't need a structural
+ * constraint on T. */
+export function NameListPage<T>({
   title,
   subtitle,
   queryKey,
-  nameField,
+  singular,
   fetchList,
+  nameOf,
+  countOf,
   renameOne,
   deleteOne,
 }: {
   title: string;
   subtitle: string;
   queryKey: string;
-  nameField: keyof T & string;
+  singular: string;
   fetchList: () => Promise<T[]>;
+  nameOf: (row: T) => string;
+  countOf: (row: T) => number;
   renameOne: (from: string, to: string) => Promise<unknown>;
   deleteOne: (name: string) => Promise<unknown>;
 }) {
@@ -55,13 +62,15 @@ export function NameListPage<T extends Record<string, unknown>>({
             err.response?.data?.detail
           : undefined;
       setErrorMsg(
-        typeof detail === "string" ? detail : `Could not delete ${title.toLowerCase()}.`,
+        typeof detail === "string"
+          ? detail
+          : `Could not delete ${singular.toLowerCase()}.`,
       );
     },
   });
 
   const filtered = data.filter((row) => {
-    const name = String(row[nameField] ?? "");
+    const name = nameOf(row);
     if (!q.trim()) return true;
     return name.toLowerCase().includes(q.trim().toLowerCase());
   });
@@ -78,7 +87,11 @@ export function NameListPage<T extends Record<string, unknown>>({
             </CardDescription>
           </div>
           <div className="w-64">
-            <Input placeholder={`Filter ${title.toLowerCase()}`} value={q} onChange={(e) => setQ(e.target.value)} />
+            <Input
+              placeholder={`Filter ${title.toLowerCase()}`}
+              value={q}
+              onChange={(e) => setQ(e.target.value)}
+            />
           </div>
         </CardHeader>
         <CardContent>
@@ -86,26 +99,33 @@ export function NameListPage<T extends Record<string, unknown>>({
             <p className="text-sm text-muted-foreground">Loading…</p>
           ) : data.length === 0 ? (
             <p className="text-sm text-muted-foreground">
-              None yet. Add one by saving a book with a new {title.slice(0, -1).toLowerCase()} on the Books tab.
+              None yet. Add one by saving a book with a new{" "}
+              {singular.toLowerCase()} on the Books tab.
             </p>
           ) : (
             <table className="w-full text-sm">
               <thead className="text-left text-xs uppercase tracking-wide text-muted-foreground">
                 <tr>
-                  <th className="py-2">{title.slice(0, -1) /* singular */}</th>
+                  <th className="py-2">{singular}</th>
                   <th>Books</th>
                   <th></th>
                 </tr>
               </thead>
               <tbody>
                 {filtered.map((row, i) => {
-                  const name = String(row[nameField] ?? "");
+                  const name = nameOf(row);
                   return (
                     <tr key={i} className="border-t border-saffron-pale">
-                      <td className="py-2 font-medium text-indigo-dark">{name}</td>
-                      <td>{String(row["books"] ?? "—")}</td>
+                      <td className="py-2 font-medium text-indigo-dark">
+                        {name}
+                      </td>
+                      <td>{countOf(row)}</td>
                       <td className="text-right">
-                        <Button size="sm" variant="ghost" onClick={() => setRenaming(name)}>
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          onClick={() => setRenaming(name)}
+                        >
                           <Pencil className="mr-1 h-3 w-3" /> Rename
                         </Button>
                         <Button
@@ -131,7 +151,7 @@ export function NameListPage<T extends Record<string, unknown>>({
 
       {renaming !== null && (
         <RenameDialog
-          title={title.slice(0, -1)}
+          singular={singular}
           from={renaming}
           onClose={() => setRenaming(null)}
           onSave={async (to) => {
@@ -144,21 +164,38 @@ export function NameListPage<T extends Record<string, unknown>>({
       )}
 
       {deleting !== null && (
-        <ModalShell title={`Delete "${deleting}"?`} onClose={() => { setDeleting(null); setErrorMsg(null); }}>
+        <ModalShell
+          title={`Delete "${deleting}"?`}
+          onClose={() => {
+            setDeleting(null);
+            setErrorMsg(null);
+          }}
+        >
           <p className="text-sm text-muted-foreground">
-            The {title.slice(0, -1).toLowerCase()} is cleared off every book that carries it. Books survive.
+            The {singular.toLowerCase()} is cleared off every book that
+            carries it. Books survive.
           </p>
           {errorMsg && (
-            <p className="mt-3 rounded-md bg-destructive/10 px-3 py-2 text-sm text-destructive">{errorMsg}</p>
+            <p className="mt-3 rounded-md bg-destructive/10 px-3 py-2 text-sm text-destructive">
+              {errorMsg}
+            </p>
           )}
           <div className="mt-4 flex justify-end gap-2">
-            <Button variant="ghost" onClick={() => { setDeleting(null); setErrorMsg(null); }}>Cancel</Button>
+            <Button
+              variant="ghost"
+              onClick={() => {
+                setDeleting(null);
+                setErrorMsg(null);
+              }}
+            >
+              Cancel
+            </Button>
             <Button
               onClick={() => del.mutate(deleting)}
               disabled={del.isPending}
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
             >
-              Delete {title.slice(0, -1).toLowerCase()}
+              Delete {singular.toLowerCase()}
             </Button>
           </div>
         </ModalShell>
@@ -168,12 +205,12 @@ export function NameListPage<T extends Record<string, unknown>>({
 }
 
 function RenameDialog({
-  title,
+  singular,
   from,
   onClose,
   onSave,
 }: {
-  title: string;
+  singular: string;
   from: string;
   onClose: () => void;
   onSave: (to: string) => Promise<void>;
@@ -193,7 +230,11 @@ function RenameDialog({
           ? // @ts-expect-error - axios error shape
             err.response?.data?.detail
           : undefined;
-      setErrorMsg(typeof detail === "string" ? detail : `Could not rename ${title}.`);
+      setErrorMsg(
+        typeof detail === "string"
+          ? detail
+          : `Could not rename ${singular.toLowerCase()}.`,
+      );
     } finally {
       setBusy(false);
     }
@@ -210,11 +251,18 @@ function RenameDialog({
           </p>
         </div>
         {errorMsg && (
-          <p className="rounded-md bg-destructive/10 px-3 py-2 text-sm text-destructive">{errorMsg}</p>
+          <p className="rounded-md bg-destructive/10 px-3 py-2 text-sm text-destructive">
+            {errorMsg}
+          </p>
         )}
         <div className="flex justify-end gap-2">
-          <Button variant="ghost" onClick={onClose}>Cancel</Button>
-          <Button onClick={submit} disabled={!to.trim() || to.trim() === from || busy}>
+          <Button variant="ghost" onClick={onClose}>
+            Cancel
+          </Button>
+          <Button
+            onClick={submit}
+            disabled={!to.trim() || to.trim() === from || busy}
+          >
             Rename
           </Button>
         </div>
