@@ -12,6 +12,7 @@ import { HomeworkPage } from "@/features/homework/HomeworkPage";
 import { LibraryDashboardPage } from "@/features/library/LibraryDashboardPage";
 import { LibraryBooksPage } from "@/features/library/LibraryBooksPage";
 import { LibraryCategoriesPage } from "@/features/library/LibraryCategoriesPage";
+import { LibraryBookCopiesPage } from "@/features/library/LibraryBookCopiesPage";
 import { LibraryIssueBooksPage } from "@/features/library/LibraryIssueBooksPage";
 import { LibraryReturnBooksPage } from "@/features/library/LibraryReturnBooksPage";
 import { LibraryFineManagementPage } from "@/features/library/LibraryFineManagementPage";
@@ -74,6 +75,7 @@ export const routes: RouteObject[] = [
       { path: "library", element: <LibraryDashboardPage /> },
       { path: "library-books", element: <LibraryBooksPage /> },
       { path: "library-categories", element: <LibraryCategoriesPage /> },
+      { path: "library-copies", element: <LibraryBookCopiesPage /> },
       { path: "library-issue", element: <LibraryIssueBooksPage /> },
       { path: "library-return", element: <LibraryReturnBooksPage /> },
       { path: "library-fines", element: <LibraryFineManagementPage /> },
