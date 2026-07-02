@@ -1,4 +1,5 @@
-import { NavLink, Outlet, useNavigate } from "react-router-dom";
+import { useMemo, useState } from "react";
+import { NavLink, Outlet, useLocation, useNavigate } from "react-router-dom";
 import {
   BookOpen,
   BookOpenCheck,
@@ -6,8 +7,11 @@ import {
   BarChart3,
   Bus,
   CalendarDays,
+  ChevronDown,
+  ChevronRight,
   ClipboardList,
   CalendarCheck,
+  Copy,
   CreditCard,
   GraduationCap,
   Hand,
@@ -23,45 +27,76 @@ import {
   RotateCcw,
   Settings,
   Users,
+  type LucideIcon,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { logout as logoutApi } from "@/lib/auth-api";
 import { useAuth } from "@/stores/auth";
 
-const nav = [
-  { to: "/dashboard", label: "Overview", icon: Home },
-  { to: "/org", label: "Departments / Classes", icon: Layers },
-  { to: "/academic", label: "Academic year", icon: CalendarDays },
-  { to: "/curriculum", label: "Curriculum", icon: BookOpenCheck },
-  { to: "/students", label: "Students", icon: GraduationCap },
-  { to: "/teachers", label: "Teachers", icon: Users },
-  { to: "/staff", label: "Staff attendance", icon: CalendarCheck },
-  { to: "/users", label: "Users & logins", icon: KeyRound },
-  { to: "/attendance", label: "Attendance", icon: ClipboardList },
-  { to: "/timetable", label: "Timetable", icon: CalendarDays },
-  { to: "/homework", label: "Homework", icon: ClipboardList },
-  { to: "/exams", label: "Exams", icon: BookOpenCheck },
-  { to: "/report-cards", label: "Report cards", icon: FileText },
-  { to: "/fees", label: "Fees", icon: Receipt },
-  { to: "/communication", label: "Communication", icon: MessageCircle },
-  // ---- Library ---------------------------------------------------
-  // Each sub-section gets its own sidebar entry so it can be granted
-  // individually on the Users & credentials Page access checklist.
-  // A librarian can be given just Books + Issue + Return, or the
-  // full set, without spilling into unrelated modules.
-  { to: "/library", label: "Library dashboard", icon: Library },
-  { to: "/library-books", label: "Books", icon: BookOpen },
-  { to: "/library-categories", label: "Categories", icon: Layers },
-  { to: "/library-issue", label: "Issue books", icon: Hand },
-  { to: "/library-return", label: "Return books", icon: RotateCcw },
-  { to: "/library-fines", label: "Fine management", icon: ReceiptText },
-  { to: "/library-reports", label: "Library reports", icon: BarChart3 },
-  { to: "/transport", label: "Transport", icon: Bus },
-  { to: "/hostel", label: "Hostel", icon: Building },
-  { to: "/reports", label: "Reports", icon: BarChart3 },
-  { to: "/subscription", label: "Subscription", icon: CreditCard },
-  { to: "/settings", label: "Settings", icon: Settings },
+// ---- Nav model -----------------------------------------------------------
+// A nav item is either a leaf (has a route) or a group (renders as a
+// collapsible header + children). Groups themselves aren't routes —
+// clicking the header just toggles the section open / closed.
+interface NavLeaf {
+  kind: "leaf";
+  to: string;
+  label: string;
+  icon: LucideIcon;
+}
+interface NavGroup {
+  kind: "group";
+  key: string;         // stable identifier for open-state persistence
+  label: string;
+  icon: LucideIcon;
+  children: NavLeaf[];
+}
+type NavItem = NavLeaf | NavGroup;
+
+const leaf = (to: string, label: string, icon: LucideIcon): NavLeaf => ({
+  kind: "leaf", to, label, icon,
+});
+
+// Library is grouped so its 8 sub-pages don't blow up the flat
+// sidebar. All other modules stay as flat leaves for now — group
+// more when they grow their own sub-pages.
+const nav: NavItem[] = [
+  leaf("/dashboard", "Overview", Home),
+  leaf("/org", "Departments / Classes", Layers),
+  leaf("/academic", "Academic year", CalendarDays),
+  leaf("/curriculum", "Curriculum", BookOpenCheck),
+  leaf("/students", "Students", GraduationCap),
+  leaf("/teachers", "Teachers", Users),
+  leaf("/staff", "Staff attendance", CalendarCheck),
+  leaf("/users", "Users & logins", KeyRound),
+  leaf("/attendance", "Attendance", ClipboardList),
+  leaf("/timetable", "Timetable", CalendarDays),
+  leaf("/homework", "Homework", ClipboardList),
+  leaf("/exams", "Exams", BookOpenCheck),
+  leaf("/report-cards", "Report cards", FileText),
+  leaf("/fees", "Fees", Receipt),
+  leaf("/communication", "Communication", MessageCircle),
+  {
+    kind: "group",
+    key: "library",
+    label: "Library",
+    icon: Library,
+    children: [
+      leaf("/library", "Dashboard", Home),
+      leaf("/library-books", "Books", BookOpen),
+      leaf("/library-categories", "Categories", Layers),
+      leaf("/library-copies", "Book Copies", Copy),
+      leaf("/library-issue", "Issue Books", Hand),
+      leaf("/library-return", "Return Books", RotateCcw),
+      leaf("/library-fines", "Fine Management", ReceiptText),
+      leaf("/library-reports", "Reports", BarChart3),
+    ],
+  },
+  leaf("/transport", "Transport", Bus),
+  leaf("/hostel", "Hostel", Building),
+  leaf("/reports", "Reports", BarChart3),
+  leaf("/subscription", "Subscription", CreditCard),
+  leaf("/settings", "Settings", Settings),
 ];
 
 // Senior leadership sees every page without needing per-page grants.
@@ -75,22 +110,93 @@ const FULL_ACCESS_ROLES = new Set([
 ]);
 
 /**
- * Role-scoped sidebar. Every entry is checked against the user's
- * ``granted_admin_pages`` — so a librarian only sees the Library
- * sub-pages that were granted to them via Users & credentials, a
- * receptionist only sees the reception surfaces, and so on. Senior
- * leadership bypasses the gate and sees everything.
+ * Role-scoped sidebar. Every leaf is checked against the user's
+ * ``granted_admin_pages``; a group survives if at least one of its
+ * children survives. Senior leadership bypasses the filter and sees
+ * the whole tree.
  *
  * The slug in ``granted_admin_pages`` matches the sidebar route path
  * with the leading slash stripped ("library-books" for "/library-books").
  */
-function useFilteredNav(roles: string[], granted: string[]) {
+function filterNav(
+  items: NavItem[], roles: string[], granted: string[],
+): NavItem[] {
   const bypass = roles.some((r) => FULL_ACCESS_ROLES.has(r));
-  if (bypass) return nav;
-  const granted_slugs = new Set(
+  if (bypass) return items;
+  const grantedSlugs = new Set(
     granted.map((s) => (s.startsWith("/") ? s.slice(1) : s)),
   );
-  return nav.filter((n) => granted_slugs.has(n.to.replace(/^\//, "")));
+  const isVisible = (l: NavLeaf) =>
+    grantedSlugs.has(l.to.replace(/^\//, ""));
+  const out: NavItem[] = [];
+  for (const item of items) {
+    if (item.kind === "leaf") {
+      if (isVisible(item)) out.push(item);
+    } else {
+      const kids = item.children.filter(isVisible);
+      if (kids.length > 0) out.push({ ...item, children: kids });
+    }
+  }
+  return out;
+}
+
+const leafClass = ({ isActive }: { isActive: boolean }) =>
+  cn(
+    "flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors",
+    isActive
+      ? "bg-saffron-pale text-saffron-darker"
+      : "text-indigo/80 hover:bg-saffron-pale/60 hover:text-indigo-dark",
+  );
+
+const nestedLeafClass = ({ isActive }: { isActive: boolean }) =>
+  cn(
+    "flex items-center gap-3 rounded-md px-3 py-1.5 pl-9 text-sm transition-colors",
+    isActive
+      ? "bg-saffron-pale text-saffron-darker font-semibold"
+      : "text-indigo/70 hover:bg-saffron-pale/40 hover:text-indigo-dark",
+  );
+
+function NavGroupSection({
+  group, forceOpen,
+}: {
+  group: NavGroup;
+  forceOpen: boolean;
+}) {
+  const [open, setOpen] = useState(forceOpen);
+  // If the active route moves *into* the group, auto-expand.
+  const effectiveOpen = open || forceOpen;
+  return (
+    <div className="mb-1">
+      <button
+        type="button"
+        onClick={() => setOpen((o) => !o)}
+        className={cn(
+          "flex w-full items-center gap-3 rounded-md px-3 py-2 text-sm font-semibold transition-colors",
+          forceOpen
+            ? "text-saffron-darker"
+            : "text-indigo/80 hover:bg-saffron-pale/60 hover:text-indigo-dark",
+        )}
+      >
+        <group.icon className="h-4 w-4" />
+        <span className="flex-1 text-left">{group.label}</span>
+        {effectiveOpen ? (
+          <ChevronDown className="h-3.5 w-3.5" />
+        ) : (
+          <ChevronRight className="h-3.5 w-3.5" />
+        )}
+      </button>
+      {effectiveOpen && (
+        <div className="mt-1 flex flex-col gap-0.5">
+          {group.children.map((c) => (
+            <NavLink key={c.to} to={c.to} className={nestedLeafClass}>
+              <c.icon className="h-3.5 w-3.5" />
+              {c.label}
+            </NavLink>
+          ))}
+        </div>
+      )}
+    </div>
+  );
 }
 
 export function SchoolAdminLayout() {
@@ -98,9 +204,11 @@ export function SchoolAdminLayout() {
   const tokens = useAuth((s) => s.tokens);
   const clear = useAuth((s) => s.clear);
   const navigate = useNavigate();
-  const visibleNav = useFilteredNav(
-    user?.roles ?? [],
-    user?.granted_admin_pages ?? [],
+  const location = useLocation();
+
+  const visibleNav = useMemo(
+    () => filterNav(nav, user?.roles ?? [], user?.granted_admin_pages ?? []),
+    [user?.roles, user?.granted_admin_pages],
   );
 
   const onLogout = async () => {
@@ -112,6 +220,8 @@ export function SchoolAdminLayout() {
     clear();
     navigate("/login", { replace: true });
   };
+
+  const currentPath = location.pathname;
 
   return (
     <div className="grid h-full grid-cols-[260px_1fr] bg-ivory">
@@ -132,23 +242,29 @@ export function SchoolAdminLayout() {
               mobile app, or ask your school admin to grant page access.
             </p>
           )}
-          {visibleNav.map(({ to, label, icon: Icon }) => (
-            <NavLink
-              key={to}
-              to={to}
-              className={({ isActive }) =>
-                cn(
-                  "flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors",
-                  isActive
-                    ? "bg-saffron-pale text-saffron-darker"
-                    : "text-indigo/80 hover:bg-saffron-pale/60 hover:text-indigo-dark",
-                )
-              }
-            >
-              <Icon className="h-4 w-4" />
-              {label}
-            </NavLink>
-          ))}
+          {visibleNav.map((item) => {
+            if (item.kind === "leaf") {
+              return (
+                <NavLink key={item.to} to={item.to} className={leafClass}>
+                  <item.icon className="h-4 w-4" />
+                  {item.label}
+                </NavLink>
+              );
+            }
+            // Auto-expand the group when the active route is one of its
+            // children so the librarian doesn't have to click Library
+            // to re-open it every time they navigate.
+            const forceOpen = item.children.some(
+              (c) => currentPath === c.to || currentPath.startsWith(c.to + "/"),
+            );
+            return (
+              <NavGroupSection
+                key={item.key}
+                group={item}
+                forceOpen={forceOpen}
+              />
+            );
+          })}
         </nav>
 
         <div className="mt-6 space-y-3 border-t border-saffron-pale pt-4">

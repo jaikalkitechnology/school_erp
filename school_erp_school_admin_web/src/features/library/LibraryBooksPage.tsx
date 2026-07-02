@@ -1,15 +1,16 @@
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { BookOpen, Plus } from "lucide-react";
+import { BookOpen } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { addCopiesBulk, createBook, listBooks } from "./api";
+import { createBook, listBooks } from "./api";
 import { LibraryHeader } from "./_shared";
 
-/** Catalogue management: search titles, add a new title, bulk-add
- * copies to a title. */
+/** Catalogue management — search titles, add a new title. Copies
+ * live on their own sidebar entry (Book Copies) so the barcode /
+ * accession workflow doesn't clutter this list. */
 export function LibraryBooksPage() {
   const qc = useQueryClient();
   const [q, setQ] = useState("");
@@ -44,19 +45,9 @@ export function LibraryBooksPage() {
     },
   });
 
-  const [activeBook, setActiveBook] = useState<number | null>(null);
-  const [copyCount, setCopyCount] = useState("1");
-  const addCopies = useMutation({
-    mutationFn: () => addCopiesBulk(activeBook!, { count: Number(copyCount) || 1 }),
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ["library-books"] });
-      setCopyCount("1");
-    },
-  });
-
   return (
     <div className="space-y-6">
-      <LibraryHeader title="Books" subtitle="The catalogue. Search titles, add new books, drop in extra copies." />
+      <LibraryHeader title="Books" subtitle="The catalogue. Manage titles here; copies live on the Book Copies tab." />
 
       <Card>
         <CardHeader className="flex flex-row items-center justify-between space-y-0">
@@ -77,9 +68,9 @@ export function LibraryBooksPage() {
                 <tr>
                   <th className="py-2">Title</th>
                   <th>Author</th>
+                  <th>ISBN</th>
                   <th>Category</th>
                   <th>Copies (avail / total)</th>
-                  <th></th>
                 </tr>
               </thead>
               <tbody>
@@ -87,19 +78,10 @@ export function LibraryBooksPage() {
                   <tr key={b.id} className="border-t border-saffron-pale">
                     <td className="py-2 font-medium text-indigo-dark">{b.title}</td>
                     <td>{b.author ?? "—"}</td>
+                    <td className="font-mono text-xs">{b.isbn ?? "—"}</td>
                     <td>{b.category ?? "—"}</td>
                     <td>
                       {b.available_copies} / {b.total_copies}
-                    </td>
-                    <td className="text-right">
-                      <Button
-                        size="sm"
-                        variant={activeBook === b.id ? "default" : "ghost"}
-                        onClick={() => setActiveBook(activeBook === b.id ? null : b.id)}
-                      >
-                        <Plus className="mr-1 h-3 w-3" />
-                        Copies
-                      </Button>
                     </td>
                   </tr>
                 ))}
@@ -108,25 +90,6 @@ export function LibraryBooksPage() {
           )}
         </CardContent>
       </Card>
-
-      {activeBook !== null && (
-        <Card>
-          <CardHeader>
-            <CardTitle>Add copies to book #{activeBook}</CardTitle>
-            <CardDescription>Barcodes are auto-generated per copy.</CardDescription>
-          </CardHeader>
-          <CardContent className="flex items-end gap-3">
-            <div className="w-40">
-              <Label>How many?</Label>
-              <Input value={copyCount} onChange={(e) => setCopyCount(e.target.value)} />
-            </div>
-            <Button onClick={() => addCopies.mutate()} disabled={addCopies.isPending}>
-              <Plus className="mr-1 h-4 w-4" />
-              Add copies
-            </Button>
-          </CardContent>
-        </Card>
-      )}
 
       <Card>
         <CardHeader>
