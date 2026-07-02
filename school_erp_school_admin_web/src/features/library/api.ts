@@ -130,3 +130,14 @@ export const cancelReservation = async (id: number) =>
   (await api.post<Reservation>(`${base}/reservations/${id}/cancel`)).data;
 
 export const reports = async () => (await api.get<Reports>(`${base}/reports`)).data;
+
+export const renameCategory = async (from: string, to: string) =>
+  (await api.post<{ updated: number; from: string; to: string }>(
+    `${base}/categories/rename`,
+    { from, to },
+  )).data;
+
+export const deleteCategory = async (name: string) =>
+  (await api.delete<{ cleared: number; category: string }>(
+    `${base}/categories/${encodeURIComponent(name)}`,
+  )).data;
