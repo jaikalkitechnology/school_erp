@@ -192,6 +192,278 @@ async def delete_category_route(
     return {"cleared": len(books), "category": name}
 
 
+# ---- Authors + Publishers (free-text on Book) ----------------------------
+
+
+@router.get("/authors")
+async def list_authors_route(
+    session: AsyncSession = Depends(tenant_scoped_session),
+):
+    """Distinct set of authors used across every book. Same pattern
+    as ``/reports.by_category`` — we treat free-text authors as
+    first-class entities in the UI."""
+    from app.models.library import Book
+
+    from sqlalchemy import func as _func
+
+    rows = (
+        await session.execute(
+            select(Book.author, _func.count(Book.id))
+            .where(Book.author.isnot(None))
+            .group_by(Book.author)
+            .order_by(Book.author)
+        )
+    ).all()
+    return [{"author": name, "books": int(count)} for name, count in rows]
+
+
+@router.post("/authors/rename")
+async def rename_author_route(
+    payload: dict,
+    principal: AuthPrincipal = Depends(_librarian),
+    session: AsyncSession = Depends(tenant_scoped_session),
+):
+    from app.models.library import Book
+
+    src = (payload.get("from") or "").strip()
+    tgt = (payload.get("to") or "").strip()
+    if not src or not tgt:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST,
+                            detail="Both 'from' and 'to' are required")
+    if src == tgt:
+        return {"updated": 0}
+    books = list(
+        (await session.execute(select(Book).where(Book.author == src)))
+        .scalars().all()
+    )
+    for b in books:
+        b.author = tgt
+    await session.commit()
+    return {"updated": len(books), "from": src, "to": tgt}
+
+
+@router.delete("/authors/{name}")
+async def delete_author_route(
+    name: str,
+    principal: AuthPrincipal = Depends(_librarian),
+    session: AsyncSession = Depends(tenant_scoped_session),
+):
+    from app.models.library import Book
+
+    name = (name or "").strip()
+    books = list(
+        (await session.execute(select(Book).where(Book.author == name)))
+        .scalars().all()
+    )
+    for b in books:
+        b.author = None
+    await session.commit()
+    return {"cleared": len(books), "author": name}
+
+
+@router.get("/publishers")
+async def list_publishers_route(
+    session: AsyncSession = Depends(tenant_scoped_session),
+):
+    """Distinct set of publishers used across every book."""
+    from app.models.library import Book
+
+    from sqlalchemy import func as _func
+
+    rows = (
+        await session.execute(
+            select(Book.publisher, _func.count(Book.id))
+            .where(Book.publisher.isnot(None))
+            .group_by(Book.publisher)
+            .order_by(Book.publisher)
+        )
+    ).all()
+    return [{"publisher": name, "books": int(count)} for name, count in rows]
+
+
+@router.post("/publishers/rename")
+async def rename_publisher_route(
+    payload: dict,
+    principal: AuthPrincipal = Depends(_librarian),
+    session: AsyncSession = Depends(tenant_scoped_session),
+):
+    from app.models.library import Book
+
+    src = (payload.get("from") or "").strip()
+    tgt = (payload.get("to") or "").strip()
+    if not src or not tgt:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST,
+                            detail="Both 'from' and 'to' are required")
+    if src == tgt:
+        return {"updated": 0}
+    books = list(
+        (await session.execute(select(Book).where(Book.publisher == src)))
+        .scalars().all()
+    )
+    for b in books:
+        b.publisher = tgt
+    await session.commit()
+    return {"updated": len(books), "from": src, "to": tgt}
+
+
+@router.delete("/publishers/{name}")
+async def delete_publisher_route(
+    name: str,
+    principal: AuthPrincipal = Depends(_librarian),
+    session: AsyncSession = Depends(tenant_scoped_session),
+):
+    from app.models.library import Book
+
+    name = (name or "").strip()
+    books = list(
+        (await session.execute(select(Book).where(Book.publisher == name)))
+        .scalars().all()
+    )
+    for b in books:
+        b.publisher = None
+    await session.commit()
+    return {"cleared": len(books), "publisher": name}
+
+
+# ---- Renew a loan ---------------------------------------------------------
+
+
+@router.post("/loans/{loan_id}/renew")
+async def renew_loan_route(
+    loan_id: int,
+    payload: dict,
+    principal: AuthPrincipal = Depends(_librarian),
+    session: AsyncSession = Depends(tenant_scoped_session),
+):
+    """Extend the due date on an active loan. Payload:
+    ``{"extra_days": 7}``. Blocks the renewal if the loan is already
+    returned or lost, or if someone else has an outstanding
+    reservation for the book."""
+    from datetime import timedelta
+
+    from app.models.library import (
+        Loan, LoanStatus, Reservation, ReservationStatus,
+    )
+
+    extra_days = int(payload.get("extra_days") or 0)
+    if extra_days <= 0 or extra_days > 60:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST,
+                            detail="extra_days must be between 1 and 60")
+    loan = (
+        await session.execute(select(Loan).where(Loan.id == loan_id))
+    ).scalar_one_or_none()
+    if loan is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND,
+                            detail="Loan not found")
+    if loan.status not in {LoanStatus.ACTIVE.value, LoanStatus.OVERDUE.value}:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST,
+                            detail=f"Cannot renew a loan in status {loan.status}")
+
+    pending_reservation = (
+        await session.execute(
+            select(Reservation).where(
+                Reservation.book_id == loan.book_id,
+                Reservation.status.in_([
+                    ReservationStatus.PENDING.value,
+                    ReservationStatus.READY.value,
+                ]),
+            )
+        )
+    ).scalar_one_or_none()
+    if pending_reservation is not None:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Another borrower has this book reserved. Renewal blocked.",
+        )
+
+    loan.due_on = loan.due_on + timedelta(days=extra_days)
+    if loan.status == LoanStatus.OVERDUE.value:
+        loan.status = LoanStatus.ACTIVE.value
+    await session.commit()
+    await session.refresh(loan)
+    return {"loan_id": loan.id, "new_due_on": loan.due_on.isoformat()}
+
+
+# ---- Recent activity (audit-lite) ----------------------------------------
+
+
+@router.get("/activity")
+async def recent_activity_route(
+    limit: int = 50,
+    session: AsyncSession = Depends(tenant_scoped_session),
+):
+    """Chronological feed of the most recent library actions —
+    without a dedicated audit table, we synthesise this from the
+    ``loans`` table (issue + return timestamps) and ``books`` /
+    ``book_copies`` created_at columns."""
+    from app.models.library import Book, BookCopy, Loan
+
+    limit = max(1, min(limit, 200))
+
+    loans = list(
+        (
+            await session.execute(
+                select(Loan).order_by(Loan.id.desc()).limit(limit)
+            )
+        ).scalars().all()
+    )
+    books = list(
+        (
+            await session.execute(
+                select(Book).order_by(Book.created_at.desc()).limit(limit)
+            )
+        ).scalars().all()
+    )
+    copies = list(
+        (
+            await session.execute(
+                select(BookCopy).order_by(BookCopy.created_at.desc()).limit(limit)
+            )
+        ).scalars().all()
+    )
+
+    events: list[dict] = []
+    for l in loans:
+        events.append({
+            "kind": "issue",
+            "when": l.created_at.isoformat() if l.created_at else None,
+            "loan_id": l.id,
+            "copy_id": l.copy_id,
+            "book_id": l.book_id,
+            "borrower_kind": l.borrower_kind,
+            "borrower_id": l.borrower_id,
+        })
+        if l.returned_on is not None:
+            events.append({
+                "kind": "return",
+                "when": l.returned_on.isoformat(),
+                "loan_id": l.id,
+                "copy_id": l.copy_id,
+                "book_id": l.book_id,
+                "borrower_kind": l.borrower_kind,
+                "borrower_id": l.borrower_id,
+                "fine_paid": float(l.fine_paid or 0),
+            })
+    for b in books:
+        events.append({
+            "kind": "book_created",
+            "when": b.created_at.isoformat() if b.created_at else None,
+            "book_id": b.id,
+            "title": b.title,
+        })
+    for c in copies:
+        events.append({
+            "kind": "copy_created",
+            "when": c.created_at.isoformat() if c.created_at else None,
+            "copy_id": c.id,
+            "book_id": c.book_id,
+            "barcode": c.barcode,
+        })
+
+    events.sort(key=lambda e: (e["when"] or ""), reverse=True)
+    return events[:limit]
+
+
 # ---- Copies ----------------------------------------------------------------
 
 

@@ -141,3 +141,62 @@ export const deleteCategory = async (name: string) =>
   (await api.delete<{ cleared: number; category: string }>(
     `${base}/categories/${encodeURIComponent(name)}`,
   )).data;
+
+// --- Authors --------------------------------------------------------------
+
+export interface AuthorRow { author: string; books: number }
+
+export const listAuthors = async () =>
+  (await api.get<AuthorRow[]>(`${base}/authors`)).data;
+
+export const renameAuthor = async (from: string, to: string) =>
+  (await api.post<{ updated: number; from: string; to: string }>(
+    `${base}/authors/rename`, { from, to },
+  )).data;
+
+export const deleteAuthor = async (name: string) =>
+  (await api.delete<{ cleared: number; author: string }>(
+    `${base}/authors/${encodeURIComponent(name)}`,
+  )).data;
+
+// --- Publishers -----------------------------------------------------------
+
+export interface PublisherRow { publisher: string; books: number }
+
+export const listPublishers = async () =>
+  (await api.get<PublisherRow[]>(`${base}/publishers`)).data;
+
+export const renamePublisher = async (from: string, to: string) =>
+  (await api.post<{ updated: number; from: string; to: string }>(
+    `${base}/publishers/rename`, { from, to },
+  )).data;
+
+export const deletePublisher = async (name: string) =>
+  (await api.delete<{ cleared: number; publisher: string }>(
+    `${base}/publishers/${encodeURIComponent(name)}`,
+  )).data;
+
+// --- Renew a loan ---------------------------------------------------------
+
+export const renewLoan = async (loanId: number, extraDays: number) =>
+  (await api.post<{ loan_id: number; new_due_on: string }>(
+    `${base}/loans/${loanId}/renew`, { extra_days: extraDays },
+  )).data;
+
+// --- Recent activity (audit-lite) -----------------------------------------
+
+export interface ActivityEvent {
+  kind: "issue" | "return" | "book_created" | "copy_created";
+  when: string | null;
+  loan_id?: number;
+  copy_id?: number;
+  book_id?: number;
+  title?: string;
+  barcode?: string;
+  borrower_kind?: BorrowerKind;
+  borrower_id?: number;
+  fine_paid?: number;
+}
+
+export const recentActivity = async (limit = 100) =>
+  (await api.get<ActivityEvent[]>(`${base}/activity`, { params: { limit } })).data;
