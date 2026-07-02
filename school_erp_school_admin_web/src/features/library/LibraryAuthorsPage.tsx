@@ -10,10 +10,12 @@ export function LibraryAuthorsPage() {
   return (
     <NameListPage<AuthorRow>
       title="Authors"
+      singular="Author"
       subtitle="Every author currently in the catalogue. Rename fixes typos across every book; delete clears the author field on books that carry it."
       queryKey="library-authors"
-      nameField="author"
       fetchList={listAuthors}
+      nameOf={(r) => r.author}
+      countOf={(r) => r.books}
       renameOne={renameAuthor}
       deleteOne={deleteAuthor}
     />
