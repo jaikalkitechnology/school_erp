@@ -124,6 +124,32 @@ async def build_current_user(
         if roles_with_level:
             primary = max(roles_with_level, key=lambda x: x[1])[0]
 
+    # Self-heal ``granted_admin_pages`` against the current role
+    # defaults. If the user's grants are a strict subset of the union
+    # of every default for their roles — meaning nothing was manually
+    # added by the school admin — replace them with the current
+    # default set. This makes newly-added role → page defaults (eg.
+    # Librarian's post-split Library subpages) take effect the next
+    # time the user hits /auth/me or logs in, without needing a
+    # separate backfill run.
+    #
+    # Manually-customised grants (anything outside the role defaults)
+    # are left alone.
+    from app.core.admin_pages import DEFAULT_PAGES_BY_ROLE
+
+    default_slugs: set[str] = set()
+    for code in role_codes:
+        for slug in DEFAULT_PAGES_BY_ROLE.get(code, ()):
+            default_slugs.add(slug)
+    current_grants = set(user.granted_admin_pages or [])
+    if default_slugs and (
+        not current_grants or current_grants.issubset(default_slugs)
+    ):
+        target = sorted(default_slugs)
+        if sorted(current_grants) != target:
+            user.granted_admin_pages = target
+            await session.commit()
+
     return CurrentUser(
         id=user.id,
         full_name=user.full_name,
