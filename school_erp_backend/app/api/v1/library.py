@@ -110,10 +110,86 @@ async def update_book_route(
 @router.delete("/books/{book_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_book_route(
     book_id: int,
-    principal: AuthPrincipal = Depends(_school_admin),
+    principal: AuthPrincipal = Depends(_librarian),
     session: AsyncSession = Depends(tenant_scoped_session),
 ):
+    """Delete a book from the catalogue. The service blocks the
+    delete if any copy is still on active loan — so no data-loss
+    risk when the librarian mis-clicks. School admins used to be
+    required; librarians run the day-to-day catalogue so they now
+    own it too."""
     await delete_book(session, book_id)
+
+
+# ---- Categories (free-text on Book.category) -------------------------------
+
+
+@router.post("/categories/rename")
+async def rename_category_route(
+    payload: dict,
+    principal: AuthPrincipal = Depends(_librarian),
+    session: AsyncSession = Depends(tenant_scoped_session),
+):
+    """Rename a category across every book that currently carries
+    it. Payload: ``{"from": "Sci-Fi", "to": "Science Fiction"}``.
+
+    Categories aren't a first-class table — they're a free-text
+    string on ``Book.category``. Rename = bulk UPDATE. The response
+    reports how many books were touched so the librarian sees the
+    scope of the change."""
+    from app.models.library import Book
+
+    source = (payload.get("from") or "").strip()
+    target = (payload.get("to") or "").strip()
+    if not source or not target:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Both 'from' and 'to' are required",
+        )
+    if source == target:
+        return {"updated": 0}
+
+    books = list(
+        (
+            await session.execute(
+                select(Book).where(Book.category == source)
+            )
+        ).scalars().all()
+    )
+    for b in books:
+        b.category = target
+    await session.commit()
+    return {"updated": len(books), "from": source, "to": target}
+
+
+@router.delete("/categories/{name}", status_code=status.HTTP_200_OK)
+async def delete_category_route(
+    name: str,
+    principal: AuthPrincipal = Depends(_librarian),
+    session: AsyncSession = Depends(tenant_scoped_session),
+):
+    """Delete a category by clearing it off every book that carries
+    it (books survive; they just become "Uncategorised"). Returns
+    the count of books touched."""
+    from app.models.library import Book
+
+    name = (name or "").strip()
+    if not name:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Category name required",
+        )
+    books = list(
+        (
+            await session.execute(
+                select(Book).where(Book.category == name)
+            )
+        ).scalars().all()
+    )
+    for b in books:
+        b.category = None
+    await session.commit()
+    return {"cleared": len(books), "category": name}
 
 
 # ---- Copies ----------------------------------------------------------------
