@@ -200,3 +200,24 @@ export interface ActivityEvent {
 
 export const recentActivity = async (limit = 100) =>
   (await api.get<ActivityEvent[]>(`${base}/activity`, { params: { limit } })).data;
+
+// --- Notification templates -----------------------------------------------
+
+export type NotifChannel = "in_app" | "push" | "sms" | "email" | "whatsapp";
+
+export interface LibraryTemplate {
+  code: string;
+  subject_en: string;
+  body_en: string;
+  channels: NotifChannel[];
+  is_active: boolean;
+}
+
+export const listLibraryTemplates = async () =>
+  (await api.get<LibraryTemplate[]>(`${base}/notification-templates`)).data;
+
+export const updateLibraryTemplate = async (
+  code: string,
+  patch: Partial<Pick<LibraryTemplate, "subject_en" | "body_en" | "channels" | "is_active">>,
+) =>
+  (await api.put<LibraryTemplate>(`${base}/notification-templates/${encodeURIComponent(code)}`, patch)).data;
