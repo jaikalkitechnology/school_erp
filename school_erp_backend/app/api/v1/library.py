@@ -363,6 +363,206 @@ async def list_library_templates_route(
     ]
 
 
+@router.get("/notifications/diagnostics")
+async def notification_diagnostics_route(
+    borrower_kind: Optional[str] = None,
+    borrower_id: Optional[int] = None,
+    principal: AuthPrincipal = Depends(_librarian),
+    session: AsyncSession = Depends(tenant_scoped_session),
+):
+    """One-shot health check for the library notification pipeline.
+
+    Answers, in a single request:
+      1. Are all 5 library.* templates seeded for this tenant?
+      2. If a borrower is given, which User rows would be notified?
+      3. How many active FCM tokens (user_devices rows) do they have?
+      4. What's in the notification_outbox for those users in the
+         last 15 minutes?
+
+    Pass ``?borrower_kind=student&borrower_id=<id>`` to include the
+    per-recipient breakdown. Without params you still get the
+    template-seed status."""
+    from datetime import datetime, timedelta
+
+    from app.models.auth_extras import UserDevice
+    from app.models.comms import NotificationOutbox, NotificationTemplate
+    from app.services.library_notifications import (
+        LIBRARY_TEMPLATES, borrower_users,
+    )
+
+    known_codes = [t["code"] for t in LIBRARY_TEMPLATES]
+    rows = list(
+        (
+            await session.execute(
+                select(NotificationTemplate)
+                .where(NotificationTemplate.code.in_(known_codes))
+            )
+        ).scalars().all()
+    )
+    template_status = {
+        t["code"]: {"seeded": False, "active": False, "channels": []}
+        for t in LIBRARY_TEMPLATES
+    }
+    for r in rows:
+        template_status[r.code] = {
+            "seeded": True,
+            "active": bool(r.is_active),
+            "channels": list(r.channels or []),
+        }
+
+    result: dict = {
+        "tenant_id": principal.tenant_id,
+        "templates_seeded": len(rows),
+        "templates_expected": len(known_codes),
+        "templates": template_status,
+    }
+
+    if borrower_kind and borrower_id:
+        recipients = await borrower_users(session, borrower_kind, int(borrower_id))
+        recipient_ids = [u.id for u in recipients]
+        recipient_summary = [
+            {
+                "user_id": u.id,
+                "name": u.full_name,
+                "email": u.email,
+                "phone": u.phone,
+                "is_active": bool(u.is_active),
+            }
+            for u in recipients
+        ]
+
+        device_counts: dict[int, int] = {}
+        if recipient_ids:
+            device_rows = list(
+                (
+                    await session.execute(
+                        select(UserDevice.user_id).where(
+                            UserDevice.user_id.in_(recipient_ids),
+                            UserDevice.is_active.is_(True),
+                        )
+                    )
+                ).all()
+            )
+            for (uid,) in device_rows:
+                device_counts[uid] = device_counts.get(uid, 0) + 1
+        for r in recipient_summary:
+            r["active_devices"] = device_counts.get(r["user_id"], 0)
+
+        since = datetime.utcnow() - timedelta(minutes=15)
+        outbox_rows: list[dict] = []
+        if recipient_ids:
+            rows_ob = list(
+                (
+                    await session.execute(
+                        select(NotificationOutbox)
+                        .where(
+                            NotificationOutbox.recipient_user_id.in_(recipient_ids),
+                            NotificationOutbox.created_at >= since,
+                        )
+                        .order_by(NotificationOutbox.id.desc())
+                        .limit(30)
+                    )
+                ).scalars().all()
+            )
+            outbox_rows = [
+                {
+                    "id": r.id,
+                    "recipient_user_id": r.recipient_user_id,
+                    "channel": r.channel,
+                    "status": r.status,
+                    "subject": r.subject,
+                    "error": r.error,
+                    "created_at": (
+                        r.created_at.isoformat() if r.created_at else None
+                    ),
+                }
+                for r in rows_ob
+            ]
+
+        result["borrower"] = {
+            "kind": borrower_kind,
+            "id": int(borrower_id),
+            "recipient_count": len(recipient_summary),
+            "recipients": recipient_summary,
+            "recent_outbox_rows": outbox_rows,
+        }
+    return result
+
+
+@router.post("/notifications/test-send")
+async def notification_test_send_route(
+    payload: dict,
+    principal: AuthPrincipal = Depends(_librarian),
+    session: AsyncSession = Depends(tenant_scoped_session),
+):
+    """Fire the ``library.issued`` template at a specified borrower
+    without actually issuing a book. Use this to prove the whole
+    pipeline works end-to-end from the browser: pick a real
+    borrower, click send, watch their phone (and check
+    notification_outbox afterwards).
+
+    Payload: ``{"borrower_kind": "student", "borrower_id": 42}``.
+    """
+    from app.services.library_notifications import (
+        _borrower_name, borrower_users,
+    )
+    from app.services.comms import notify
+    from app.services.push_dispatch import drain_pending_push_outbox_ids
+
+    borrower_kind = str(payload.get("borrower_kind") or "").strip()
+    try:
+        borrower_id = int(payload.get("borrower_id"))
+    except (TypeError, ValueError):
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST,
+                            detail="borrower_id required")
+    if borrower_kind not in {"student", "teacher"}:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST,
+                            detail="borrower_kind must be 'student' or 'teacher'")
+
+    recipients = await borrower_users(session, borrower_kind, borrower_id)
+    if not recipients:
+        return {
+            "ok": False,
+            "reason": "No linked user accounts for this borrower — "
+                      "neither the student's own login nor any parent login "
+                      "is on record. Nothing to send.",
+            "recipient_count": 0,
+        }
+
+    borrower_name = await _borrower_name(session, borrower_kind, borrower_id)
+    n_created, push_outbox_ids = await notify(
+        session,
+        tenant_id=principal.tenant_id,
+        template_code="library.issued",
+        recipients=recipients,
+        context={
+            "borrower": borrower_name,
+            "title": "TEST BOOK (diagnostic)",
+            "due": "2099-01-01",
+            "fine": "0",
+            "fine_per_day": "0",
+        },
+        deeplink="/library",
+        source_type="library_test",
+        source_id=0,
+        kind="library",
+    )
+    push_result = None
+    if push_outbox_ids:
+        r = await drain_pending_push_outbox_ids(session, push_outbox_ids)
+        push_result = {"sent": r.sent, "failed": r.failed}
+    return {
+        "ok": True,
+        "recipient_count": len(recipients),
+        "recipients": [
+            {"user_id": u.id, "name": u.full_name} for u in recipients
+        ],
+        "in_app_created": n_created,
+        "push_outbox_queued": len(push_outbox_ids),
+        "push_result": push_result,
+    }
+
+
 @router.put("/notification-templates/{code}")
 async def update_library_template_route(
     code: str,

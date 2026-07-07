@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Bell, MessageSquare, Save } from "lucide-react";
+import { Bell, MessageSquare, Save, Send, Stethoscope } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -8,9 +8,13 @@ import { Label } from "@/components/ui/label";
 import { cn } from "@/lib/utils";
 import {
   listLibraryTemplates,
+  notificationDiagnostics,
+  notificationTestSend,
   updateLibraryTemplate,
   type LibraryTemplate,
   type NotifChannel,
+  type NotifDiagnostics,
+  type TestSendResult,
 } from "./api";
 import { LibraryHeader } from "./_shared";
 
@@ -105,6 +109,8 @@ export function LibraryNotificationsPage() {
         title="Notifications"
         subtitle="Automated messages to borrowers. Edits here take effect on the next event fire — no restart needed."
       />
+
+      <DiagnosticsPanel />
 
       {isLoading && (
         <p className="text-sm text-muted-foreground">Loading templates…</p>
@@ -219,5 +225,252 @@ export function LibraryNotificationsPage() {
         })}
       </div>
     </div>
+  );
+}
+
+// ---- Diagnostics panel --------------------------------------------------
+
+function DiagnosticsPanel() {
+  const [borrowerKind, setBorrowerKind] = useState<"student" | "teacher">("student");
+  const [borrowerId, setBorrowerId] = useState("");
+  const [diag, setDiag] = useState<NotifDiagnostics | null>(null);
+  const [testResult, setTestResult] = useState<TestSendResult | null>(null);
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
+
+  const load = useMutation({
+    mutationFn: () => {
+      const id = Number(borrowerId);
+      return notificationDiagnostics(
+        id ? { kind: borrowerKind, id } : undefined,
+      );
+    },
+    onSuccess: (d) => {
+      setDiag(d);
+      setTestResult(null);
+      setErrorMsg(null);
+    },
+    onError: (err: unknown) => {
+      const detail =
+        typeof err === "object" && err !== null && "response" in err
+          ? // @ts-expect-error - axios error shape
+            err.response?.data?.detail
+          : undefined;
+      setErrorMsg(typeof detail === "string" ? detail : "Diagnostics failed.");
+    },
+  });
+
+  const test = useMutation({
+    mutationFn: () => notificationTestSend(borrowerKind, Number(borrowerId)),
+    onSuccess: (r) => {
+      setTestResult(r);
+      setErrorMsg(null);
+      // Refresh diagnostics so the recent outbox rows appear.
+      load.mutate();
+    },
+    onError: (err: unknown) => {
+      const detail =
+        typeof err === "object" && err !== null && "response" in err
+          ? // @ts-expect-error - axios error shape
+            err.response?.data?.detail
+          : undefined;
+      setErrorMsg(typeof detail === "string" ? detail : "Test send failed.");
+    },
+  });
+
+  return (
+    <Card className="border-marigold-pale bg-marigold-pale/20">
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2 text-base">
+          <Stethoscope className="h-4 w-4" /> Diagnostics
+        </CardTitle>
+        <CardDescription>
+          Verify the pipeline is wired end-to-end. Pick a real borrower, click
+          "Run check" to see who would be notified + their device count, then
+          "Send test" to fire the "library.issued" template at them right now.
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        <div className="grid grid-cols-4 gap-3">
+          <div>
+            <Label>Borrower type</Label>
+            <select
+              className="mt-1 h-9 w-full rounded border border-input bg-transparent px-2 text-sm"
+              value={borrowerKind}
+              onChange={(e) => setBorrowerKind(e.target.value as "student" | "teacher")}
+            >
+              <option value="student">Student</option>
+              <option value="teacher">Teacher</option>
+            </select>
+          </div>
+          <div>
+            <Label>Borrower ID</Label>
+            <Input
+              value={borrowerId}
+              onChange={(e) => setBorrowerId(e.target.value)}
+              placeholder="Leave blank to just check templates"
+            />
+          </div>
+          <div className="flex items-end">
+            <Button variant="outline" onClick={() => load.mutate()} disabled={load.isPending}>
+              Run check
+            </Button>
+          </div>
+          <div className="flex items-end">
+            <Button
+              onClick={() => test.mutate()}
+              disabled={!borrowerId || test.isPending}
+            >
+              <Send className="mr-1 h-4 w-4" /> Send test
+            </Button>
+          </div>
+        </div>
+
+        {errorMsg && (
+          <p className="rounded-md bg-destructive/10 px-3 py-2 text-sm text-destructive">
+            {errorMsg}
+          </p>
+        )}
+
+        {testResult && (
+          <div
+            className={cn(
+              "rounded-md px-3 py-2 text-sm",
+              testResult.ok
+                ? "bg-teal-pale text-teal-dark"
+                : "bg-destructive/10 text-destructive",
+            )}
+          >
+            <p className="font-medium">
+              {testResult.ok ? "Test fired." : `Blocked: ${testResult.reason}`}
+            </p>
+            {testResult.ok && (
+              <ul className="mt-1 space-y-0.5 text-xs">
+                <li>
+                  Recipients: {testResult.recipient_count} —{" "}
+                  {testResult.recipients?.map((r) => r.name).join(", ")}
+                </li>
+                <li>In-app rows created: {testResult.in_app_created}</li>
+                <li>
+                  Push outbox queued: {testResult.push_outbox_queued}
+                  {testResult.push_result &&
+                    ` · sent ${testResult.push_result.sent} · failed ${testResult.push_result.failed}`}
+                </li>
+              </ul>
+            )}
+          </div>
+        )}
+
+        {diag && (
+          <div className="space-y-3 text-sm">
+            <div>
+              <p className="font-semibold">
+                Templates: {diag.templates_seeded} of {diag.templates_expected} seeded
+              </p>
+              <ul className="mt-1 space-y-0.5 text-xs">
+                {Object.entries(diag.templates).map(([code, meta]) => (
+                  <li key={code}>
+                    <span className="font-mono">{code}</span>{" "}
+                    {meta.seeded ? (
+                      <span
+                        className={cn(
+                          "rounded px-1.5 py-0.5 text-[10px]",
+                          meta.active
+                            ? "bg-teal-pale text-teal-dark"
+                            : "bg-muted text-muted-foreground",
+                        )}
+                      >
+                        {meta.active ? "active" : "disabled"} · {meta.channels.join("/")}
+                      </span>
+                    ) : (
+                      <span className="rounded bg-destructive/15 px-1.5 py-0.5 text-[10px] text-destructive">
+                        NOT SEEDED
+                      </span>
+                    )}
+                  </li>
+                ))}
+              </ul>
+            </div>
+
+            {diag.borrower && (
+              <div>
+                <p className="font-semibold">
+                  Recipients for {diag.borrower.kind} #{diag.borrower.id}:{" "}
+                  {diag.borrower.recipient_count}
+                </p>
+                {diag.borrower.recipient_count === 0 ? (
+                  <p className="mt-1 text-xs text-destructive">
+                    Nobody would be notified — this borrower has no linked User
+                    account. For a student, either the student needs a login OR
+                    a parent needs to be linked via parent_child_mappings.
+                  </p>
+                ) : (
+                  <ul className="mt-1 space-y-1 text-xs">
+                    {diag.borrower.recipients.map((r) => (
+                      <li key={r.user_id} className="rounded border border-saffron-pale bg-white p-2">
+                        <span className="font-medium">{r.name}</span>{" "}
+                        <span className="text-muted-foreground">
+                          (user #{r.user_id}, {r.is_active ? "active" : "inactive"})
+                        </span>
+                        <div className="mt-0.5 text-[11px] text-muted-foreground">
+                          phone {r.phone ?? "—"} · email {r.email ?? "—"} · FCM devices{" "}
+                          <span
+                            className={cn(
+                              r.active_devices > 0 ? "text-teal-dark" : "text-destructive",
+                            )}
+                          >
+                            {r.active_devices}
+                          </span>
+                        </div>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+
+                {diag.borrower.recent_outbox_rows.length > 0 && (
+                  <div className="mt-2">
+                    <p className="text-xs font-semibold">
+                      Recent notification_outbox rows (last 15 min)
+                    </p>
+                    <table className="mt-1 w-full text-[11px]">
+                      <thead className="text-left text-[10px] uppercase tracking-wide text-muted-foreground">
+                        <tr>
+                          <th className="py-1">Ch</th>
+                          <th>Status</th>
+                          <th>Subject</th>
+                          <th>Error</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {diag.borrower.recent_outbox_rows.map((r) => (
+                          <tr key={r.id} className="border-t border-saffron-pale">
+                            <td className="py-1 font-mono">{r.channel}</td>
+                            <td>
+                              <span
+                                className={cn(
+                                  "rounded px-1.5 py-0.5 text-[10px]",
+                                  r.status === "sent"
+                                    ? "bg-teal-pale text-teal-dark"
+                                    : r.status === "failed"
+                                    ? "bg-destructive/15 text-destructive"
+                                    : "bg-marigold-pale text-marigold-dark",
+                                )}
+                              >
+                                {r.status}
+                              </span>
+                            </td>
+                            <td className="truncate">{r.subject ?? "—"}</td>
+                            <td className="text-destructive">{r.error ?? ""}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        )}
+      </CardContent>
+    </Card>
   );
 }
