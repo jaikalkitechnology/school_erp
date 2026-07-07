@@ -221,3 +221,56 @@ export const updateLibraryTemplate = async (
   patch: Partial<Pick<LibraryTemplate, "subject_en" | "body_en" | "channels" | "is_active">>,
 ) =>
   (await api.put<LibraryTemplate>(`${base}/notification-templates/${encodeURIComponent(code)}`, patch)).data;
+
+// --- Diagnostics + test send ---------------------------------------------
+
+export interface NotifDiagnostics {
+  tenant_id: number;
+  templates_seeded: number;
+  templates_expected: number;
+  templates: Record<string, { seeded: boolean; active: boolean; channels: string[] }>;
+  borrower?: {
+    kind: string;
+    id: number;
+    recipient_count: number;
+    recipients: {
+      user_id: number;
+      name: string;
+      email: string | null;
+      phone: string | null;
+      is_active: boolean;
+      active_devices: number;
+    }[];
+    recent_outbox_rows: {
+      id: number;
+      recipient_user_id: number;
+      channel: string;
+      status: string;
+      subject: string | null;
+      error: string | null;
+      created_at: string | null;
+    }[];
+  };
+}
+
+export const notificationDiagnostics = async (
+  borrower?: { kind: "student" | "teacher"; id: number },
+) =>
+  (await api.get<NotifDiagnostics>(`${base}/notifications/diagnostics`, {
+    params: borrower ? { borrower_kind: borrower.kind, borrower_id: borrower.id } : undefined,
+  })).data;
+
+export interface TestSendResult {
+  ok: boolean;
+  reason?: string;
+  recipient_count: number;
+  recipients?: { user_id: number; name: string }[];
+  in_app_created?: number;
+  push_outbox_queued?: number;
+  push_result?: { sent: number; failed: number } | null;
+}
+
+export const notificationTestSend = async (kind: "student" | "teacher", id: number) =>
+  (await api.post<TestSendResult>(`${base}/notifications/test-send`, {
+    borrower_kind: kind, borrower_id: id,
+  })).data;
