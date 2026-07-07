@@ -325,6 +325,90 @@ async def delete_publisher_route(
     return {"cleared": len(books), "publisher": name}
 
 
+# ---- Notification templates (library.* only) -----------------------------
+
+
+@router.get("/notification-templates")
+async def list_library_templates_route(
+    session: AsyncSession = Depends(tenant_scoped_session),
+):
+    """List every library.* NotificationTemplate for the tenant so
+    the LibraryNotificationsPage can render + edit them. Rows are
+    seeded at boot by ``seed_library_templates`` so this endpoint
+    always returns the full set."""
+    from app.models.comms import NotificationTemplate
+    from app.services.library_notifications import LIBRARY_TEMPLATES
+
+    codes = [t["code"] for t in LIBRARY_TEMPLATES]
+    rows = list(
+        (
+            await session.execute(
+                select(NotificationTemplate)
+                .where(NotificationTemplate.code.in_(codes))
+                .order_by(NotificationTemplate.code)
+            )
+        ).scalars().all()
+    )
+    order = {c: i for i, c in enumerate(codes)}
+    rows.sort(key=lambda r: order.get(r.code, 99))
+    return [
+        {
+            "code": r.code,
+            "subject_en": r.subject_en,
+            "body_en": r.body_en,
+            "channels": list(r.channels or []),
+            "is_active": r.is_active,
+        }
+        for r in rows
+    ]
+
+
+@router.put("/notification-templates/{code}")
+async def update_library_template_route(
+    code: str,
+    payload: dict,
+    principal: AuthPrincipal = Depends(_librarian),
+    session: AsyncSession = Depends(tenant_scoped_session),
+):
+    """Update a library.* template's subject / body / channels /
+    active flag. Only the four editable fields are honoured; the
+    code itself is immutable so triggers keep firing."""
+    from app.models.comms import NotificationTemplate
+    from app.services.library_notifications import LIBRARY_TEMPLATES
+
+    known_codes = {t["code"] for t in LIBRARY_TEMPLATES}
+    if code not in known_codes:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND,
+                            detail="Not a library template")
+    row = (
+        await session.execute(
+            select(NotificationTemplate)
+            .where(NotificationTemplate.code == code)
+        )
+    ).scalar_one_or_none()
+    if row is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND,
+                            detail="Template not found")
+
+    if "subject_en" in payload:
+        row.subject_en = str(payload["subject_en"])[:255]
+    if "body_en" in payload:
+        row.body_en = str(payload["body_en"])
+    if "channels" in payload:
+        valid = {"in_app", "push", "sms", "email", "whatsapp"}
+        row.channels = [c for c in payload["channels"] if c in valid]
+    if "is_active" in payload:
+        row.is_active = bool(payload["is_active"])
+    await session.commit()
+    return {
+        "code": row.code,
+        "subject_en": row.subject_en,
+        "body_en": row.body_en,
+        "channels": list(row.channels or []),
+        "is_active": row.is_active,
+    }
+
+
 # ---- Renew a loan ---------------------------------------------------------
 
 

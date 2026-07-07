@@ -262,6 +262,17 @@ async def issue_loan(
     session.add(loan)
     await session.commit()
     await session.refresh(loan)
+
+    # Fire the "you've borrowed this" notification. Best-effort —
+    # a template lookup failure or a broken FCM must not roll back
+    # the issue we just committed.
+    from app.services.library_notifications import fanout_for_loan
+    await fanout_for_loan(
+        session,
+        tenant_id=tenant_id,
+        template_code="library.issued",
+        loan=loan,
+    )
     return loan
 
 
@@ -328,6 +339,18 @@ async def return_loan(
         res.ready_at = _now()
         copy.status = CopyStatus.RESERVED.value
         await session.commit()
+        # Tell the reserving borrower a copy is ready for pickup.
+        from app.services.library_notifications import (
+            fanout_for_reservation_ready,
+        )
+        await fanout_for_reservation_ready(
+            session,
+            tenant_id=loan.tenant_id,
+            book=book,
+            borrower_kind=res.borrower_kind,
+            borrower_id=res.borrower_id,
+            reservation_id=res.id,
+        )
     return loan
 
 
@@ -363,6 +386,7 @@ async def mark_overdue(session: AsyncSession) -> int:
         ).scalars().all()
     )
     book_cache: dict[int, Book] = {}
+    newly_overdue: list[Loan] = []
     for r in rows:
         if r.book_id not in book_cache:
             book_cache[r.book_id] = (
@@ -371,7 +395,19 @@ async def mark_overdue(session: AsyncSession) -> int:
         late_days = (today - r.due_on).days
         r.status = LoanStatus.OVERDUE.value
         r.fine_amount = _D(book_cache[r.book_id].default_fine_per_day) * late_days
+        newly_overdue.append(r)
     await session.commit()
+
+    # Day-1 "you're overdue" fanout for each loan we just flipped.
+    if newly_overdue:
+        from app.services.library_notifications import fanout_for_loan
+        for r in newly_overdue:
+            await fanout_for_loan(
+                session,
+                tenant_id=r.tenant_id,
+                template_code="library.overdue_day1",
+                loan=r,
+            )
     return len(rows)
 
 

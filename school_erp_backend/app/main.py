@@ -39,6 +39,98 @@ async def _retention_loop() -> None:
         await asyncio.sleep(24 * 60 * 60)
 
 
+async def _library_daily_notifications_loop() -> None:
+    """Background task: once every 24h, sweep across every tenant and
+    fire the two time-based library notifications:
+
+      * **due_soon**   — loans still ACTIVE whose ``due_on`` is
+                         exactly 2 calendar days from today.
+      * **overdue_day7** — loans in OVERDUE status whose ``due_on``
+                           is exactly 7 days ago.
+
+    Runs in-process. The first sweep happens 120s after boot so the
+    RBAC + template seed above have already finished. In-flight
+    errors log-and-continue — a broken tenant must not kill the
+    task for everyone else."""
+    from datetime import date, timedelta
+
+    from sqlalchemy import select
+
+    from app.database import AsyncSessionLocal
+    from app.models.library import Loan, LoanStatus
+    from app.models.tenant import Tenant
+    from app.services.library_notifications import fanout_for_loan
+
+    await asyncio.sleep(120)
+    while True:
+        try:
+            today = date.today()
+            due_soon_target = today + timedelta(days=2)
+            overdue_day7_target = today - timedelta(days=7)
+
+            async with AsyncSessionLocal() as session:
+                tenants = [
+                    t for (t,) in (
+                        await session.execute(select(Tenant.id))
+                    ).all()
+                ]
+                due_soon_sent = 0
+                overdue_day7_sent = 0
+                for tid in tenants:
+                    try:
+                        due_soon_loans = list(
+                            (
+                                await session.execute(
+                                    select(Loan).where(
+                                        Loan.tenant_id == tid,
+                                        Loan.status == LoanStatus.ACTIVE.value,
+                                        Loan.due_on == due_soon_target,
+                                    )
+                                )
+                            ).scalars().all()
+                        )
+                        for l in due_soon_loans:
+                            await fanout_for_loan(
+                                session,
+                                tenant_id=tid,
+                                template_code="library.due_soon",
+                                loan=l,
+                            )
+                            due_soon_sent += 1
+
+                        overdue_day7_loans = list(
+                            (
+                                await session.execute(
+                                    select(Loan).where(
+                                        Loan.tenant_id == tid,
+                                        Loan.status == LoanStatus.OVERDUE.value,
+                                        Loan.due_on == overdue_day7_target,
+                                    )
+                                )
+                            ).scalars().all()
+                        )
+                        for l in overdue_day7_loans:
+                            await fanout_for_loan(
+                                session,
+                                tenant_id=tid,
+                                template_code="library.overdue_day7",
+                                loan=l,
+                            )
+                            overdue_day7_sent += 1
+                    except Exception:
+                        log.exception(
+                            "library daily notifications failed for tenant %s",
+                            tid,
+                        )
+                log.info(
+                    "library daily notifications: %s due-soon, %s day-7 overdue",
+                    due_soon_sent, overdue_day7_sent,
+                )
+        except Exception:  # pragma: no cover
+            log.exception("library daily notifications loop error")
+        await asyncio.sleep(24 * 60 * 60)
+
+
 async def _sync_rbac_catalogue() -> None:
     """On boot: replay the RBAC catalogue against every tenant. New
     role codes added to ``rbac_catalog.ROLES`` (currently: hod,
@@ -67,6 +159,19 @@ async def _sync_rbac_catalogue() -> None:
                     await seed_rbac_for_tenant(session, tid)
                 except Exception:
                     log.exception("RBAC re-seed failed for tenant %s", tid)
+                # Library notification templates ride the same boot
+                # sync — idempotent, only inserts missing rows so
+                # librarian edits made on the Notifications page
+                # survive.
+                try:
+                    from app.services.library_notifications import (
+                        seed_library_templates,
+                    )
+                    await seed_library_templates(session, tid)
+                except Exception:
+                    log.exception(
+                        "Library template seed failed for tenant %s", tid,
+                    )
         log.info("RBAC catalogue synced for %s tenants", len(tenant_ids))
     except Exception:
         log.exception("RBAC catalogue sync failed")
@@ -139,15 +244,18 @@ async def lifespan(_: FastAPI):
     # boot before traffic starts hitting the API.
     await _sync_rbac_catalogue()
     # Daily notification retention sweep — keeps the inbox tidy.
-    task = asyncio.create_task(_retention_loop())
+    retention_task = asyncio.create_task(_retention_loop())
+    # Daily due-soon + overdue-day-7 library push loop.
+    lib_task = asyncio.create_task(_library_daily_notifications_loop())
     try:
         yield
     finally:
-        task.cancel()
-        try:
-            await task
-        except (asyncio.CancelledError, Exception):
-            pass
+        for t in (retention_task, lib_task):
+            t.cancel()
+            try:
+                await t
+            except (asyncio.CancelledError, Exception):
+                pass
 
 
 app = FastAPI(
