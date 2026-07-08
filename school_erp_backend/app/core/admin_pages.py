@@ -54,6 +54,24 @@ ADMIN_PAGES: tuple[tuple[str, str, str], ...] = (
     ("library-user-history", "User history", "Library"),
     ("library-audit", "Library audit logs", "Library"),
     ("library-settings", "Library settings", "Library"),
+    # ---- Phase 28 operational modules ----
+    ("admissions", "Admissions pipeline", "Admissions"),
+    ("finance-expenses", "Expenses", "Accounts / Finance"),
+    ("finance-vendors", "Vendors", "Accounts / Finance"),
+    ("payroll-structures", "Salary structures", "Payroll / HR"),
+    ("payroll-payslips", "Payslips", "Payroll / HR"),
+    ("inventory-items", "Inventory items", "Inventory / Stores"),
+    ("inventory-movements", "Stock movements", "Inventory / Stores"),
+    ("visitor-logs", "Visitor management", "Front desk"),
+    ("health-records", "Health / Infirmary", "Wellbeing"),
+    ("cert-issue", "Issue certificate", "Certificates"),
+    ("cert-templates", "Certificate templates", "Certificates"),
+    ("id-cards", "ID cards", "Certificates"),
+    ("discipline", "Discipline register", "Wellbeing"),
+    ("notice-board", "Notice board", "Comms"),
+    ("alumni", "Alumni directory", "Community"),
+    ("sports-houses", "Sports houses", "Sports & clubs"),
+    ("sports-events", "Sports events", "Sports & clubs"),
     ("transport", "Transport", "Operations"),
     ("hostel", "Hostel", "Operations"),
     ("reports", "Reports", "Insights"),
@@ -76,7 +94,32 @@ DEFAULT_PAGES_BY_ROLE: dict[str, tuple[str, ...]] = {
     "coordinator": ALL_PAGES,
     "accountant": (
         "dashboard", "students", "fees", "communication", "reports",
-        "subscription",
+        "subscription", "finance-expenses", "finance-vendors",
+    ),
+    # Phase 28 org-chart specialists.
+    "accounts": (
+        "dashboard", "students", "fees", "reports",
+        "finance-expenses", "finance-vendors",
+    ),
+    "payroll": (
+        "dashboard", "teachers", "reports",
+        "payroll-structures", "payroll-payslips",
+    ),
+    "office_admin": (
+        "dashboard", "students", "teachers", "admissions",
+        "visitor-logs", "notice-board", "id-cards",
+        "cert-issue", "cert-templates",
+    ),
+    "office_staff": (
+        "dashboard", "students", "admissions", "visitor-logs",
+        "notice-board", "cert-issue", "id-cards",
+    ),
+    "receptionist": (
+        "dashboard", "visitor-logs", "notice-board", "admissions",
+    ),
+    "data_entry_operator": (
+        "dashboard", "students", "teachers", "attendance",
+        "admissions", "alumni",
     ),
 
     # --- Visible-but-narrow surfaces ---------------------------------
@@ -84,7 +127,7 @@ DEFAULT_PAGES_BY_ROLE: dict[str, tuple[str, ...]] = {
         "dashboard", "students", "teachers", "attendance",
         "communication", "reports",
     ),
-    "visitor_desk": ("dashboard", "students", "communication"),
+    "visitor_desk": ("dashboard", "students", "communication", "visitor-logs"),
 
     # --- Visible-but-narrow surfaces (contd.) ------------------------
     # Librarian runs only the library module. Their sidebar is

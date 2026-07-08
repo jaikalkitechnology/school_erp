@@ -16,6 +16,7 @@ from app.api.v1 import (
     library,
     parent,
     principal,
+    operations,
     report_cards,
     school_admin,
     school_analytics,
@@ -66,3 +67,4 @@ router.include_router(subscription.router)
 router.include_router(admin_users.router)
 router.include_router(teacher_app.router)
 router.include_router(principal.router)
+router.include_router(operations.router)
