@@ -7,10 +7,12 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { cn } from "@/lib/utils";
 import {
+  borrowerSearch,
   listLibraryTemplates,
   notificationDiagnostics,
   notificationTestSend,
   updateLibraryTemplate,
+  type BorrowerRow,
   type LibraryTemplate,
   type NotifChannel,
   type NotifDiagnostics,
@@ -232,18 +234,16 @@ export function LibraryNotificationsPage() {
 
 function DiagnosticsPanel() {
   const [borrowerKind, setBorrowerKind] = useState<"student" | "teacher">("student");
-  const [borrowerId, setBorrowerId] = useState("");
+  const [picked, setPicked] = useState<BorrowerRow | null>(null);
   const [diag, setDiag] = useState<NotifDiagnostics | null>(null);
   const [testResult, setTestResult] = useState<TestSendResult | null>(null);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
   const load = useMutation({
-    mutationFn: () => {
-      const id = Number(borrowerId);
-      return notificationDiagnostics(
-        id ? { kind: borrowerKind, id } : undefined,
-      );
-    },
+    mutationFn: () =>
+      notificationDiagnostics(
+        picked ? { kind: borrowerKind, id: picked.id } : undefined,
+      ),
     onSuccess: (d) => {
       setDiag(d);
       setTestResult(null);
@@ -260,7 +260,7 @@ function DiagnosticsPanel() {
   });
 
   const test = useMutation({
-    mutationFn: () => notificationTestSend(borrowerKind, Number(borrowerId)),
+    mutationFn: () => notificationTestSend(borrowerKind, picked!.id),
     onSuccess: (r) => {
       setTestResult(r);
       setErrorMsg(null);
@@ -284,30 +284,34 @@ function DiagnosticsPanel() {
           <Stethoscope className="h-4 w-4" /> Diagnostics
         </CardTitle>
         <CardDescription>
-          Verify the pipeline is wired end-to-end. Pick a real borrower, click
-          "Run check" to see who would be notified + their device count, then
-          "Send test" to fire the "library.issued" template at them right now.
+          Verify the pipeline is wired end-to-end. Search for a real
+          student or teacher, click "Run check" to see who would be
+          notified + their FCM device count, then "Send test" to fire
+          the "library.issued" template at them right now.
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
-        <div className="grid grid-cols-4 gap-3">
+        <div className="grid grid-cols-[140px_1fr_auto_auto] gap-3">
           <div>
             <Label>Borrower type</Label>
             <select
               className="mt-1 h-9 w-full rounded border border-input bg-transparent px-2 text-sm"
               value={borrowerKind}
-              onChange={(e) => setBorrowerKind(e.target.value as "student" | "teacher")}
+              onChange={(e) => {
+                setBorrowerKind(e.target.value as "student" | "teacher");
+                setPicked(null);
+              }}
             >
               <option value="student">Student</option>
               <option value="teacher">Teacher</option>
             </select>
           </div>
           <div>
-            <Label>Borrower ID</Label>
-            <Input
-              value={borrowerId}
-              onChange={(e) => setBorrowerId(e.target.value)}
-              placeholder="Leave blank to just check templates"
+            <Label>Borrower</Label>
+            <BorrowerPicker
+              kind={borrowerKind}
+              picked={picked}
+              onPick={setPicked}
             />
           </div>
           <div className="flex items-end">
@@ -318,7 +322,7 @@ function DiagnosticsPanel() {
           <div className="flex items-end">
             <Button
               onClick={() => test.mutate()}
-              disabled={!borrowerId || test.isPending}
+              disabled={!picked || test.isPending}
             >
               <Send className="mr-1 h-4 w-4" /> Send test
             </Button>
@@ -472,5 +476,103 @@ function DiagnosticsPanel() {
         )}
       </CardContent>
     </Card>
+  );
+}
+
+// ---- Borrower picker (search + click) -----------------------------------
+
+function BorrowerPicker({
+  kind,
+  picked,
+  onPick,
+}: {
+  kind: "student" | "teacher";
+  picked: BorrowerRow | null;
+  onPick: (row: BorrowerRow | null) => void;
+}) {
+  const [q, setQ] = useState("");
+  const [open, setOpen] = useState(false);
+
+  // Debounced query — we don't hammer the backend for every keystroke.
+  const [debounced, setDebounced] = useState("");
+  useEffect(() => {
+    const t = setTimeout(() => setDebounced(q), 200);
+    return () => clearTimeout(t);
+  }, [q]);
+
+  const { data: results = [], isLoading } = useQuery({
+    queryKey: ["library-borrower-search", kind, debounced],
+    queryFn: () => borrowerSearch(kind, debounced, 20),
+    enabled: open,
+  });
+
+  if (picked) {
+    return (
+      <div className="mt-1 flex h-9 items-center justify-between rounded border border-saffron bg-saffron-pale px-3 text-sm">
+        <span>
+          <span className="font-semibold text-saffron-darker">{picked.name}</span>{" "}
+          <span className="text-xs text-muted-foreground">
+            #{picked.id}
+            {picked.hint ? ` · ${picked.hint}` : ""}
+          </span>
+        </span>
+        <button
+          type="button"
+          className="text-xs text-muted-foreground hover:text-indigo-dark"
+          onClick={() => {
+            onPick(null);
+            setQ("");
+            setOpen(true);
+          }}
+        >
+          Change
+        </button>
+      </div>
+    );
+  }
+
+  return (
+    <div className="relative mt-1">
+      <Input
+        value={q}
+        onChange={(e) => {
+          setQ(e.target.value);
+          setOpen(true);
+        }}
+        onFocus={() => setOpen(true)}
+        placeholder={`Search ${kind} by name${kind === "student" ? " or admission number" : " or phone"}`}
+      />
+      {open && (
+        <div className="absolute left-0 right-0 top-10 z-20 max-h-64 overflow-y-auto rounded-md border border-input bg-warm-white shadow-lg">
+          {isLoading ? (
+            <p className="px-3 py-2 text-xs text-muted-foreground">Searching…</p>
+          ) : results.length === 0 ? (
+            <p className="px-3 py-2 text-xs text-muted-foreground">
+              No matching {kind}s.
+            </p>
+          ) : (
+            results.map((r) => (
+              <button
+                key={r.id}
+                type="button"
+                onClick={() => {
+                  onPick(r);
+                  setOpen(false);
+                }}
+                className="flex w-full items-start gap-2 border-t border-saffron-pale/50 px-3 py-2 text-left text-sm first:border-t-0 hover:bg-saffron-pale/60"
+              >
+                <div className="flex-1">
+                  <p className="font-medium text-indigo-dark">{r.name}</p>
+                  <p className="text-xs text-muted-foreground">
+                    #{r.id}
+                    {r.hint ? ` · ${r.hint}` : ""}
+                  </p>
+                </div>
+              </button>
+            ))
+          )}
+        </div>
+      )}
+    </div>
   );
 }

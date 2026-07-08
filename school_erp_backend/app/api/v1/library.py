@@ -363,6 +363,69 @@ async def list_library_templates_route(
     ]
 
 
+@router.get("/borrowers/search")
+async def borrower_search_route(
+    q: str = "",
+    kind: str = "student",
+    limit: int = 20,
+    principal: AuthPrincipal = Depends(_librarian),
+    session: AsyncSession = Depends(tenant_scoped_session),
+):
+    """Lightweight borrower picker for the Notifications / Issue /
+    Return pages. Search students or teachers by name / admission
+    number / phone and get back id + label pairs the UI can render
+    in a dropdown."""
+    from sqlalchemy import or_
+
+    from app.models.parent import Student
+    from app.models.teacher import Teacher
+
+    q = (q or "").strip()
+    limit = max(1, min(limit, 50))
+
+    if kind == "student":
+        stmt = select(Student).where(Student.is_active.is_(True))
+        if q:
+            like = f"%{q}%"
+            stmt = stmt.where(
+                or_(
+                    Student.full_name.ilike(like),
+                    Student.admission_number.ilike(like),
+                    Student.parent_phone.ilike(like),
+                )
+            )
+        stmt = stmt.order_by(Student.full_name).limit(limit)
+        rows = list((await session.execute(stmt)).scalars().all())
+        return [
+            {
+                "id": s.id,
+                "name": s.full_name,
+                "hint": s.admission_number or "",
+            }
+            for s in rows
+        ]
+
+    if kind == "teacher":
+        stmt = select(Teacher)
+        if q:
+            like = f"%{q}%"
+            stmt = stmt.where(
+                or_(
+                    Teacher.full_name.ilike(like),
+                    Teacher.phone.ilike(like),
+                )
+            )
+        stmt = stmt.order_by(Teacher.full_name).limit(limit)
+        rows = list((await session.execute(stmt)).scalars().all())
+        return [
+            {"id": t.id, "name": t.full_name, "hint": t.phone or ""}
+            for t in rows
+        ]
+
+    raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST,
+                        detail="kind must be 'student' or 'teacher'")
+
+
 @router.get("/notifications/diagnostics")
 async def notification_diagnostics_route(
     borrower_kind: Optional[str] = None,

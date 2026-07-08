@@ -274,3 +274,18 @@ export const notificationTestSend = async (kind: "student" | "teacher", id: numb
   (await api.post<TestSendResult>(`${base}/notifications/test-send`, {
     borrower_kind: kind, borrower_id: id,
   })).data;
+
+// --- Borrower search picker (students / teachers) ------------------------
+
+export interface BorrowerRow {
+  id: number;
+  name: string;
+  hint: string;
+}
+
+export const borrowerSearch = async (
+  kind: "student" | "teacher", q: string, limit = 20,
+) =>
+  (await api.get<BorrowerRow[]>(`${base}/borrowers/search`, {
+    params: { kind, q, limit },
+  })).data;
