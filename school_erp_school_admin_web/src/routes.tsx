@@ -32,6 +32,19 @@ import { LibraryImportExportPage } from "@/features/library/LibraryImportExportP
 import { LibraryNotificationsPage } from "@/features/library/LibraryNotificationsPage";
 import { LibraryAuditPage } from "@/features/library/LibraryAuditPage";
 import { LibrarySettingsPage } from "@/features/library/LibrarySettingsPage";
+// Phase 28 operations modules
+import { AdmissionsPage } from "@/features/operations/AdmissionsPage";
+import { VendorsPage, ExpensesPage } from "@/features/operations/FinancePage";
+import { SalaryStructuresPage, PayslipsPage } from "@/features/operations/PayrollPage";
+import { InventoryItemsPage, InventoryMovementsPage } from "@/features/operations/InventoryPage";
+import { VisitorPage } from "@/features/operations/VisitorPage";
+import { HealthPage } from "@/features/operations/HealthPage";
+import { CertificateTemplatesPage, IssueCertificatePage } from "@/features/operations/CertificatesPage";
+import { IdCardsPage } from "@/features/operations/IdCardsPage";
+import { DisciplinePage } from "@/features/operations/DisciplinePage";
+import { NoticeBoardPage } from "@/features/operations/NoticeBoardPage";
+import { AlumniPage } from "@/features/operations/AlumniPage";
+import { SportsHousesPage, SportsEventsPage } from "@/features/operations/SportsPage";
 import { TimetablePage } from "@/features/timetable/TimetablePage";
 import { TransportPage } from "@/features/transport/TransportPage";
 import { HostelPage } from "@/features/hostel/HostelPage";
@@ -108,6 +121,24 @@ export const routes: RouteObject[] = [
       { path: "library-user-history", element: <LibraryUserHistoryPage /> },
       { path: "library-audit", element: <LibraryAuditPage /> },
       { path: "library-settings", element: <LibrarySettingsPage /> },
+      // ---- Phase 28 operations modules ----
+      { path: "admissions", element: <AdmissionsPage /> },
+      { path: "finance-vendors", element: <VendorsPage /> },
+      { path: "finance-expenses", element: <ExpensesPage /> },
+      { path: "payroll-structures", element: <SalaryStructuresPage /> },
+      { path: "payroll-payslips", element: <PayslipsPage /> },
+      { path: "inventory-items", element: <InventoryItemsPage /> },
+      { path: "inventory-movements", element: <InventoryMovementsPage /> },
+      { path: "visitor-logs", element: <VisitorPage /> },
+      { path: "health-records", element: <HealthPage /> },
+      { path: "cert-templates", element: <CertificateTemplatesPage /> },
+      { path: "cert-issue", element: <IssueCertificatePage /> },
+      { path: "id-cards", element: <IdCardsPage /> },
+      { path: "discipline", element: <DisciplinePage /> },
+      { path: "notice-board", element: <NoticeBoardPage /> },
+      { path: "alumni", element: <AlumniPage /> },
+      { path: "sports-houses", element: <SportsHousesPage /> },
+      { path: "sports-events", element: <SportsEventsPage /> },
       { path: "transport", element: <TransportPage /> },
       { path: "hostel", element: <HostelPage /> },
       { path: "reports", element: <ReportsPage /> },
