@@ -7,6 +7,9 @@ import '../../theme/brand.dart';
 import '../calendar/calendar_page.dart';
 import '../messages/messages_page.dart';
 import '../notifications/notifications_page.dart';
+import '../operations/my_payslips_page.dart';
+import '../operations/notice_board_page.dart';
+import '../operations/sports_page.dart';
 import '../principal/principal_academics_page.dart';
 import '../principal/principal_approvals_page.dart';
 import '../principal/principal_dashboard_page.dart';
@@ -156,6 +159,27 @@ class _PrincipalMorePage extends StatelessWidget {
               appBar: AppBar(title: const Text('Calendar')),
               body: const CalendarPage(),
             ),
+          ),
+          _tile(
+            context,
+            icon: Icons.campaign_outlined,
+            title: 'Notice board',
+            subtitle: 'School announcements + circulars',
+            builder: (_) => const NoticeBoardPage(),
+          ),
+          _tile(
+            context,
+            icon: Icons.sports_soccer_outlined,
+            title: 'Sports & clubs',
+            subtitle: 'House leaderboard + events',
+            builder: (_) => const SportsPage(),
+          ),
+          _tile(
+            context,
+            icon: Icons.receipt_long_outlined,
+            title: 'My payslips',
+            subtitle: 'Your salary slips',
+            builder: (_) => const MyPayslipsPage(),
           ),
           _tile(
             context,
