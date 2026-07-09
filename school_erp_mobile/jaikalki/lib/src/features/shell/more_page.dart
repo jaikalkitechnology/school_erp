@@ -11,6 +11,11 @@ import '../directory/directory_page.dart';
 import '../library/library_catalog_page.dart';
 import '../messages/messages_page.dart';
 import '../notifications/notifications_page.dart';
+import '../operations/child_certificates_page.dart';
+import '../operations/child_discipline_page.dart';
+import '../operations/child_health_page.dart';
+import '../operations/notice_board_page.dart';
+import '../operations/sports_page.dart';
 import '../profile/student_profile_page.dart';
 import '../results/result_cards_page.dart';
 import '../settings/settings_page.dart';
@@ -79,6 +84,46 @@ class MorePage extends StatelessWidget {
             label: 'Messages',
             onTap: () => Navigator.of(context).push(
               MaterialPageRoute(builder: (_) => const MessagesPage()),
+            ),
+          ),
+          _Tile(
+            icon: Icons.campaign_outlined,
+            label: 'Notice board',
+            subtitle: 'School announcements + circulars',
+            onTap: () => Navigator.of(context).push(
+              MaterialPageRoute(builder: (_) => const NoticeBoardPage()),
+            ),
+          ),
+          _Tile(
+            icon: Icons.medical_services_outlined,
+            label: 'Health records',
+            subtitle: "Your child's sick-room visits & vaccinations",
+            onTap: () => Navigator.of(context).push(
+              MaterialPageRoute(builder: (_) => const ChildHealthPage()),
+            ),
+          ),
+          _Tile(
+            icon: Icons.gavel_outlined,
+            label: 'Discipline register',
+            subtitle: 'Incidents involving your child',
+            onTap: () => Navigator.of(context).push(
+              MaterialPageRoute(builder: (_) => const ChildDisciplinePage()),
+            ),
+          ),
+          _Tile(
+            icon: Icons.workspace_premium_outlined,
+            label: 'Certificates',
+            subtitle: 'Bonafide, TC, character issued to your child',
+            onTap: () => Navigator.of(context).push(
+              MaterialPageRoute(builder: (_) => const ChildCertificatesPage()),
+            ),
+          ),
+          _Tile(
+            icon: Icons.sports_soccer_outlined,
+            label: 'Sports & clubs',
+            subtitle: 'House leaderboard + events',
+            onTap: () => Navigator.of(context).push(
+              MaterialPageRoute(builder: (_) => const SportsPage()),
             ),
           ),
           _Tile(

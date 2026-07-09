@@ -46,10 +46,48 @@ def _to_dict(obj: Any) -> dict:
     return out
 
 
+def _coerce(col_type_name: str, v: Any) -> Any:
+    """Convert JSON-friendly primitives to SQLAlchemy-friendly values.
+
+    The frontend always sends dates/times as ISO strings and numbers
+    as strings from form inputs. Silently coercing them here means
+    every router doesn't have to.
+    """
+    if v is None or v == "":
+        return None
+    tn = col_type_name.upper()
+    try:
+        if tn.startswith("DATETIME"):
+            if isinstance(v, datetime):
+                return v
+            return datetime.fromisoformat(str(v).replace("Z", "+00:00").replace(" ", "T"))
+        if tn.startswith("DATE"):
+            if isinstance(v, date):
+                return v
+            return date.fromisoformat(str(v)[:10])
+        if tn.startswith("BOOL") or tn.startswith("TINYINT"):
+            if isinstance(v, bool):
+                return v
+            return str(v).lower() in {"1", "true", "yes", "on"}
+        if tn.startswith("NUMERIC") or tn.startswith("DECIMAL") or tn.startswith("FLOAT") or tn.startswith("REAL"):
+            from decimal import Decimal
+            return Decimal(str(v))
+        if tn.startswith("INTEGER") or tn.startswith("BIGINT") or tn.startswith("SMALLINT"):
+            return int(v) if str(v).strip() != "" else None
+    except (ValueError, TypeError):
+        return v
+    return v
+
+
 def _apply(obj: Any, payload: dict, allowed: set[str]) -> None:
+    columns = {c.name: c for c in obj.__table__.columns}
     for k, v in (payload or {}).items():
-        if k in allowed:
-            setattr(obj, k, v)
+        if k not in allowed:
+            continue
+        col = columns.get(k)
+        if col is not None:
+            v = _coerce(str(col.type), v)
+        setattr(obj, k, v)
 
 
 # ---------------------------------------------------------------------------

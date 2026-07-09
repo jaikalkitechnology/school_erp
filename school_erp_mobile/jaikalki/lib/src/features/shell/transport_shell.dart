@@ -11,6 +11,7 @@ import '../driver/driver_stops_map_page.dart';
 import '../driver/driver_students_page.dart';
 import '../messages/messages_page.dart';
 import '../notifications/notifications_page.dart';
+import '../operations/notice_board_page.dart';
 import '../settings/settings_page.dart';
 
 /// Bottom-nav shell shown when a user logs in with ``transport_manager``
@@ -138,6 +139,25 @@ class _TransportMorePage extends StatelessWidget {
             onTap: () => Navigator.of(context).push(
               MaterialPageRoute(
                 builder: (_) => const DriverStopsMapPage(),
+              ),
+            ),
+          ),
+          ListTile(
+            leading: const Icon(Icons.campaign_outlined,
+                color: JaikalkiBrand.saffron),
+            title: const Text('Notice board'),
+            subtitle: const Text(
+              'School announcements + circulars',
+              style: TextStyle(
+                fontSize: 12,
+                color: JaikalkiBrand.textSecondary,
+              ),
+            ),
+            trailing: const Icon(Icons.chevron_right,
+                color: JaikalkiBrand.textSecondary),
+            onTap: () => Navigator.of(context).push(
+              MaterialPageRoute(
+                builder: (_) => const NoticeBoardPage(),
               ),
             ),
           ),

@@ -7,6 +7,9 @@ import '../../core/service_locator.dart';
 import '../../theme/brand.dart';
 import '../../widgets/authed_photo.dart';
 import '../notifications/notifications_page.dart';
+import '../operations/my_payslips_page.dart';
+import '../operations/notice_board_page.dart';
+import '../operations/sports_page.dart';
 import '../settings/settings_page.dart';
 import 'chat_list_page.dart';
 import 'homework_list_page.dart';
@@ -151,6 +154,30 @@ class _TeacherMorePageState extends State<TeacherMorePage> {
             const SizedBox(height: 8),
             _ListCard(
               children: [
+                _ListRow(
+                  icon: Icons.campaign_outlined,
+                  label: 'Notice board',
+                  onTap: () => Navigator.of(context).push(
+                    MaterialPageRoute(builder: (_) => const NoticeBoardPage()),
+                  ),
+                ),
+                const _Separator(),
+                _ListRow(
+                  icon: Icons.receipt_long_outlined,
+                  label: 'My payslips',
+                  onTap: () => Navigator.of(context).push(
+                    MaterialPageRoute(builder: (_) => const MyPayslipsPage()),
+                  ),
+                ),
+                const _Separator(),
+                _ListRow(
+                  icon: Icons.sports_soccer_outlined,
+                  label: 'Sports & clubs',
+                  onTap: () => Navigator.of(context).push(
+                    MaterialPageRoute(builder: (_) => const SportsPage()),
+                  ),
+                ),
+                const _Separator(),
                 _ListRow(
                   icon: Icons.notifications_outlined,
                   label: 'Notifications',
