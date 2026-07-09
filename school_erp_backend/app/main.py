@@ -236,9 +236,50 @@ async def _sync_rbac_catalogue() -> None:
         log.exception("granted_admin_pages backfill failed")
 
 
+async def _ensure_operations_tables() -> None:
+    """Safety net: create the Phase 28 operations tables if the
+    Alembic migration hasn't been applied yet. Only touches the
+    16 tables from ``models/operations.py`` — existing tables are
+    untouched because ``create_all`` is a no-op for those.
+
+    Reason to have this: in dev + fast deploys the migration
+    sometimes lags the code deploy, which produces
+    ``Table 'school_erp_db.admission_inquiries' doesn't exist`` on
+    the first POST. This keeps the app usable even in that
+    window."""
+    try:
+        from app.database import engine
+        from app.models import operations as ops_module
+
+        target_tables = [
+            t for t in ops_module.TenantBase.metadata.tables.values()
+            if t.name in {
+                "admission_inquiries", "vendors", "expenses",
+                "salary_structures", "payslips", "inventory_items",
+                "inventory_movements", "visitor_logs",
+                "health_records", "certificate_templates",
+                "issued_certificates", "discipline_incidents",
+                "notices", "alumni", "sports_houses", "sports_events",
+            }
+        ]
+        async with engine.begin() as conn:
+            await conn.run_sync(
+                lambda sync_conn: ops_module.TenantBase.metadata.create_all(
+                    sync_conn, tables=target_tables, checkfirst=True,
+                )
+            )
+        log.info("Operations tables verified (%s tables checked)",
+                 len(target_tables))
+    except Exception:
+        log.exception("Operations tables auto-create failed")
+
+
 @asynccontextmanager
 async def lifespan(_: FastAPI):
     setup_upload_directory()
+    # Auto-create any operations tables that are missing — covers the
+    # window between a code deploy and the alembic migration.
+    await _ensure_operations_tables()
     # Replay RBAC so new role codes shipped in the catalogue land in
     # every tenant's roles table. Safe + idempotent — runs once per
     # boot before traffic starts hitting the API.
