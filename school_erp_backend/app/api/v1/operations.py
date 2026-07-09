@@ -156,7 +156,7 @@ async def _commit_with_fk_translation(session: AsyncSession) -> None:
     from sqlalchemy.exc import IntegrityError
 
     try:
-        await _commit_with_fk_translation(session)
+        await session.commit()
     except IntegrityError as exc:
         await session.rollback()
         msg = str(exc.orig) if getattr(exc, "orig", None) else str(exc)
