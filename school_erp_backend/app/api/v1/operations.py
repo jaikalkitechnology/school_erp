@@ -32,6 +32,64 @@ _staff = require_roles(
 router = APIRouter(prefix="/operations", tags=["operations"])
 
 
+@router.post("/_bootstrap-tables")
+async def bootstrap_operations_tables(
+    principal: AuthPrincipal = Depends(
+        require_roles("school_admin", "super_admin", "principal"),
+    ),
+):
+    """One-shot fallback: create every Phase 28 operations table if
+    the Alembic migration hasn't been applied yet.
+
+    Idempotent — uses ``checkfirst=True`` so tables that already
+    exist are left alone. Safe to hit from a browser / curl by any
+    school_admin. Returns the list of tables that got created (may
+    be empty if everything is already in place)."""
+    from sqlalchemy import inspect as sync_inspect
+
+    from app.database import engine
+    from app.models import operations as ops_module
+
+    wanted = {
+        "admission_inquiries", "vendors", "expenses",
+        "salary_structures", "payslips", "inventory_items",
+        "inventory_movements", "visitor_logs",
+        "health_records", "certificate_templates",
+        "issued_certificates", "discipline_incidents",
+        "notices", "alumni", "sports_houses", "sports_events",
+    }
+    tables = [
+        t for t in ops_module.TenantBase.metadata.tables.values()
+        if t.name in wanted
+    ]
+
+    before: set[str] = set()
+    async with engine.connect() as conn:
+        def _get(sync_conn):
+            return set(sync_inspect(sync_conn).get_table_names())
+        before = await conn.run_sync(_get)
+
+    async with engine.begin() as conn:
+        await conn.run_sync(
+            lambda sync_conn: ops_module.TenantBase.metadata.create_all(
+                sync_conn, tables=tables, checkfirst=True,
+            )
+        )
+
+    async with engine.connect() as conn:
+        def _get(sync_conn):
+            return set(sync_inspect(sync_conn).get_table_names())
+        after = await conn.run_sync(_get)
+
+    created = sorted(after - before)
+    already = sorted(wanted & before)
+    return {
+        "created": created,
+        "already_present": already,
+        "missing_still": sorted(wanted - after),
+    }
+
+
 def _to_dict(obj: Any) -> dict:
     """SQLAlchemy row → JSON-safe dict."""
     out: dict = {}
