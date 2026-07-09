@@ -17,13 +17,23 @@ export type FieldKind =
   | "datetime"
   | "textarea"
   | "select"
-  | "checkbox";
+  | "checkbox"
+  | "picker";
+
+export interface PickerOption {
+  id: number;
+  label: string;
+  hint?: string;
+}
 
 export interface FieldSpec {
   key: string;
   label: string;
   kind?: FieldKind;
   options?: { value: string; label: string }[];
+  /** For kind="picker": function that returns the option list. Called
+   *  once when the form opens; results are cached in-component. */
+  fetchOptions?: () => Promise<PickerOption[]>;
   required?: boolean;
   hideInList?: boolean;
   hideInForm?: boolean;
@@ -65,7 +75,7 @@ const toInputValue = (v: unknown, kind?: FieldKind): string => {
 };
 
 const fromInputValue = (v: string, kind?: FieldKind): unknown => {
-  if (kind === "number") return v === "" ? null : Number(v);
+  if (kind === "number" || kind === "picker") return v === "" ? null : Number(v);
   if (kind === "checkbox") return v === "true";
   if (kind === "date" || kind === "datetime") return v || null;
   return v === "" ? null : v;
@@ -379,6 +389,12 @@ function FormDialog({
                 />
                 Enabled
               </label>
+            ) : f.kind === "picker" ? (
+              <PickerField
+                field={f}
+                value={values[f.key] ?? ""}
+                onChange={(v) => setValues({ ...values, [f.key]: v })}
+              />
             ) : (
               <Input
                 type={
@@ -439,6 +455,134 @@ function ModalShell({
         </div>
         {children}
       </div>
+    </div>
+  );
+}
+
+// ---- Picker field: fetches options from the server -------------------
+// Prevents users from typing an FK value that doesn't exist. Renders a
+// searchable dropdown with a "None" option so nullable FKs stay
+// nullable.
+
+function PickerField({
+  field,
+  value,
+  onChange,
+}: {
+  field: FieldSpec;
+  value: string;
+  onChange: (v: string) => void;
+}) {
+  const { data: options = [], isLoading } = useQuery({
+    queryKey: ["crud-picker", field.key],
+    queryFn: () => field.fetchOptions?.() ?? Promise.resolve([]),
+  });
+  const selected = options.find((o) => String(o.id) === String(value));
+  const [q, setQ] = useState("");
+  const [open, setOpen] = useState(false);
+
+  const filtered = options.filter((o) => {
+    if (!q.trim()) return true;
+    const needle = q.trim().toLowerCase();
+    return (
+      o.label.toLowerCase().includes(needle) ||
+      String(o.id) === needle ||
+      (o.hint ?? "").toLowerCase().includes(needle)
+    );
+  });
+
+  if (isLoading) {
+    return (
+      <p className="mt-1 text-xs text-muted-foreground">Loading options…</p>
+    );
+  }
+
+  return (
+    <div className="relative">
+      <div
+        role="button"
+        tabIndex={0}
+        onClick={() => setOpen((o) => !o)}
+        onKeyDown={(e) => {
+          if (e.key === "Enter" || e.key === " ") setOpen((o) => !o);
+        }}
+        className={cn(
+          "mt-1 flex h-9 w-full cursor-pointer items-center rounded border border-input bg-transparent px-3 text-sm",
+          open && "border-saffron",
+        )}
+      >
+        {selected ? (
+          <span>
+            <span className="font-medium">{selected.label}</span>
+            <span className="ml-1 text-xs text-muted-foreground">
+              #{selected.id}
+              {selected.hint ? ` · ${selected.hint}` : ""}
+            </span>
+          </span>
+        ) : value ? (
+          <span className="text-destructive">
+            Unknown #{value} (clear or pick another)
+          </span>
+        ) : (
+          <span className="text-muted-foreground">
+            {field.placeholder ?? `Pick ${field.label.toLowerCase()}`}
+          </span>
+        )}
+        <span className="ml-auto text-muted-foreground">▾</span>
+      </div>
+      {open && (
+        <div className="absolute left-0 right-0 top-11 z-30 max-h-64 overflow-y-auto rounded-md border border-input bg-warm-white shadow-lg">
+          <div className="border-b border-input p-2">
+            <Input
+              value={q}
+              onChange={(e) => setQ(e.target.value)}
+              placeholder="Search…"
+              autoFocus
+            />
+          </div>
+          <button
+            type="button"
+            onClick={() => {
+              onChange("");
+              setOpen(false);
+              setQ("");
+            }}
+            className="flex w-full items-center gap-2 border-b border-saffron-pale px-3 py-2 text-left text-sm text-muted-foreground hover:bg-muted"
+          >
+            <span className="italic">None</span>
+          </button>
+          {filtered.length === 0 ? (
+            <p className="px-3 py-2 text-xs text-muted-foreground">
+              No matches. If the row you want doesn't exist yet, add it
+              first on its own page.
+            </p>
+          ) : (
+            filtered.map((o) => (
+              <button
+                key={o.id}
+                type="button"
+                onClick={() => {
+                  onChange(String(o.id));
+                  setOpen(false);
+                  setQ("");
+                }}
+                className={cn(
+                  "flex w-full items-center gap-2 border-t border-saffron-pale/50 px-3 py-2 text-left text-sm first:border-t-0 hover:bg-saffron-pale/60",
+                  String(o.id) === String(value) && "bg-saffron-pale",
+                )}
+              >
+                <div className="flex-1">
+                  <p className="font-medium">{o.label}</p>
+                  {o.hint && (
+                    <p className="text-xs text-muted-foreground">{o.hint}</p>
+                  )}
+                </div>
+                <span className="text-xs text-muted-foreground">#{o.id}</span>
+              </button>
+            ))
+          )}
+        </div>
+      )}
     </div>
   );
 }

@@ -8,9 +8,10 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { cn } from "@/lib/utils";
 import { SimpleCrudPage, type FieldSpec } from "./_crud";
+import { fetchStaffUserOptions } from "./_pickers";
 
 const STRUCT_FIELDS: FieldSpec[] = [
-  { key: "user_id", label: "User #", kind: "number", required: true },
+  { key: "user_id", label: "Staff member", kind: "picker", fetchOptions: fetchStaffUserOptions, required: true },
   { key: "basic", label: "Basic", kind: "number", required: true },
   { key: "hra", label: "HRA", kind: "number" },
   { key: "effective_from", label: "Effective from", kind: "date", required: true },
