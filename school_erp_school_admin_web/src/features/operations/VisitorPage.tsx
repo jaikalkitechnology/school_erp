@@ -3,13 +3,14 @@ import { LogOut } from "lucide-react";
 import { api } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { SimpleCrudPage, type FieldSpec } from "./_crud";
+import { fetchStaffUserOptions } from "./_pickers";
 
 const FIELDS: FieldSpec[] = [
   { key: "full_name", label: "Visitor", required: true },
   { key: "phone", label: "Phone" },
   { key: "company", label: "Company / from" },
   { key: "purpose", label: "Purpose", placeholder: "meeting / delivery / fee payment" },
-  { key: "host_user_id", label: "Host user #", kind: "number", hideInList: true },
+  { key: "host_user_id", label: "Host (staff)", kind: "picker", fetchOptions: fetchStaffUserOptions, hideInList: true },
   { key: "id_proof_type", label: "ID type", placeholder: "aadhaar / dl / other", hideInList: true },
   { key: "id_proof_ref", label: "ID number", hideInList: true },
   { key: "badge_no", label: "Badge #" },

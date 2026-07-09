@@ -1,10 +1,14 @@
 import { SimpleCrudPage, type FieldSpec } from "./_crud";
+import {
+  fetchSportsHouseOptions,
+  fetchStudentOptions,
+} from "./_pickers";
 
 const HOUSE_FIELDS: FieldSpec[] = [
   { key: "name", label: "House", required: true },
   { key: "color", label: "Colour", placeholder: "#DC2626 or red" },
   { key: "motto", label: "Motto", hideInList: true },
-  { key: "captain_student_id", label: "Captain #", kind: "number" },
+  { key: "captain_student_id", label: "Captain", kind: "picker", fetchOptions: fetchStudentOptions },
   { key: "points", label: "Points", kind: "number" },
 ];
 
@@ -26,7 +30,7 @@ const EVENT_FIELDS: FieldSpec[] = [
   { key: "starts_on", label: "Starts", kind: "date", required: true },
   { key: "ends_on", label: "Ends", kind: "date" },
   { key: "venue", label: "Venue" },
-  { key: "winner_house_id", label: "Winner house #", kind: "number", hideInList: true },
+  { key: "winner_house_id", label: "Winner house", kind: "picker", fetchOptions: fetchSportsHouseOptions, hideInList: true },
   { key: "notes", label: "Notes", kind: "textarea", hideInList: true },
 ];
 

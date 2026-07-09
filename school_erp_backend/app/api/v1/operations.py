@@ -148,6 +148,40 @@ def _apply(obj: Any, payload: dict, allowed: set[str]) -> None:
         setattr(obj, k, v)
 
 
+async def _commit_with_fk_translation(session: AsyncSession) -> None:
+    """Commit + translate MySQL FK errors to a clean 400 with the
+    column name. Otherwise SQLAlchemy bubbles a 500 and the user
+    sees a stack trace-y ``expenses_ibfk_1`` string that says
+    nothing about what's wrong."""
+    from sqlalchemy.exc import IntegrityError
+
+    try:
+        await _commit_with_fk_translation(session)
+    except IntegrityError as exc:
+        await session.rollback()
+        msg = str(exc.orig) if getattr(exc, "orig", None) else str(exc)
+        # MySQL 1452 = "Cannot add or update a child row: a foreign
+        # key constraint fails". Show a short human message.
+        if "1452" in msg or "foreign key constraint fails" in msg.lower():
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=(
+                    "One of the referenced rows doesn't exist. "
+                    "Check that every foreign-key field points to a "
+                    "row that's already been created."
+                ),
+            )
+        if "1062" in msg or "Duplicate entry" in msg:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="A row with that unique value already exists.",
+            )
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Save failed: {msg[:200]}",
+        )
+
+
 # ---------------------------------------------------------------------------
 # 1. Admissions
 # ---------------------------------------------------------------------------
@@ -194,7 +228,7 @@ async def create_admission(
     if not obj.child_full_name:
         raise HTTPException(400, "child_full_name required")
     session.add(obj)
-    await session.commit()
+    await _commit_with_fk_translation(session)
     await session.refresh(obj)
     return _to_dict(obj)
 
@@ -211,7 +245,7 @@ async def update_admission(
     if obj is None:
         raise HTTPException(404, "Not found")
     _apply(obj, payload, _ADM_FIELDS)
-    await session.commit()
+    await _commit_with_fk_translation(session)
     await session.refresh(obj)
     return _to_dict(obj)
 
@@ -228,7 +262,7 @@ async def delete_admission(
     if obj is None:
         return
     await session.delete(obj)
-    await session.commit()
+    await _commit_with_fk_translation(session)
 
 
 @router.get("/admissions/stats")
@@ -285,7 +319,7 @@ def _simple_list_create_update_delete(prefix: str, Model, fields: set[str],
         obj = Model(tenant_id=principal.tenant_id)
         _apply(obj, payload, fields)
         session.add(obj)
-        await session.commit()
+        await _commit_with_fk_translation(session)
         await session.refresh(obj)
         return _to_dict(obj)
 
@@ -299,7 +333,7 @@ def _simple_list_create_update_delete(prefix: str, Model, fields: set[str],
         if obj is None:
             raise HTTPException(404, "Not found")
         _apply(obj, payload, fields)
-        await session.commit()
+        await _commit_with_fk_translation(session)
         await session.refresh(obj)
         return _to_dict(obj)
 
@@ -312,7 +346,7 @@ def _simple_list_create_update_delete(prefix: str, Model, fields: set[str],
         obj = await session.get(Model, row_id)
         if obj is not None:
             await session.delete(obj)
-            await session.commit()
+            await _commit_with_fk_translation(session)
 
 
 # Register the simple-CRUD modules --------------------------------------
@@ -466,7 +500,7 @@ async def create_inventory_movement(
     if isinstance(mov.occurred_on, str):
         mov.occurred_on = date.fromisoformat(mov.occurred_on)
     session.add(mov)
-    await session.commit()
+    await _commit_with_fk_translation(session)
     await session.refresh(mov)
     await session.refresh(item)
     return {"movement": _to_dict(mov), "item": _to_dict(item)}
@@ -502,7 +536,7 @@ async def visitor_checkout(
     if v is None:
         raise HTTPException(404, "Not found")
     v.checked_out_at = datetime.utcnow()
-    await session.commit()
+    await _commit_with_fk_translation(session)
     await session.refresh(v)
     return _to_dict(v)
 
@@ -580,7 +614,7 @@ async def generate_payslip(
         status="issued",
     )
     session.add(slip)
-    await session.commit()
+    await _commit_with_fk_translation(session)
     await session.refresh(slip)
     return _to_dict(slip)
 
@@ -616,7 +650,7 @@ async def payslip_mark_paid(
         raise HTTPException(404, "Not found")
     slip.status = "paid"
     slip.paid_on = date.today()
-    await session.commit()
+    await _commit_with_fk_translation(session)
     await session.refresh(slip)
     return _to_dict(slip)
 
@@ -678,7 +712,7 @@ async def issue_certificate(
         notes=payload.get("notes"),
     )
     session.add(obj)
-    await session.commit()
+    await _commit_with_fk_translation(session)
     await session.refresh(obj)
     return _to_dict(obj)
 

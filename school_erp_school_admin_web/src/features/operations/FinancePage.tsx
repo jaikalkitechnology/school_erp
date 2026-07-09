@@ -2,6 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import { api } from "@/lib/api";
 import { Card, CardContent } from "@/components/ui/card";
 import { SimpleCrudPage, type FieldSpec } from "./_crud";
+import { fetchVendorOptions } from "./_pickers";
 
 const VENDOR_FIELDS: FieldSpec[] = [
   { key: "name", label: "Vendor", required: true },
@@ -16,7 +17,7 @@ const VENDOR_FIELDS: FieldSpec[] = [
 
 const EXPENSE_FIELDS: FieldSpec[] = [
   { key: "category", label: "Category", required: true, placeholder: "salaries / utilities / stationery" },
-  { key: "vendor_id", label: "Vendor #", kind: "number" },
+  { key: "vendor_id", label: "Vendor", kind: "picker", fetchOptions: fetchVendorOptions, placeholder: "Pick a vendor (optional)" },
   { key: "amount", label: "Amount ₹", kind: "number", required: true },
   { key: "spent_on", label: "Date", kind: "date", required: true },
   { key: "paid_from", label: "Paid from", placeholder: "cash / bank / upi" },

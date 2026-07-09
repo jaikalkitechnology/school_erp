@@ -1,7 +1,8 @@
 import { SimpleCrudPage, type FieldSpec } from "./_crud";
+import { fetchStudentOptions } from "./_pickers";
 
 const FIELDS: FieldSpec[] = [
-  { key: "student_id", label: "Student #", kind: "number", required: true },
+  { key: "student_id", label: "Student", kind: "picker", fetchOptions: fetchStudentOptions, required: true },
   {
     key: "kind",
     label: "Kind",
