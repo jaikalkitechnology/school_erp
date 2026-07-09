@@ -148,11 +148,20 @@ def _apply(obj: Any, payload: dict, allowed: set[str]) -> None:
         setattr(obj, k, v)
 
 
+import re as _re
+
+_FK_PATTERN = _re.compile(
+    r"FOREIGN KEY \(`(?P<col>[^`]+)`\) REFERENCES `(?P<ref>[^`]+)`",
+    _re.IGNORECASE,
+)
+_DUP_PATTERN = _re.compile(r"Duplicate entry '(?P<val>[^']+)' for key '(?P<key>[^']+)'")
+
+
 async def _commit_with_fk_translation(session: AsyncSession) -> None:
-    """Commit + translate MySQL FK errors to a clean 400 with the
-    column name. Otherwise SQLAlchemy bubbles a 500 and the user
-    sees a stack trace-y ``expenses_ibfk_1`` string that says
-    nothing about what's wrong."""
+    """Commit + translate MySQL FK / duplicate errors to a clean 400
+    with the exact column at fault. Otherwise SQLAlchemy bubbles a
+    500 and the user sees a stack-tracey error string that says
+    nothing about which field to fix."""
     from sqlalchemy.exc import IntegrityError
 
     try:
@@ -160,22 +169,46 @@ async def _commit_with_fk_translation(session: AsyncSession) -> None:
     except IntegrityError as exc:
         await session.rollback()
         msg = str(exc.orig) if getattr(exc, "orig", None) else str(exc)
-        # MySQL 1452 = "Cannot add or update a child row: a foreign
-        # key constraint fails". Show a short human message.
+
+        # ---- MySQL 1452: FK constraint --------------------------------
         if "1452" in msg or "foreign key constraint fails" in msg.lower():
+            m = _FK_PATTERN.search(msg)
+            if m:
+                col = m.group("col")
+                ref = m.group("ref")
+                detail = (
+                    f"'{col}' must point to an existing row in {ref}. "
+                    f"The value you entered doesn't match any {ref} row — "
+                    f"either pick from the dropdown or leave it blank if "
+                    f"the field is optional."
+                )
+            else:
+                detail = (
+                    "One of the referenced rows doesn't exist. Check that "
+                    "every foreign-key field points to a row that's "
+                    "already been created."
+                )
             raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail=(
-                    "One of the referenced rows doesn't exist. "
-                    "Check that every foreign-key field points to a "
-                    "row that's already been created."
-                ),
+                status_code=status.HTTP_400_BAD_REQUEST, detail=detail,
             )
+
+        # ---- MySQL 1062: duplicate unique -----------------------------
         if "1062" in msg or "Duplicate entry" in msg:
+            dup = _DUP_PATTERN.search(msg)
+            if dup:
+                val = dup.group("val")
+                key = dup.group("key")
+                detail = (
+                    f"A row with '{val}' already exists (constraint '{key}'). "
+                    f"Change the value or edit the existing row instead."
+                )
+            else:
+                detail = "A row with that unique value already exists."
             raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="A row with that unique value already exists.",
+                status_code=status.HTTP_400_BAD_REQUEST, detail=detail,
             )
+
+        # ---- Everything else — surface first 200 chars ---------------
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=f"Save failed: {msg[:200]}",
