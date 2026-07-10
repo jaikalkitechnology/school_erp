@@ -139,7 +139,12 @@ class _TransportPageState extends State<TransportPage>
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
+    // Provide the ChildrenCubit ourselves so the page also works when
+    // pushed from the More menu (no ancestor BlocProvider). Cheap
+    // no-op re-wrap when the same instance is already up the tree.
+    return BlocProvider.value(
+      value: locator<ChildrenCubit>(),
+      child: Scaffold(
       appBar: AppBar(title: const Text('Transport')),
       body: RefreshIndicator(
         onRefresh: _refresh,
@@ -155,15 +160,41 @@ class _TransportPageState extends State<TransportPage>
                     ]);
                   }
                   if (snap.hasError) {
-                    return ListView(children: [
-                      const SizedBox(height: 40),
+                    // Parents shouldn't see the raw Dio stack trace — the
+                    // most common cause is "no bus assigned yet" or "school
+                    // office hasn't set your child up on a route", so show a
+                    // friendly empty state and only surface the raw error
+                    // to the debug console.
+                    debugPrint('Transport load failed: ${snap.error}');
+                    return ListView(children: const [
+                      SizedBox(height: 80),
                       Center(
                         child: Padding(
-                          padding: const EdgeInsets.all(24),
-                          child: Text(
-                            'Could not load transport: ${snap.error}',
-                            textAlign: TextAlign.center,
-                            style: const TextStyle(color: Color(0xFFD32F2F)),
+                          padding: EdgeInsets.all(24),
+                          child: Column(
+                            children: [
+                              Icon(Icons.directions_bus_outlined,
+                                  size: 48, color: JaikalkiBrand.textSecondary),
+                              SizedBox(height: 12),
+                              Text(
+                                "Transport isn't set up for your child yet.",
+                                textAlign: TextAlign.center,
+                                style: TextStyle(
+                                  fontWeight: FontWeight.w700,
+                                  color: JaikalkiBrand.indigoDark,
+                                ),
+                              ),
+                              SizedBox(height: 6),
+                              Text(
+                                "Ask the school office to assign a bus route "
+                                "and stops. Pull down to retry.",
+                                textAlign: TextAlign.center,
+                                style: TextStyle(
+                                  fontSize: 13,
+                                  color: JaikalkiBrand.textSecondary,
+                                ),
+                              ),
+                            ],
                           ),
                         ),
                       ),
@@ -182,6 +213,7 @@ class _TransportPageState extends State<TransportPage>
                 },
               ),
       ),
+    ),
     );
   }
 }

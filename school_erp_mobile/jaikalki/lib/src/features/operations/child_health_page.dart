@@ -20,17 +20,25 @@ class ChildHealthPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(title: const Text('Health records')),
-      body: BlocBuilder<ChildrenCubit, ChildrenState>(
-        builder: (context, state) {
-          if (state is! ChildrenLoaded || state.selectedId == null) {
-            return const Center(
-              child: Text('Pick a child first from the top bar.'),
-            );
-          }
-          return _HealthFeed(studentId: state.selectedId!);
-        },
+    // Provide the ChildrenCubit ourselves so the page works whether
+    // it's mounted inside the parent shell (which already provides it)
+    // or pushed via MaterialPageRoute from the More menu (no ancestor
+    // BlocProvider). ``BlocProvider.value`` is a no-op re-wrap when the
+    // same instance is already up the tree.
+    return BlocProvider.value(
+      value: locator<ChildrenCubit>(),
+      child: Scaffold(
+        appBar: AppBar(title: const Text('Health records')),
+        body: BlocBuilder<ChildrenCubit, ChildrenState>(
+          builder: (context, state) {
+            if (state is! ChildrenLoaded || state.selectedId == null) {
+              return const Center(
+                child: Text('Pick a child first from the top bar.'),
+              );
+            }
+            return _HealthFeed(studentId: state.selectedId!);
+          },
+        ),
       ),
     );
   }
