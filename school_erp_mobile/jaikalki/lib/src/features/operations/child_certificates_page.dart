@@ -14,17 +14,20 @@ class ChildCertificatesPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(title: const Text('Certificates')),
-      body: BlocBuilder<ChildrenCubit, ChildrenState>(
-        builder: (context, state) {
-          if (state is! ChildrenLoaded || state.selectedId == null) {
-            return const Center(
-              child: Text('Pick a child first from the top bar.'),
-            );
-          }
-          return _Feed(studentId: state.selectedId!);
-        },
+    return BlocProvider.value(
+      value: locator<ChildrenCubit>(),
+      child: Scaffold(
+        appBar: AppBar(title: const Text('Certificates')),
+        body: BlocBuilder<ChildrenCubit, ChildrenState>(
+          builder: (context, state) {
+            if (state is! ChildrenLoaded || state.selectedId == null) {
+              return const Center(
+                child: Text('Pick a child first from the top bar.'),
+              );
+            }
+            return _Feed(studentId: state.selectedId!);
+          },
+        ),
       ),
     );
   }
