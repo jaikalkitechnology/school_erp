@@ -72,27 +72,91 @@ const leaf = (to: string, label: string, icon: LucideIcon): NavLeaf => ({
 // Library is grouped so its 8 sub-pages don't blow up the flat
 // sidebar. All other modules stay as flat leaves for now — group
 // more when they grow their own sub-pages.
+// Grouped nav that matches the school-side org chart. Where a single
+// existing page covers multiple sub-nav concepts (e.g. Fee Structure,
+// Fee Collection and Fee Reports all live inside /fees as tabs), the
+// entries share a URL — clicking any of them takes the user to the
+// same page. That's intentional; splitting each tab into its own
+// route is a follow-up.
 const nav: NavItem[] = [
-  leaf("/dashboard", "Overview", Home),
-  leaf("/org", "Departments / Classes", Layers),
-  leaf("/academic", "Academic year", CalendarDays),
-  leaf("/curriculum", "Curriculum", BookOpenCheck),
-  leaf("/students", "Students", GraduationCap),
-  leaf("/teachers", "Teachers", Users),
-  leaf("/staff", "Staff attendance", CalendarCheck),
-  leaf("/users", "Users & logins", KeyRound),
-  leaf("/attendance", "Attendance", ClipboardList),
-  leaf("/timetable", "Timetable", CalendarDays),
-  leaf("/homework", "Homework", ClipboardList),
-  leaf("/exams", "Exams", BookOpenCheck),
-  leaf("/report-cards", "Report cards", FileText),
-  leaf("/fees", "Fees", Receipt),
-  leaf("/communication", "Communication", MessageCircle),
+  leaf("/dashboard", "Dashboard", Home),
+
+  // ------------------------------- School Setup
   {
-    kind: "group",
-    key: "library",
-    label: "Library",
-    icon: Library,
+    kind: "group", key: "school-setup", label: "School Setup", icon: Building,
+    children: [
+      leaf("/settings", "School Profile", Settings),
+      leaf("/academic", "Academic Year", CalendarDays),
+      leaf("/org", "Departments", Layers),
+      leaf("/org", "Classes & Sections", GraduationCap),
+      leaf("/curriculum", "Curriculum", BookOpenCheck),
+    ],
+  },
+
+  // ------------------------------- Student Management
+  {
+    kind: "group", key: "students-mgmt", label: "Student Management",
+    icon: GraduationCap,
+    children: [
+      leaf("/students", "Students", GraduationCap),
+      leaf("/admissions", "Admissions", ClipboardList),
+      leaf("/attendance", "Attendance", ClipboardList),
+      leaf("/report-cards", "Report Cards", FileText),
+      leaf("/cert-issue", "Certificates", FileText),
+      leaf("/id-cards", "ID Cards", Printer),
+      leaf("/discipline", "Discipline", AlertOctagon),
+      leaf("/alumni", "Alumni", Users),
+    ],
+  },
+
+  // ------------------------------- Staff Management
+  {
+    kind: "group", key: "staff-mgmt", label: "Staff Management", icon: Users,
+    children: [
+      leaf("/teachers", "Teachers", Users),
+      leaf("/users", "Users & Logins", KeyRound),
+      leaf("/staff", "Staff Attendance", CalendarCheck),
+    ],
+  },
+
+  // ------------------------------- Academic Management
+  {
+    kind: "group", key: "academic-mgmt", label: "Academic Management",
+    icon: BookOpenCheck,
+    children: [
+      leaf("/timetable", "Timetable", CalendarDays),
+      leaf("/homework", "Homework", ClipboardList),
+      leaf("/exams", "Exams", BookOpenCheck),
+      leaf("/report-cards", "Report Cards", FileText),
+    ],
+  },
+
+  // ------------------------------- Fee Management
+  {
+    kind: "group", key: "fees", label: "Fee Management", icon: Receipt,
+    children: [
+      leaf("/fees", "Fee Structure", Layers),
+      leaf("/fees", "Fee Collection", Receipt),
+      leaf("/fees", "Fee Reports", BarChart3),
+    ],
+  },
+
+  // ------------------------------- Communication
+  {
+    kind: "group", key: "communication", label: "Communication",
+    icon: MessageCircle,
+    children: [
+      leaf("/notice-board", "Notice Board", Bell),
+      leaf("/communication", "SMS", MessageCircle),
+      leaf("/communication", "Email", Send),
+      leaf("/communication", "Push Notifications", Bell),
+      leaf("/notice-board", "Circulars", FileText),
+    ],
+  },
+
+  // ------------------------------- Library
+  {
+    kind: "group", key: "library", label: "Library", icon: Library,
     children: [
       leaf("/library", "Dashboard", Home),
       leaf("/library-books", "Books", BookOpen),
@@ -117,74 +181,42 @@ const nav: NavItem[] = [
       leaf("/library-settings", "Settings", Settings),
     ],
   },
+
   leaf("/transport", "Transport", Bus),
   leaf("/hostel", "Hostel", Building),
-  // ---- Phase 28 operational modules ----
+
+  // ------------------------------- Finance
   {
-    kind: "group",
-    key: "admissions",
-    label: "Admissions",
-    icon: GraduationCap,
+    kind: "group", key: "finance", label: "Finance", icon: Receipt,
     children: [
-      leaf("/admissions", "Enquiry pipeline", ClipboardList),
-    ],
-  },
-  {
-    kind: "group",
-    key: "finance",
-    label: "Accounts / Finance",
-    icon: Receipt,
-    children: [
-      leaf("/finance-expenses", "Expenses", Receipt),
+      leaf("/finance-expenses", "Accounts", Receipt),
       leaf("/finance-vendors", "Vendors", Users),
-    ],
-  },
-  {
-    kind: "group",
-    key: "payroll",
-    label: "Payroll / HR",
-    icon: KeyRound,
-    children: [
-      leaf("/payroll-structures", "Salary structures", Layers),
+      leaf("/payroll-structures", "Payroll & HR", KeyRound),
       leaf("/payroll-payslips", "Payslips", FileText),
     ],
   },
+
+  // ------------------------------- Inventory & Assets
   {
-    kind: "group",
-    key: "inventory",
-    label: "Inventory / Stores",
+    kind: "group", key: "inventory", label: "Inventory & Assets",
     icon: Warehouse,
     children: [
       leaf("/inventory-items", "Items", BookOpen),
-      leaf("/inventory-movements", "Stock movements", ArrowUpDown),
+      leaf("/inventory-movements", "Stock Movements", ArrowUpDown),
     ],
   },
-  leaf("/visitor-logs", "Visitor management", Hand),
-  leaf("/health-records", "Health / Infirmary", ShieldCheck),
+
+  // ------------------------------- Campus Management
   {
-    kind: "group",
-    key: "certificates",
-    label: "Certificates",
-    icon: FileText,
+    kind: "group", key: "campus", label: "Campus Management", icon: Building,
     children: [
-      leaf("/cert-issue", "Issue certificate", Send),
-      leaf("/cert-templates", "Templates", Layers),
+      leaf("/visitor-logs", "Visitor Management", Hand),
+      leaf("/health-records", "Health / Infirmary", ShieldCheck),
+      leaf("/sports-houses", "Sports Houses", PenTool),
+      leaf("/sports-events", "Sports Events", CalendarDays),
     ],
   },
-  leaf("/id-cards", "ID cards", Printer),
-  leaf("/discipline", "Discipline", AlertOctagon),
-  leaf("/notice-board", "Notice board", Bell),
-  leaf("/alumni", "Alumni", Users),
-  {
-    kind: "group",
-    key: "sports",
-    label: "Sports & clubs",
-    icon: PenTool,
-    children: [
-      leaf("/sports-houses", "Houses", Layers),
-      leaf("/sports-events", "Events", CalendarDays),
-    ],
-  },
+
   leaf("/reports", "Reports", BarChart3),
   leaf("/subscription", "Subscription", CreditCard),
   leaf("/settings", "Settings", Settings),
