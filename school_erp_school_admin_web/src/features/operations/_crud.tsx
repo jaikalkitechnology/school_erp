@@ -20,7 +20,8 @@ export type FieldKind =
   | "checkbox"
   | "picker"
   | "phone"
-  | "email";
+  | "email"
+  | "gst";
 
 export interface PickerOption {
   id: number;
@@ -357,9 +358,17 @@ function FormDialog({
         }
       }
       if (raw !== "" && f.kind === "email") {
-        // Simple, permissive email shape check.
-        if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(raw)) {
-          errs[f.key] = "Enter a valid email address";
+        // Strict: local + domain may only contain letters, digits,
+        // dots and hyphens — this rejects ~!#$%^&*()_+|?><":{},;' and
+        // spaces. A single @ and a 2+ letter TLD are required.
+        if (!/^[a-zA-Z0-9.-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/.test(raw)) {
+          errs[f.key] = "Only letters, digits, . and - allowed — no special symbols";
+        }
+      }
+      if (raw !== "" && f.kind === "gst") {
+        // Indian GSTIN is exactly 15 alphanumeric characters.
+        if (!/^[0-9A-Z]{15}$/.test(raw)) {
+          errs[f.key] = "GST must be 15 letters/digits";
         }
       }
     }
@@ -467,14 +476,26 @@ function FormDialog({
                 }
                 min={f.kind === "number" ? 0 : undefined}
                 inputMode={f.kind === "phone" ? "numeric" : undefined}
-                maxLength={f.kind === "phone" ? 10 : undefined}
+                maxLength={
+                  f.kind === "phone" ? 10 : f.kind === "gst" ? 15 : undefined
+                }
                 value={values[f.key] ?? ""}
                 onChange={(e) => {
-                  // Phone inputs accept digits only, capped at 10.
-                  const v =
-                    f.kind === "phone"
-                      ? e.target.value.replace(/\D/g, "").slice(0, 10)
-                      : e.target.value;
+                  let v = e.target.value;
+                  // Phone: digits only, capped at 10.
+                  if (f.kind === "phone") {
+                    v = v.replace(/\D/g, "").slice(0, 10);
+                  }
+                  // GST: uppercase alphanumeric only, capped at 15.
+                  else if (f.kind === "gst") {
+                    v = v.toUpperCase().replace(/[^0-9A-Z]/g, "").slice(0, 15);
+                  }
+                  // Email: strip the special symbols the user can't use
+                  // (keep letters, digits, @ . _ - + so typing feels
+                  // natural; the submit check enforces the final shape).
+                  else if (f.kind === "email") {
+                    v = v.replace(/[~!#$%^&*()|?><":{},;'\s]/g, "");
+                  }
                   setValues({ ...values, [f.key]: v });
                   if (fieldErrors[f.key]) {
                     setFieldErrors((prev) => {
@@ -486,7 +507,11 @@ function FormDialog({
                 }}
                 placeholder={
                   f.placeholder ??
-                  (f.kind === "phone" ? "10-digit mobile" : undefined)
+                  (f.kind === "phone"
+                    ? "10-digit mobile"
+                    : f.kind === "gst"
+                    ? "15-character GSTIN"
+                    : undefined)
                 }
                 className={cn(fieldErrors[f.key] && "border-destructive")}
               />
