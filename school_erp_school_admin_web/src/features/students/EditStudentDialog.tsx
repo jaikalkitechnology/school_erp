@@ -243,6 +243,7 @@ export function EditStudentDialog({ student, open, onClose }: Props) {
           </div>
           <Field
             label="Phone"
+            kind="phone"
             value={form.phone ?? ""}
             onChange={(v) => setForm((f) => ({ ...f, phone: v }))}
           />
@@ -258,12 +259,13 @@ export function EditStudentDialog({ student, open, onClose }: Props) {
           />
           <Field
             label="Parent phone"
+            kind="phone"
             value={form.parent_phone ?? ""}
             onChange={(v) => setForm((f) => ({ ...f, parent_phone: v }))}
           />
           <Field
             label="Parent email"
-            type="email"
+            kind="email"
             value={form.parent_email ?? ""}
             onChange={(v) => setForm((f) => ({ ...f, parent_email: v }))}
           />
@@ -298,16 +300,30 @@ function Field({
   value,
   onChange,
   type = "text",
+  kind,
 }: {
   label: string;
   value: string;
   onChange: (v: string) => void;
   type?: string;
+  kind?: "phone" | "email";
 }) {
   return (
     <div className="space-y-1.5">
       <Label>{label}</Label>
-      <Input type={type} value={value} onChange={(e) => onChange(e.target.value)} />
+      <Input
+        type={kind === "email" ? "email" : kind === "phone" ? "tel" : type}
+        inputMode={kind === "phone" ? "numeric" : undefined}
+        maxLength={kind === "phone" ? 10 : undefined}
+        value={value}
+        onChange={(e) => {
+          const v =
+            kind === "phone"
+              ? e.target.value.replace(/\D/g, "").slice(0, 10)
+              : e.target.value;
+          onChange(v);
+        }}
+      />
     </div>
   );
 }

@@ -229,7 +229,8 @@ export function LibraryIssueBooksPage() {
                     <Label>Borrower ID</Label>
                     <Input
                       value={borrowerId}
-                      onChange={(e) => setBorrowerId(e.target.value)}
+                      inputMode="numeric"
+                      onChange={(e) => setBorrowerId(e.target.value.replace(/\D/g, ""))}
                     />
                   </div>
                   <div>

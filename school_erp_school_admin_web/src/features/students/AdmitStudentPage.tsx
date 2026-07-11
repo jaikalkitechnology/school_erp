@@ -67,6 +67,22 @@ export function AdmitStudentPage() {
   const set = <K extends keyof StudentCreatePayload>(k: K, v: StudentCreatePayload[K]) =>
     setForm((s) => ({ ...s, [k]: v }));
 
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
+
+  const validate = (): Record<string, string> => {
+    const errs: Record<string, string> = {};
+    const phone = (form.phone ?? "").trim();
+    const pPhone = (form.parent_phone ?? "").trim();
+    const pEmail = (form.parent_email ?? "").trim();
+    if (phone && phone.replace(/\D/g, "").length !== 10)
+      errs.phone = "Enter a 10-digit phone number";
+    if (pPhone && pPhone.replace(/\D/g, "").length !== 10)
+      errs.parent_phone = "Enter a 10-digit phone number";
+    if (pEmail && !/^[a-zA-Z0-9.-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/.test(pEmail))
+      errs.parent_email = "Enter a valid email address";
+    return errs;
+  };
+
   const submit = useMutation({
     mutationFn: () => createStudent(form),
     onSuccess: (s) => navigate(`/students/${s.id}`),
@@ -97,6 +113,12 @@ export function AdmitStudentPage() {
             onSubmit={(e) => {
               e.preventDefault();
               setError(null);
+              const errs = validate();
+              setFieldErrors(errs);
+              if (Object.keys(errs).length > 0) {
+                setError("Please fix the highlighted fields.");
+                return;
+              }
               submit.mutate();
             }}
           >
@@ -178,11 +200,11 @@ export function AdmitStudentPage() {
 
             <Field label="Father's name" value={form.father_name ?? ""} onChange={(v) => set("father_name", v)} />
             <Field label="Mother's name" value={form.mother_name ?? ""} onChange={(v) => set("mother_name", v)} />
-            <Field label="Parent phone" value={form.parent_phone ?? ""} onChange={(v) => set("parent_phone", v)} />
-            <Field label="Parent email" value={form.parent_email ?? ""} onChange={(v) => set("parent_email", v)} />
+            <Field label="Parent phone" kind="phone" error={fieldErrors.parent_phone} value={form.parent_phone ?? ""} onChange={(v) => set("parent_phone", v)} />
+            <Field label="Parent email" kind="email" error={fieldErrors.parent_email} value={form.parent_email ?? ""} onChange={(v) => set("parent_email", v)} />
 
             <Field label="Address" value={form.address ?? ""} onChange={(v) => set("address", v)} />
-            <Field label="Student phone" value={form.phone ?? ""} onChange={(v) => set("phone", v)} />
+            <Field label="Student phone" kind="phone" error={fieldErrors.phone} value={form.phone ?? ""} onChange={(v) => set("phone", v)} />
 
             {error && <p className="col-span-2 text-sm text-destructive">{error}</p>}
             <div className="col-span-2 flex justify-end gap-2 border-t border-saffron-pale pt-4">
@@ -203,17 +225,37 @@ function Field({
   value,
   onChange,
   hint,
+  kind,
+  error,
 }: {
   label: string;
   value: string;
   onChange: (v: string) => void;
   hint?: string;
+  kind?: "text" | "phone" | "email" | "aadhaar";
+  error?: string;
 }) {
   return (
     <div className="space-y-1.5">
       <Label>{label}</Label>
-      <Input value={value} onChange={(e) => onChange(e.target.value)} />
-      {hint && <p className="text-xs text-muted-foreground">{hint}</p>}
+      <Input
+        type={kind === "email" ? "email" : kind === "phone" ? "tel" : "text"}
+        inputMode={kind === "phone" || kind === "aadhaar" ? "numeric" : undefined}
+        maxLength={kind === "phone" ? 10 : kind === "aadhaar" ? 12 : undefined}
+        value={value}
+        onChange={(e) => {
+          let v = e.target.value;
+          if (kind === "phone") v = v.replace(/\D/g, "").slice(0, 10);
+          else if (kind === "aadhaar") v = v.replace(/\D/g, "").slice(0, 12);
+          onChange(v);
+        }}
+        className={error ? "border-destructive" : undefined}
+      />
+      {error ? (
+        <p className="text-xs text-destructive">{error}</p>
+      ) : (
+        hint && <p className="text-xs text-muted-foreground">{hint}</p>
+      )}
     </div>
   );
 }

@@ -81,7 +81,7 @@ export function LibraryShelvesPage() {
           </div>
           <div>
             <label className="text-xs uppercase tracking-wide text-muted-foreground">Capacity</label>
-            <Input value={capacity} onChange={(e) => setCapacity(e.target.value)} />
+            <Input type="number" min={1} value={capacity} onChange={(e) => setCapacity(e.target.value.replace(/\D/g, ""))} />
           </div>
           <div className="flex items-end">
             <Button onClick={add} disabled={!code.trim() || !section.trim()}>
