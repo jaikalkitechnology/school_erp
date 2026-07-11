@@ -6,10 +6,10 @@ import { fetchVendorOptions } from "./_pickers";
 
 const VENDOR_FIELDS: FieldSpec[] = [
   { key: "name", label: "Vendor", required: true },
-  { key: "contact_person", label: "Contact", required: true },
+  { key: "contact_person", label: "Contact", kind: "phone", required: true },
   { key: "phone", label: "Phone", kind: "phone", required: true },
   { key: "email", label: "Email", kind: "email", required: true },
-  { key: "gst_number", label: "GST", hideInList: true },
+  { key: "gst_number", label: "GST", kind: "gst", hideInList: true },
   { key: "address", label: "Address", kind: "textarea", hideInList: true },
   { key: "notes", label: "Notes", kind: "textarea", hideInList: true },
   { key: "is_active", label: "Active", kind: "checkbox" },
