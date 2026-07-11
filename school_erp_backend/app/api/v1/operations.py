@@ -898,3 +898,60 @@ async def finance_summary(
         "expenses_pending": float(exp_pending or 0),
         "net_month": float((inc_month or 0) - (exp_month or 0)),
     }
+
+
+# ---------------------------------------------------------------------------
+# Staff-user options — powers the FK pickers on Salary / Payslip / Visitor.
+# Gated to the broad operations staff set (not just school_admin), so a
+# payroll / accounts user who can see the Salary page can also populate
+# its "Staff member" dropdown.
+# ---------------------------------------------------------------------------
+
+
+@router.get("/_staff-options")
+async def staff_options(
+    q: Optional[str] = None,
+    session: AsyncSession = Depends(tenant_scoped_session),
+    principal: AuthPrincipal = Depends(_staff),
+):
+    """Every user account in the tenant (id + name + email + roles).
+    Teachers appear here because onboarding a teacher creates a User
+    row; salary structures / payslips FK on users.id, so this is the
+    right source for the picker."""
+    from app.models.auth import Role, User, UserRole
+
+    stmt = (
+        select(User)
+        .where(User.is_active.is_(True))
+        .order_by(User.full_name)
+        .limit(1000)
+    )
+    if q:
+        like = f"%{q.strip()}%"
+        stmt = stmt.where(
+            User.full_name.ilike(like) | User.email.ilike(like)
+        )
+    users = list((await session.execute(stmt)).scalars().all())
+
+    # Bulk-load role codes per user in one query.
+    roles_by_user: dict[int, list[str]] = {}
+    if users:
+        rows = (
+            await session.execute(
+                select(UserRole.user_id, Role.code)
+                .join(Role, Role.id == UserRole.role_id)
+                .where(UserRole.user_id.in_([u.id for u in users]))
+            )
+        ).all()
+        for uid, code in rows:
+            roles_by_user.setdefault(uid, []).append(code)
+
+    return [
+        {
+            "id": u.id,
+            "full_name": u.full_name,
+            "email": u.email,
+            "role_codes": roles_by_user.get(u.id, []),
+        }
+        for u in users
+    ]

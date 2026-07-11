@@ -59,22 +59,26 @@ export const fetchStudentOptions = async (): Promise<PickerOption[]> => {
   }));
 };
 
-/** Staff-user picker (any user with a staff-ish role assigned). Used
- * for salary structures, payslip target, visitor host, etc. */
+/** Staff-user picker — every active user account in the tenant, which
+ * includes teachers (onboarding a teacher creates a User row). Used
+ * for salary structures, payslip target, visitor host, etc. The
+ * salary/payslip FK is users.id, so this is the correct source.
+ *
+ * Uses the dedicated /operations/_staff-options endpoint (gated to
+ * the broad operations-staff role set) rather than the full
+ * /school-admin/users admin surface — so a payroll / accounts user
+ * who can see the Salary page can also populate this dropdown. */
 export const fetchStaffUserOptions = async (): Promise<PickerOption[]> => {
-  // Reuse the admin users listing endpoint if it exists; otherwise
-  // fall back to a lightweight all-users listing.
   try {
-    const page = await api
-      .get<{ items: Array<{ id: number; full_name: string; email: string | null; role_codes: string[] }> }>(
-        "/v1/school-admin/users",
-        { params: { limit: 500 } },
+    const rows = await api
+      .get<Array<{ id: number; full_name: string; email: string | null; role_codes: string[] }>>(
+        "/v1/operations/_staff-options",
       )
       .then((r) => r.data);
-    return (page.items ?? []).map((u) => ({
+    return rows.map((u) => ({
       id: u.id,
       label: u.full_name,
-      hint: [u.email, u.role_codes.join(", ")].filter(Boolean).join(" · "),
+      hint: [u.email, (u.role_codes ?? []).join(", ")].filter(Boolean).join(" · "),
     }));
   } catch {
     return [];
