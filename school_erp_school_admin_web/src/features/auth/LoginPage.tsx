@@ -4,8 +4,9 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { login as loginApi } from "@/lib/auth-api";
+import { login as loginApi, loginWithGoogle } from "@/lib/auth-api";
 import { useAuth } from "@/stores/auth";
+import { GoogleSignInButton } from "./GoogleSignInButton";
 
 const SCHOOL_ROLES = new Set([
   "school_admin",
@@ -51,6 +52,23 @@ export function LoginPage() {
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
+  // Shared post-login handling: gate to school staff, persist subdomain,
+  // set the session, navigate. Used by both password + Google login.
+  const finishLogin = (
+    res: Awaited<ReturnType<typeof loginApi>>,
+    cleanSubdomain: string,
+  ): boolean => {
+    const allowed = res.user.roles.some((r) => SCHOOL_ROLES.has(r));
+    if (!allowed) {
+      setError("This console is for school staff. Use the mobile app to sign in as parent/student.");
+      return false;
+    }
+    localStorage.setItem("jaikalki.subdomain", cleanSubdomain);
+    setSession(res.user, res.tokens);
+    navigate("/dashboard");
+    return true;
+  };
+
   const onSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
@@ -66,17 +84,30 @@ export function LoginPage() {
       // on every reload. loginApi sends the subdomain as an explicit header
       // for this call; the auth store writes it to localStorage on success.
       const res = await loginApi({ identifier, password, subdomain: cleanSubdomain });
-      const allowed = res.user.roles.some((r) => SCHOOL_ROLES.has(r));
-      if (!allowed) {
-        setError("This console is for school staff. Use the mobile app to sign in as parent/student.");
-        setSubmitting(false);
-        return;
-      }
-      localStorage.setItem("jaikalki.subdomain", cleanSubdomain);
-      setSession(res.user, res.tokens);
-      navigate("/dashboard");
+      finishLogin(res, cleanSubdomain);
     } catch (err: any) {
       setError(err?.response?.data?.detail ?? "Could not sign in. Check your credentials.");
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const onGoogleCredential = async (idToken: string) => {
+    setError(null);
+    if (!subdomain.trim()) {
+      setError("Pick your school's subdomain first, then sign in with Google.");
+      return;
+    }
+    setSubmitting(true);
+    try {
+      const cleanSubdomain = subdomain.trim().toLowerCase();
+      const res = await loginWithGoogle(idToken, cleanSubdomain);
+      finishLogin(res, cleanSubdomain);
+    } catch (err: any) {
+      setError(
+        err?.response?.data?.detail ??
+          "Google sign-in failed. Make sure your school admin has invited this email.",
+      );
     } finally {
       setSubmitting(false);
     }
@@ -161,6 +192,25 @@ export function LoginPage() {
                 {submitting ? "Signing in…" : "Sign in"}
               </Button>
             </form>
+
+            {/* Google Sign-In — subdomain-first: the user picks their
+                school above, then taps this. Renders nothing when
+                VITE_GOOGLE_CLIENT_ID_WEB isn't configured. */}
+            <div className="mt-4">
+              <div className="mb-3 flex items-center gap-3">
+                <span className="h-px flex-1 bg-border" />
+                <span className="text-xs uppercase tracking-wide text-muted-foreground">
+                  or
+                </span>
+                <span className="h-px flex-1 bg-border" />
+              </div>
+              <div className="flex justify-center">
+                <GoogleSignInButton
+                  onCredential={onGoogleCredential}
+                  disabled={submitting}
+                />
+              </div>
+            </div>
           </CardContent>
         </Card>
       </main>
