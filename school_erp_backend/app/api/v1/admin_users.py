@@ -103,7 +103,11 @@ async def list_users_route(
     q: Optional[str] = None,
     role_code: Optional[str] = None,
     only_active: bool = False,
-    limit: int = Query(50, ge=1, le=200),
+    # le raised from 200 → 1000 so an older cached frontend bundle that
+    # requests limit=500 (the pre-fix staff picker) doesn't 422. New
+    # code uses /operations/_staff-options instead, but this keeps the
+    # admin users list resilient to any caller asking for a big page.
+    limit: int = Query(50, ge=1, le=1000),
     offset: int = Query(0, ge=0),
     principal: AuthPrincipal = Depends(_admin),
     session: AsyncSession = Depends(tenant_scoped_session),
