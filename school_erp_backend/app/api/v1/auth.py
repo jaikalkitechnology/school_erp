@@ -69,6 +69,35 @@ async def login(
     )
 
 
+class GoogleLoginRequest(__import__("pydantic").BaseModel):
+    id_token: str
+    subdomain: Optional[str] = None
+    platform: Optional[str] = None  # accepted for parity; not gated
+
+
+@router.post("/google", response_model=LoginResponse)
+async def login_google(
+    payload: GoogleLoginRequest,
+    request: Request,
+    session: AsyncSession = Depends(platform_session),
+    ctx: TenantContext = Depends(get_tenant),
+):
+    """Subdomain-first Google Sign-In. The client sends the Google ID
+    token + the school subdomain; we verify the token against Google's
+    public keys, find the user inside that tenant, and issue our own
+    access/refresh pair (same shape as /login)."""
+    from app.services.auth import login_with_google
+
+    return await login_with_google(
+        session,
+        id_token=payload.id_token,
+        subdomain=payload.subdomain,
+        tenant_id_from_request=ctx.tenant_id,
+        user_agent=request.headers.get("user-agent"),
+        ip_address=request.client.host if request.client else None,
+    )
+
+
 @router.post("/refresh", response_model=TokenPair)
 async def refresh(
     payload: RefreshRequest,
