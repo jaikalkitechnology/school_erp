@@ -249,6 +249,66 @@ async def login(
     return LoginResponse(user=me, tokens=pair)
 
 
+async def login_with_google(
+    session: AsyncSession,
+    *,
+    id_token: str,
+    subdomain: Optional[str] = None,
+    tenant_id_from_request: Optional[int] = None,
+    user_agent: Optional[str] = None,
+    ip_address: Optional[str] = None,
+) -> LoginResponse:
+    """Subdomain-first Google login. Verify the Google ID token, resolve
+    the user inside the requested tenant, then issue our own token pair
+    — identical output shape to password login so the clients reuse
+    their happy path."""
+    from app.services.google_auth import (
+        resolve_google_user,
+        verify_google_id_token,
+    )
+
+    # Same tenant resolution as password login.
+    if subdomain:
+        tenant = await _get_tenant_by_subdomain(session, subdomain)
+    elif tenant_id_from_request is not None:
+        tenant = (
+            await session.execute(
+                select(Tenant).where(Tenant.id == tenant_id_from_request)
+            )
+        ).scalar_one()
+    else:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Tenant context required. Pick your school first.",
+        )
+
+    claims = await verify_google_id_token(id_token)
+    user = await resolve_google_user(session, tenant=tenant, claims=claims)
+
+    user.failed_login_count = 0
+    user.last_login_at = _now()
+
+    role_codes = sorted({ur.role.code for ur in user.role_assignments if ur.role})
+    perms = await _user_permissions(session, user)
+    pair, jti, refresh_expiry = _issue_tokens(user, tenant, role_codes, perms)
+
+    session.add(
+        RefreshToken(
+            tenant_id=tenant.id,
+            user_id=user.id,
+            jti=jti,
+            expires_at=refresh_expiry,
+            user_agent=(user_agent or "")[:255],
+            ip_address=(ip_address or "")[:64],
+        )
+    )
+    await session.commit()
+    await session.refresh(user)
+
+    me = await build_current_user(session, user, tenant)
+    return LoginResponse(user=me, tokens=pair)
+
+
 async def refresh(session: AsyncSession, refresh_token: str) -> TokenPair:
     """Rotate a refresh token: revoke the old row, mint a new pair.
 

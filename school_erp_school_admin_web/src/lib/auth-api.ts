@@ -30,6 +30,20 @@ export async function login(payload: LoginPayload): Promise<LoginResponse> {
   return data;
 }
 
+export async function loginWithGoogle(
+  idToken: string,
+  subdomain?: string,
+): Promise<LoginResponse> {
+  const headers: Record<string, string> = {};
+  if (subdomain) headers["X-Tenant-Subdomain"] = subdomain;
+  const { data } = await api.post<LoginResponse>(
+    "/v1/auth/google",
+    { id_token: idToken, subdomain, platform: "admin_panel" },
+    { headers },
+  );
+  return data;
+}
+
 export async function fetchMe(): Promise<AuthUser> {
   const { data } = await api.get<AuthUser>("/v1/auth/me");
   return data;

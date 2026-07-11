@@ -42,6 +42,21 @@ class Settings(BaseSettings):
     JWT_ACCESS_TOKEN_EXPIRE_MINUTES: int = 120
     JWT_REFRESH_TOKEN_EXPIRE_DAYS: int = 30
 
+    # Google Sign-In. Comma-separated list of accepted OAuth client IDs
+    # (audiences). A Google ID token is only trusted if its ``aud``
+    # claim matches one of these — this is what binds a token to *our*
+    # apps and rejects tokens minted for someone else's app. Add the
+    # web + android (+ ios later) client IDs here. Override via the
+    # GOOGLE_CLIENT_IDS env var in prod.
+    GOOGLE_CLIENT_IDS: str = (
+        "158812707380-i6f00ih0imbt2dh75s9dr849481joqap.apps.googleusercontent.com,"
+        "158812707380-p6hf3no37n1jdnjfer69j2558v3ujqpj.apps.googleusercontent.com"
+    )
+
+    @property
+    def google_client_ids(self) -> list[str]:
+        return [c.strip() for c in self.GOOGLE_CLIENT_IDS.split(",") if c.strip()]
+
     # CORS - Annotated[..., NoDecode] tells pydantic-settings to skip JSON parsing
     # so our custom validator can accept a plain comma-separated string from .env.
     CORS_ORIGINS: Annotated[List[str], NoDecode] = [

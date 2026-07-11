@@ -53,6 +53,10 @@ class User(TenantBase):
     phone = Column(String(20), nullable=True)
     password_hash = Column(String(255), nullable=True)  # nullable for OTP-only users
     auth_provider = Column(String(20), nullable=False, default=AuthProvider.PASSWORD.value)
+    # Google's stable per-user id (the ``sub`` claim). Set when a user
+    # links / signs in with Google. Unique per tenant so two schools
+    # can each have the same Google account as different users.
+    google_sub = Column(String(64), nullable=True)
 
     is_active = Column(Boolean, nullable=False, default=True)
     is_email_verified = Column(Boolean, nullable=False, default=False)

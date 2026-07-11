@@ -81,6 +81,25 @@ class AuthCubit extends Cubit<AuthState> {
     }
   }
 
+  Future<void> loginWithGoogle({
+    required String idToken,
+    required String subdomain,
+  }) async {
+    emit(const AuthAuthenticating());
+    try {
+      final result = await _repo.loginWithGoogle(
+        idToken: idToken,
+        subdomain: subdomain,
+      );
+      emit(AuthAuthenticated(result.user));
+      unawaited(PushService.instance.registerForCurrentSession());
+    } on AuthException catch (e) {
+      emit(AuthError(e.message));
+    } catch (e) {
+      emit(AuthError('Google sign-in failed: $e'));
+    }
+  }
+
   Future<void> loginWithOtp({
     required String identifier,
     required String subdomain,

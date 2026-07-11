@@ -274,12 +274,44 @@ async def _ensure_operations_tables() -> None:
         log.exception("Operations tables auto-create failed")
 
 
+async def _ensure_google_sub_column() -> None:
+    """Add users.google_sub if the Google-Sign-In migration hasn't run
+    yet — same resilience pattern as the operations tables. Idempotent:
+    checks information_schema first, only ALTERs when the column is
+    missing."""
+    try:
+        from sqlalchemy import text
+
+        from app.database import AsyncSessionLocal
+
+        async with AsyncSessionLocal() as session:
+            exists = (
+                await session.execute(
+                    text(
+                        "SELECT COUNT(*) FROM information_schema.columns "
+                        "WHERE table_schema = DATABASE() "
+                        "AND table_name = 'users' "
+                        "AND column_name = 'google_sub'"
+                    )
+                )
+            ).scalar()
+            if not exists:
+                await session.execute(
+                    text("ALTER TABLE users ADD COLUMN google_sub VARCHAR(64) NULL")
+                )
+                await session.commit()
+                log.info("Added users.google_sub column")
+    except Exception:
+        log.exception("google_sub column auto-add failed")
+
+
 @asynccontextmanager
 async def lifespan(_: FastAPI):
     setup_upload_directory()
     # Auto-create any operations tables that are missing — covers the
     # window between a code deploy and the alembic migration.
     await _ensure_operations_tables()
+    await _ensure_google_sub_column()
     # Replay RBAC so new role codes shipped in the catalogue land in
     # every tenant's roles table. Safe + idempotent — runs once per
     # boot before traffic starts hitting the API.
