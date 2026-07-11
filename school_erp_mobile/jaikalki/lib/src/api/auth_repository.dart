@@ -83,6 +83,42 @@ class AuthRepository {
     };
   }
 
+  /// Trade a Google ID token (from google_sign_in) for our own
+  /// session. Subdomain-first — the backend scopes the lookup to the
+  /// given school. Same response shape as [login].
+  Future<LoginResult> loginWithGoogle({
+    required String idToken,
+    required String subdomain,
+  }) async {
+    try {
+      final res = await _api.dio.post<Map<String, dynamic>>(
+        '/v1/auth/google',
+        data: {
+          'id_token': idToken,
+          'subdomain': subdomain.trim().toLowerCase(),
+          'platform': 'mobile_app',
+        },
+      );
+      final body = res.data!;
+      final tokens = TokenPair.fromJson(body['tokens'] as Map<String, dynamic>);
+      final user = AuthUser.fromJson(body['user'] as Map<String, dynamic>);
+      await _storage.write(key: _kAccessKey, value: tokens.accessToken);
+      await _storage.write(key: _kRefreshKey, value: tokens.refreshToken);
+      await _storage.write(
+        key: _kSubdomainKey,
+        value: user.tenantSubdomain ?? subdomain,
+      );
+      return LoginResult(user: user, tokens: tokens);
+    } on DioException catch (e) {
+      final detail =
+          e.response?.data is Map ? (e.response!.data as Map)['detail'] : null;
+      throw AuthException(
+        detail?.toString() ??
+            'Google sign-in failed. Ask your school to invite this email.',
+      );
+    }
+  }
+
   Future<LoginResult> login({
     required String identifier,
     required String password,
