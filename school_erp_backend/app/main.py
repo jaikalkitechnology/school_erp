@@ -343,6 +343,24 @@ async def validation_exception_handler(request: Request, exc: RequestValidationE
     )
 
 
+from app.api.v1.operations import _FieldError as _OpsFieldError
+
+
+@app.exception_handler(_OpsFieldError)
+async def ops_field_error_handler(request: Request, exc: _OpsFieldError) -> JSONResponse:
+    """Turn a bad-field error raised inside the operations router into a
+    clean 400 that names the exact field, e.g. "amount: cannot be
+    negative"."""
+    return JSONResponse(
+        status_code=400,
+        content={
+            "detail": f"{exc.field}: {exc.message}",
+            "field": exc.field,
+            "request_id": getattr(request.state, "request_id", None),
+        },
+    )
+
+
 @app.exception_handler(Exception)
 async def unhandled_exception_handler(request: Request, exc: Exception) -> JSONResponse:
     # In production, swap this for structured logging + Sentry capture.

@@ -11,7 +11,7 @@ from __future__ import annotations
 
 from datetime import date as _date
 from datetime import datetime, timezone
-from typing import List, Optional
+from typing import List, Literal, Optional
 
 from fastapi import HTTPException, status
 from pydantic import BaseModel, ConfigDict, Field
@@ -872,8 +872,10 @@ class StaffLeaveWrite(BaseModel):
 
 
 class StaffLeaveDecide(BaseModel):
-    status: str  # approved / rejected
-    decision_remarks: Optional[str] = None
+    # Only two valid decisions — a garbage status used to flow straight
+    # through to the service. Literal makes Pydantic 422 anything else.
+    status: Literal["approved", "rejected"]
+    decision_remarks: Optional[str] = Field(default=None, max_length=1000)
 
 
 def _staff_leave_to_read(obj) -> StaffLeaveRead:

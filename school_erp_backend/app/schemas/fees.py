@@ -167,7 +167,9 @@ class CollectPaymentRequest(BaseModel):
 
 class InitiatePaymentRequest(BaseModel):
     invoice_id: int
-    amount: Optional[Decimal] = None  # defaults to remaining due
+    # gt=0 so a negative / zero payment can't create a bogus FeePayment.
+    # The service still caps the upper bound at the remaining due.
+    amount: Optional[Decimal] = Field(default=None, gt=0)
 
 
 class InitiatePaymentResponse(BaseModel):
