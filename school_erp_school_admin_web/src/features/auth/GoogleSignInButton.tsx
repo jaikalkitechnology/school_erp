@@ -18,7 +18,13 @@ declare global {
   }
 }
 
-const CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID_WEB as string | undefined;
+// Web OAuth client ID. Prefer the build-time env var, but fall back to
+// the known web client so the button shows even when the deploy env
+// didn't set VITE_GOOGLE_CLIENT_ID_WEB. Client IDs are public (they're
+// embedded in every shipped bundle), so hardcoding a fallback is safe.
+const CLIENT_ID =
+  (import.meta.env.VITE_GOOGLE_CLIENT_ID_WEB as string | undefined) ||
+  "158812707380-i6f00ih0imbt2dh75s9dr849481joqap.apps.googleusercontent.com";
 
 /** Renders Google's official "Sign in with Google" button. On success
  * it calls onCredential with the ID token, which the caller trades for
