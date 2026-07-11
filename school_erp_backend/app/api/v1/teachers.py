@@ -27,6 +27,7 @@ from app.schemas.teacher import (
     TeacherUpdate,
     TeacherWorkload,
 )
+from app.services.teacher_app import StaffLeaveDecide
 from app.services.teachers import (
     assign_class_teacher,
     assign_section_subject,
@@ -324,23 +325,21 @@ async def list_staff_leaves_route(
 @router.post("/staff-leaves/{leave_id}/decide")
 async def decide_staff_leave_route(
     leave_id: int,
-    payload: dict,
+    payload: StaffLeaveDecide,
     principal: AuthPrincipal = Depends(_school_admin),
     session: AsyncSession = Depends(tenant_scoped_session),
 ):
     """Approve or reject a teacher's leave application from the admin
-    queue. Mirrors the /v1/teacher version but admin-gated."""
-    from app.services.teacher_app import StaffLeaveDecide, decide_staff_leave
+    queue. Mirrors the /v1/teacher version but admin-gated. ``status``
+    is now a Literal["approved","rejected"] — a bad value 422s at the
+    schema layer instead of flowing into the service."""
+    from app.services.teacher_app import decide_staff_leave
 
-    decision = StaffLeaveDecide(
-        status=str(payload.get("status") or ""),
-        decision_remarks=payload.get("decision_remarks"),
-    )
     result = await decide_staff_leave(
         session,
         leave_id=leave_id,
         decided_by_user_id=principal.user_id,
-        payload=decision,
+        payload=payload,
     )
     return result
 

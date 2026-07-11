@@ -3,11 +3,34 @@
 from __future__ import annotations
 
 from datetime import date
-from typing import List, Optional
+from typing import Annotated, List, Optional
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import (
+    BaseModel,
+    BeforeValidator,
+    ConfigDict,
+    EmailStr,
+    Field,
+)
 
 from app.models.sis import AdmissionStage, Category, Gender, StudentStatus
+
+
+def _blank_to_none(v):
+    """Treat empty / whitespace-only strings as None. Lets an optional
+    email field come in blank from a form or CSV import without tripping
+    EmailStr validation."""
+    if v is None:
+        return None
+    if isinstance(v, str) and v.strip() == "":
+        return None
+    return v
+
+
+# Optional email that (a) maps blank → None, (b) validates format when
+# a value is present. Used for every student/parent email field so a
+# malformed address can't silently persist into login / notify flows.
+OptionalEmail = Annotated[Optional[EmailStr], BeforeValidator(_blank_to_none)]
 
 
 # ---- Documents -------------------------------------------------------------
@@ -51,7 +74,7 @@ class StudentBase(BaseModel):
 
     address: Optional[str] = None
     phone: Optional[str] = None
-    email: Optional[str] = None
+    email: OptionalEmail = None
     aadhaar: Optional[str] = None
     religion: Optional[str] = None
     caste: Optional[str] = None
@@ -61,7 +84,7 @@ class StudentBase(BaseModel):
     mother_name: Optional[str] = None
     guardian_name: Optional[str] = None
     parent_phone: Optional[str] = None
-    parent_email: Optional[str] = None
+    parent_email: OptionalEmail = None
     parent_occupation: Optional[str] = None
 
     allergies: Optional[str] = None
@@ -110,7 +133,7 @@ class StudentRead(BaseModel):
 
     address: Optional[str]
     phone: Optional[str]
-    email: Optional[str]
+    email: Optional[str]  # read side: tolerate legacy malformed data
     aadhaar: Optional[str]
     religion: Optional[str]
     caste: Optional[str]
@@ -120,7 +143,7 @@ class StudentRead(BaseModel):
     mother_name: Optional[str]
     guardian_name: Optional[str]
     parent_phone: Optional[str]
-    parent_email: Optional[str]
+    parent_email: Optional[str]  # read side: tolerate legacy malformed data
     parent_occupation: Optional[str]
 
     allergies: Optional[str]
@@ -187,7 +210,7 @@ class AdmissionRead(BaseModel):
     gender: Optional[str]
     parent_name: Optional[str]
     parent_phone: Optional[str]
-    parent_email: Optional[str]
+    parent_email: Optional[str]  # read side: tolerate legacy malformed data
     desired_class_id: Optional[int]
     previous_school: Optional[str]
     notes: Optional[str]
@@ -201,7 +224,7 @@ class AdmissionWrite(BaseModel):
     gender: Optional[Gender] = None
     parent_name: Optional[str] = None
     parent_phone: Optional[str] = None
-    parent_email: Optional[str] = None
+    parent_email: OptionalEmail = None
     desired_class_id: Optional[int] = None
     previous_school: Optional[str] = None
     notes: Optional[str] = None

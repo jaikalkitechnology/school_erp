@@ -321,12 +321,43 @@ function FormDialog({
     return out;
   });
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const [busy, setBusy] = useState(false);
 
   const formFields = fields.filter((f) => !f.hideInForm);
 
+  /** Client-side validation before we POST. Returns a map of
+   * field-key → message; empty means valid. Catches the common cases
+   * so the user gets an inline red hint instead of a round-trip 400:
+   *   - required field left blank
+   *   - number field with a negative value (all our numeric fields
+   *     are counts / money / marks, none of which go below zero)
+   *   - number field that isn't actually a number */
+  const validate = (): Record<string, string> => {
+    const errs: Record<string, string> = {};
+    for (const f of formFields) {
+      const raw = (values[f.key] ?? "").trim();
+      if (f.required && raw === "") {
+        errs[f.key] = "Required";
+        continue;
+      }
+      if (raw !== "" && (f.kind === "number")) {
+        const n = Number(raw);
+        if (Number.isNaN(n)) errs[f.key] = "Must be a number";
+        else if (n < 0) errs[f.key] = "Cannot be negative";
+      }
+    }
+    return errs;
+  };
+
   const submit = async () => {
     setErrorMsg(null);
+    const errs = validate();
+    setFieldErrors(errs);
+    if (Object.keys(errs).length > 0) {
+      setErrorMsg("Please fix the highlighted fields.");
+      return;
+    }
     setBusy(true);
     try {
       const body: Record<string, unknown> = {};
@@ -340,6 +371,19 @@ function FormDialog({
           ? // @ts-expect-error - axios error shape
             err.response?.data?.detail
           : undefined;
+      const field =
+        typeof err === "object" && err !== null && "response" in err
+          ? // @ts-expect-error - axios error shape
+            err.response?.data?.field
+          : undefined;
+      // If the backend named a field (operations _FieldError), pin the
+      // message to that input too.
+      if (typeof field === "string") {
+        setFieldErrors((prev) => ({
+          ...prev,
+          [field]: typeof detail === "string" ? detail.replace(`${field}: `, "") : "Invalid",
+        }));
+      }
       setErrorMsg(typeof detail === "string" ? detail : "Save failed.");
     } finally {
       setBusy(false);
@@ -403,10 +447,24 @@ function FormDialog({
                     : f.kind === "datetime" ? "datetime-local"
                     : "text"
                 }
+                min={f.kind === "number" ? 0 : undefined}
                 value={values[f.key] ?? ""}
-                onChange={(e) => setValues({ ...values, [f.key]: e.target.value })}
+                onChange={(e) => {
+                  setValues({ ...values, [f.key]: e.target.value });
+                  if (fieldErrors[f.key]) {
+                    setFieldErrors((prev) => {
+                      const next = { ...prev };
+                      delete next[f.key];
+                      return next;
+                    });
+                  }
+                }}
                 placeholder={f.placeholder}
+                className={cn(fieldErrors[f.key] && "border-destructive")}
               />
+            )}
+            {fieldErrors[f.key] && (
+              <p className="mt-1 text-xs text-destructive">{fieldErrors[f.key]}</p>
             )}
           </div>
         ))}

@@ -104,47 +104,122 @@ def _to_dict(obj: Any) -> dict:
     return out
 
 
-def _coerce(col_type_name: str, v: Any) -> Any:
+# ---- Validation catalogue -------------------------------------------------
+# Enum-like string columns: value must be one of the set. Keyed by the
+# column name (columns are plain String in the DB so we validate here).
+_ENUM_FIELDS: dict[str, set[str]] = {
+    "stage": {
+        "enquiry", "applied", "tested", "offered", "confirmed",
+        "converted", "rejected", "withdrawn",
+    },
+    "status": {
+        # shared across expenses (pending/approved/paid/rejected) and
+        # payslips (draft/issued/paid) — union is safe since neither
+        # model reuses the other's values in a conflicting way.
+        "pending", "approved", "paid", "rejected", "draft", "issued",
+    },
+    "audience": {"all", "staff", "parents", "students"},
+    "severity": {"minor", "moderate", "major"},
+    "kind": {
+        # health-record kinds + inventory-movement kinds + sports-event
+        # kinds. Union; each endpoint's own logic narrows further.
+        "visit", "vaccination", "allergy", "note",
+        "in", "out", "adjust",
+        "tournament", "match", "practice", "annual_day", "club",
+    },
+}
+
+# Numeric columns that must never be negative.
+_NON_NEGATIVE_FIELDS: set[str] = {
+    "amount", "basic", "hra", "other_earnings", "total_deductions",
+    "net_pay", "unit_cost", "on_hand", "reorder_level", "points",
+    "quantity", "test_score", "capacity", "graduation_year",
+}
+
+
+class _FieldError(Exception):
+    """Raised by _coerce/_apply for a bad field value. The router turns
+    it into a clean 400 naming the field."""
+
+    def __init__(self, field: str, message: str):
+        self.field = field
+        self.message = message
+        super().__init__(f"{field}: {message}")
+
+
+def _coerce(field: str, col_type_name: str, v: Any) -> Any:
     """Convert JSON-friendly primitives to SQLAlchemy-friendly values.
 
-    The frontend always sends dates/times as ISO strings and numbers
-    as strings from form inputs. Silently coercing them here means
-    every router doesn't have to.
-    """
-    if v is None or v == "":
+    Raises ``_FieldError`` (→ 400) on malformed input instead of
+    silently returning garbage that would crash at commit time with an
+    opaque 500. The frontend sends dates as ISO strings and numbers as
+    strings from form inputs; we parse them strictly here."""
+    if v is None or (isinstance(v, str) and v.strip() == ""):
         return None
     tn = col_type_name.upper()
-    try:
-        if tn.startswith("DATETIME"):
-            if isinstance(v, datetime):
-                return v
-            return datetime.fromisoformat(str(v).replace("Z", "+00:00").replace(" ", "T"))
-        if tn.startswith("DATE"):
-            if isinstance(v, date):
-                return v
+
+    if tn.startswith("DATETIME"):
+        if isinstance(v, datetime):
+            return v
+        try:
+            return datetime.fromisoformat(
+                str(v).replace("Z", "+00:00").replace(" ", "T")
+            )
+        except (ValueError, TypeError):
+            raise _FieldError(field, "must be a valid date/time (YYYY-MM-DDTHH:MM)")
+    if tn.startswith("DATE"):
+        if isinstance(v, date):
+            return v
+        try:
             return date.fromisoformat(str(v)[:10])
-        if tn.startswith("BOOL") or tn.startswith("TINYINT"):
-            if isinstance(v, bool):
-                return v
-            return str(v).lower() in {"1", "true", "yes", "on"}
-        if tn.startswith("NUMERIC") or tn.startswith("DECIMAL") or tn.startswith("FLOAT") or tn.startswith("REAL"):
-            from decimal import Decimal
+        except (ValueError, TypeError):
+            raise _FieldError(field, "must be a valid date (YYYY-MM-DD)")
+    if tn.startswith("BOOL") or tn.startswith("TINYINT"):
+        if isinstance(v, bool):
+            return v
+        return str(v).lower() in {"1", "true", "yes", "on"}
+    if tn.startswith(("NUMERIC", "DECIMAL", "FLOAT", "REAL")):
+        from decimal import Decimal, InvalidOperation
+        try:
             return Decimal(str(v))
-        if tn.startswith("INTEGER") or tn.startswith("BIGINT") or tn.startswith("SMALLINT"):
-            return int(v) if str(v).strip() != "" else None
-    except (ValueError, TypeError):
-        return v
+        except (InvalidOperation, ArithmeticError, ValueError, TypeError):
+            raise _FieldError(field, "must be a number")
+    if tn.startswith(("INTEGER", "BIGINT", "SMALLINT")):
+        try:
+            return int(str(v).strip())
+        except (ValueError, TypeError):
+            raise _FieldError(field, "must be a whole number")
     return v
 
 
 def _apply(obj: Any, payload: dict, allowed: set[str]) -> None:
+    """Assign whitelisted payload fields to the ORM object, coercing +
+    validating each value. Raises ``_FieldError`` on any bad value; the
+    router wraps that into a 400 with the field name."""
     columns = {c.name: c for c in obj.__table__.columns}
     for k, v in (payload or {}).items():
         if k not in allowed:
             continue
         col = columns.get(k)
         if col is not None:
-            v = _coerce(str(col.type), v)
+            v = _coerce(k, str(col.type), v)
+            # Length cap for VARCHAR columns — avoids a MySQL 1406
+            # DataError 500 (or silent truncation under non-strict mode).
+            length = getattr(col.type, "length", None)
+            if length and isinstance(v, str) and len(v) > length:
+                raise _FieldError(k, f"must be {length} characters or fewer")
+            # Enum-like string membership.
+            if v is not None and k in _ENUM_FIELDS and isinstance(v, str):
+                if v not in _ENUM_FIELDS[k]:
+                    allowed_vals = ", ".join(sorted(_ENUM_FIELDS[k]))
+                    raise _FieldError(k, f"must be one of: {allowed_vals}")
+            # Non-negative numbers.
+            if v is not None and k in _NON_NEGATIVE_FIELDS:
+                try:
+                    if float(v) < 0:
+                        raise _FieldError(k, "cannot be negative")
+                except (ValueError, TypeError):
+                    pass
         setattr(obj, k, v)
 
 
@@ -162,10 +237,23 @@ async def _commit_with_fk_translation(session: AsyncSession) -> None:
     with the exact column at fault. Otherwise SQLAlchemy bubbles a
     500 and the user sees a stack-tracey error string that says
     nothing about which field to fix."""
-    from sqlalchemy.exc import IntegrityError
+    from sqlalchemy.exc import DataError, IntegrityError
 
     try:
         await session.commit()
+    except DataError as exc:
+        # MySQL 1406 (value too long), 1264 (out of range), 1366 (bad
+        # value for a column). _apply guards most of these now, but this
+        # is a belt-and-braces so a slip never becomes a 500.
+        await session.rollback()
+        msg = str(exc.orig) if getattr(exc, "orig", None) else str(exc)
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=(
+                "A value is too long or out of range for its field. "
+                f"({msg[:150]})"
+            ),
+        )
     except IntegrityError as exc:
         await session.rollback()
         msg = str(exc.orig) if getattr(exc, "orig", None) else str(exc)
@@ -595,8 +683,10 @@ async def generate_payslip(
     except (TypeError, ValueError):
         raise HTTPException(400, "user_id required")
     period = str(payload.get("period") or "")
-    if len(period) != 7 or period[4] != "-":
-        raise HTTPException(400, "period must be 'YYYY-MM'")
+    # Strict YYYY-MM: 4-digit year + valid month 01-12.
+    m = _re.fullmatch(r"(\d{4})-(0[1-9]|1[0-2])", period)
+    if not m:
+        raise HTTPException(400, "period must be 'YYYY-MM' with a month between 01 and 12")
 
     exists = (
         await session.execute(
@@ -722,7 +812,9 @@ async def issue_certificate(
     for k, v in context.items():
         body = body.replace("{{" + str(k) + "}}", "" if v is None else str(v))
 
-    # Auto-number: LIB-YYYY-NNN style ref.
+    # Auto-number: CODE-YYYY-NNNN style ref. reference_no is String(40),
+    # so cap the code prefix — the "-YYYY-NNNN" suffix is 10 chars, and
+    # for_name isn't part of the ref, so 28 chars of code leaves headroom.
     year = date.today().year
     seq = (
         await session.execute(
@@ -731,7 +823,8 @@ async def issue_certificate(
             )
         )
     ).scalar_one() + 1
-    ref = f"{code.upper()}-{year}-{seq:04d}"
+    code_prefix = code.upper()[:28]
+    ref = f"{code_prefix}-{year}-{seq:04d}"
 
     obj = IssuedCertificate(
         tenant_id=principal.tenant_id,
