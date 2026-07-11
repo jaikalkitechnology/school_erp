@@ -172,7 +172,7 @@ function ExamsPanel() {
               <option value="other">Other</option>
             </select>
           </div>
-          <FieldNum label="Default max marks" value={maxMarks} onChange={setMaxMarks} />
+          <FieldNum label="Default max marks" value={maxMarks} onChange={setMaxMarks} min={1} />
           <div className="grid grid-cols-2 gap-3">
             <FieldDate label="From" value={startDate} onChange={setStartDate} />
             <FieldDate label="To" value={endDate} onChange={setEndDate} />
@@ -248,8 +248,8 @@ function ExamsPanel() {
             <div className="grid gap-3 lg:grid-cols-5">
               <Select label="Class" value={classDefId} onChange={(v) => setClassDefId(v ? Number(v) : "")} options={(classes.data ?? []).map((c) => ({ value: c.id, label: c.name }))} />
               <Select label="Subject" value={subjectId} onChange={(v) => setSubjectId(v ? Number(v) : "")} options={(subjects.data ?? []).map((s) => ({ value: s.id, label: s.name }))} />
-              <FieldNum label="Max" value={examMax} onChange={setExamMax} />
-              <FieldNum label="Passing" value={passing} onChange={setPassing} />
+              <FieldNum label="Max" value={examMax} onChange={setExamMax} min={1} />
+              <FieldNum label="Passing" value={passing} onChange={setPassing} min={0} max={examMax} />
               <FieldDate label="Paper date" value={paperDate} onChange={setPaperDate} />
             </div>
             <div className="grid gap-3 lg:grid-cols-5">
@@ -397,16 +397,28 @@ function MarksPanel() {
                       <td className="px-4 py-2">
                         <Input
                           type="number"
+                          min={0}
+                          max={roster.data!.max_marks}
                           value={edit.obtained_marks ?? ""}
-                          onChange={(e) =>
+                          onChange={(e) => {
+                            // Clamp to 0..max so a mis-key can't record
+                            // negative marks or marks above the paper total.
+                            const raw = e.target.value;
+                            const clamped =
+                              raw === ""
+                                ? null
+                                : Math.min(
+                                    roster.data!.max_marks,
+                                    Math.max(0, Number(raw) || 0),
+                                  );
                             setEdits((m) => ({
                               ...m,
                               [row.student_id]: {
                                 ...edit,
-                                obtained_marks: e.target.value === "" ? null : Number(e.target.value),
+                                obtained_marks: clamped,
                               },
-                            }))
-                          }
+                            }));
+                          }}
                           className="h-8 w-24"
                         />
                       </td>
@@ -581,7 +593,7 @@ function GradeScalePanel() {
                     type="number"
                     value={b.min_pct}
                     onChange={(e) =>
-                      setBands((arr) => arr.map((x, j) => (j === i ? { ...x, min_pct: Number(e.target.value) || 0 } : x)))
+                      setBands((arr) => arr.map((x, j) => (j === i ? { ...x, min_pct: Math.min(100, Math.max(0, Number(e.target.value) || 0)) } : x)))
                     }
                     className="h-8 w-24"
                   />
@@ -628,11 +640,34 @@ function Field({ label, value, onChange, placeholder }: { label: string; value: 
   );
 }
 
-function FieldNum({ label, value, onChange }: { label: string; value: number; onChange: (v: number) => void }) {
+function FieldNum({
+  label,
+  value,
+  onChange,
+  min,
+  max,
+}: {
+  label: string;
+  value: number;
+  onChange: (v: number) => void;
+  min?: number;
+  max?: number;
+}) {
   return (
     <div className="space-y-1.5">
       <Label>{label}</Label>
-      <Input type="number" value={value} onChange={(e) => onChange(Number(e.target.value) || 0)} />
+      <Input
+        type="number"
+        min={min}
+        max={max}
+        value={value}
+        onChange={(e) => {
+          let v = Number(e.target.value) || 0;
+          if (min !== undefined && v < min) v = min;
+          if (max !== undefined && v > max) v = max;
+          onChange(v);
+        }}
+      />
     </div>
   );
 }

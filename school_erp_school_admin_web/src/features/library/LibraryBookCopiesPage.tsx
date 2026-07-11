@@ -177,8 +177,17 @@ export function LibraryBookCopiesPage() {
                   <div>
                     <Label>How many?</Label>
                     <Input
+                      type="number"
+                      min={1}
+                      max={200}
                       value={copyCount}
-                      onChange={(e) => setCopyCount(e.target.value)}
+                      onChange={(e) =>
+                        // 1..200 so a fat-fingered 99999 can't bulk-create
+                        // thousands of copies.
+                        setCopyCount(
+                          String(Math.min(200, Math.max(1, Number(e.target.value) || 1))),
+                        )
+                      }
                     />
                   </div>
                   <div>

@@ -7,7 +7,13 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { fetchSettings, updateSettings, type SchoolSettings } from "./api";
 
-const FIELDS: { key: keyof SchoolSettings; label: string; placeholder?: string }[] = [
+type FieldKind = "text" | "phone" | "email" | "pincode";
+const FIELDS: {
+  key: keyof SchoolSettings;
+  label: string;
+  placeholder?: string;
+  kind?: FieldKind;
+}[] = [
   { key: "school_name", label: "School name" },
   { key: "primary_color", label: "Primary colour", placeholder: "#E85D2E" },
   { key: "secondary_color", label: "Secondary colour", placeholder: "#0F766E" },
@@ -18,9 +24,9 @@ const FIELDS: { key: keyof SchoolSettings; label: string; placeholder?: string }
   { key: "address", label: "Address" },
   { key: "city", label: "City" },
   { key: "state", label: "State" },
-  { key: "pincode", label: "PIN" },
-  { key: "phone", label: "Phone" },
-  { key: "email", label: "Email" },
+  { key: "pincode", label: "PIN", kind: "pincode" },
+  { key: "phone", label: "Phone", kind: "phone" },
+  { key: "email", label: "Email", kind: "email" },
 ];
 
 export function SettingsPage() {
@@ -28,6 +34,22 @@ export function SettingsPage() {
   const settings = useQuery({ queryKey: ["settings"], queryFn: fetchSettings });
   const [form, setForm] = useState<Partial<SchoolSettings>>({});
   const [saved, setSaved] = useState(false);
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
+
+  const validate = (): Record<string, string> => {
+    const errs: Record<string, string> = {};
+    for (const f of FIELDS) {
+      const v = String((form[f.key] as string | null | undefined) ?? "").trim();
+      if (v === "") continue; // all optional
+      if (f.kind === "phone" && v.replace(/\D/g, "").length !== 10)
+        errs[f.key] = "Enter a 10-digit phone number";
+      if (f.kind === "pincode" && !/^\d{6}$/.test(v))
+        errs[f.key] = "PIN must be 6 digits";
+      if (f.kind === "email" && !/^[a-zA-Z0-9.-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/.test(v))
+        errs[f.key] = "Enter a valid email address";
+    }
+    return errs;
+  };
 
   useEffect(() => {
     if (settings.data) setForm(settings.data);
@@ -65,6 +87,9 @@ export function SettingsPage() {
             className="grid grid-cols-2 gap-4"
             onSubmit={(e) => {
               e.preventDefault();
+              const errs = validate();
+              setFieldErrors(errs);
+              if (Object.keys(errs).length > 0) return;
               save.mutate();
             }}
           >
@@ -73,10 +98,28 @@ export function SettingsPage() {
                 <Label htmlFor={f.key}>{f.label}</Label>
                 <Input
                   id={f.key}
+                  type={f.kind === "email" ? "email" : f.kind === "phone" ? "tel" : "text"}
+                  inputMode={f.kind === "phone" || f.kind === "pincode" ? "numeric" : undefined}
+                  maxLength={f.kind === "phone" ? 10 : f.kind === "pincode" ? 6 : undefined}
                   placeholder={f.placeholder}
                   value={(form[f.key] as string | null | undefined) ?? ""}
-                  onChange={(e) => setForm((s) => ({ ...s, [f.key]: e.target.value }))}
+                  onChange={(e) => {
+                    let v = e.target.value;
+                    if (f.kind === "phone") v = v.replace(/\D/g, "").slice(0, 10);
+                    else if (f.kind === "pincode") v = v.replace(/\D/g, "").slice(0, 6);
+                    setForm((s) => ({ ...s, [f.key]: v }));
+                    if (fieldErrors[f.key])
+                      setFieldErrors((p) => {
+                        const n = { ...p };
+                        delete n[f.key];
+                        return n;
+                      });
+                  }}
+                  className={fieldErrors[f.key] ? "border-destructive" : undefined}
                 />
+                {fieldErrors[f.key] && (
+                  <p className="text-xs text-destructive">{fieldErrors[f.key]}</p>
+                )}
               </div>
             ))}
             <div className="col-span-2 flex items-center justify-between">

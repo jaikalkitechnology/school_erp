@@ -177,7 +177,7 @@ function ClassesPanel() {
               ))}
             </select>
           </Field>
-          <FieldNum label="Order in school" value={sequence} onChange={setSequence} />
+          <FieldNum label="Order in school" value={sequence} onChange={setSequence} min={0} />
           <Field label="Department">
             <select
               className="h-11 rounded-md border border-input bg-background px-3 text-sm"
@@ -273,7 +273,7 @@ function SectionsPanel() {
             </select>
           </Field>
           <FieldText label="Section letter" value={name} onChange={setName} />
-          <FieldNum label="Capacity" value={capacity} onChange={setCapacity} />
+          <FieldNum label="Capacity" value={capacity} onChange={setCapacity} min={1} />
           <Button
             disabled={classId === "" || !name || create.isPending}
             onClick={() =>
@@ -417,10 +417,29 @@ function FieldText({ label, value, onChange }: { label: string; value: string; o
   );
 }
 
-function FieldNum({ label, value, onChange }: { label: string; value: number; onChange: (v: number) => void }) {
+function FieldNum({
+  label,
+  value,
+  onChange,
+  min,
+}: {
+  label: string;
+  value: number;
+  onChange: (v: number) => void;
+  min?: number;
+}) {
   return (
     <Field label={label}>
-      <Input type="number" value={value} onChange={(e) => onChange(Number(e.target.value) || 0)} />
+      <Input
+        type="number"
+        min={min}
+        value={value}
+        onChange={(e) => {
+          let v = Number(e.target.value) || 0;
+          if (min !== undefined && v < min) v = min;
+          onChange(v);
+        }}
+      />
     </Field>
   );
 }
