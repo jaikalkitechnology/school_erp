@@ -7,7 +7,7 @@ import { fetchStaffUserOptions } from "./_pickers";
 
 const FIELDS: FieldSpec[] = [
   { key: "full_name", label: "Visitor", required: true },
-  { key: "phone", label: "Phone" },
+  { key: "phone", label: "Phone", kind: "phone" },
   { key: "company", label: "Company / from" },
   { key: "purpose", label: "Purpose", placeholder: "meeting / delivery / fee payment" },
   { key: "host_user_id", label: "Host (staff)", kind: "picker", fetchOptions: fetchStaffUserOptions, hideInList: true },

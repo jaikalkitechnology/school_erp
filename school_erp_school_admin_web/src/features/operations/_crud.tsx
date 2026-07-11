@@ -18,7 +18,9 @@ export type FieldKind =
   | "textarea"
   | "select"
   | "checkbox"
-  | "picker";
+  | "picker"
+  | "phone"
+  | "email";
 
 export interface PickerOption {
   id: number;
@@ -341,10 +343,24 @@ function FormDialog({
         errs[f.key] = "Required";
         continue;
       }
-      if (raw !== "" && (f.kind === "number")) {
+      if (raw !== "" && f.kind === "number") {
         const n = Number(raw);
         if (Number.isNaN(n)) errs[f.key] = "Must be a number";
         else if (n < 0) errs[f.key] = "Cannot be negative";
+      }
+      if (raw !== "" && f.kind === "phone") {
+        // Exactly 10 digits (Indian mobile). Strip anything else out
+        // first so a pasted "+91 98765 43210" is judged on its digits.
+        const digits = raw.replace(/\D/g, "");
+        if (digits.length !== 10) {
+          errs[f.key] = "Enter a 10-digit phone number";
+        }
+      }
+      if (raw !== "" && f.kind === "email") {
+        // Simple, permissive email shape check.
+        if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(raw)) {
+          errs[f.key] = "Enter a valid email address";
+        }
       }
     }
     return errs;
@@ -445,12 +461,21 @@ function FormDialog({
                   f.kind === "number" ? "number"
                     : f.kind === "date" ? "date"
                     : f.kind === "datetime" ? "datetime-local"
+                    : f.kind === "email" ? "email"
+                    : f.kind === "phone" ? "tel"
                     : "text"
                 }
                 min={f.kind === "number" ? 0 : undefined}
+                inputMode={f.kind === "phone" ? "numeric" : undefined}
+                maxLength={f.kind === "phone" ? 10 : undefined}
                 value={values[f.key] ?? ""}
                 onChange={(e) => {
-                  setValues({ ...values, [f.key]: e.target.value });
+                  // Phone inputs accept digits only, capped at 10.
+                  const v =
+                    f.kind === "phone"
+                      ? e.target.value.replace(/\D/g, "").slice(0, 10)
+                      : e.target.value;
+                  setValues({ ...values, [f.key]: v });
                   if (fieldErrors[f.key]) {
                     setFieldErrors((prev) => {
                       const next = { ...prev };
@@ -459,7 +484,10 @@ function FormDialog({
                     });
                   }
                 }}
-                placeholder={f.placeholder}
+                placeholder={
+                  f.placeholder ??
+                  (f.kind === "phone" ? "10-digit mobile" : undefined)
+                }
                 className={cn(fieldErrors[f.key] && "border-destructive")}
               />
             )}

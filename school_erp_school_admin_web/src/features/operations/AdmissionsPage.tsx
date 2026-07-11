@@ -30,8 +30,8 @@ const FIELDS: FieldSpec[] = [
   { key: "child_full_name", label: "Child name", required: true },
   { key: "class_applying_for", label: "Class" },
   { key: "parent_name", label: "Parent" },
-  { key: "parent_phone", label: "Phone" },
-  { key: "parent_email", label: "Email", hideInList: true },
+  { key: "parent_phone", label: "Phone", kind: "phone" },
+  { key: "parent_email", label: "Email", kind: "email", hideInList: true },
   { key: "child_dob", label: "DOB", kind: "date", hideInList: true },
   { key: "source", label: "Source", placeholder: "walk-in / website / referral", hideInList: true },
   {
