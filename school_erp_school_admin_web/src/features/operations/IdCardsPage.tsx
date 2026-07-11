@@ -47,7 +47,7 @@ export function IdCardsPage() {
           <CardTitle>Filter + branding</CardTitle>
           <CardDescription>{filtered.length} cards will be rendered below</CardDescription>
         </CardHeader>
-        <CardContent className="grid grid-cols-4 gap-3">
+        <CardContent className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
           <div>
             <Label>Search</Label>
             <Input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Name or admission" />

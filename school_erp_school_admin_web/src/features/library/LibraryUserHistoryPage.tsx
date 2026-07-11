@@ -49,7 +49,7 @@ export function LibraryUserHistoryPage() {
           <CardTitle>Look up borrower</CardTitle>
         </CardHeader>
         <CardContent>
-          <form onSubmit={onSubmit} className="grid grid-cols-3 gap-3">
+          <form onSubmit={onSubmit} className="grid grid-cols-1 gap-3 sm:grid-cols-3">
             <div>
               <Label>Borrower type</Label>
               <select

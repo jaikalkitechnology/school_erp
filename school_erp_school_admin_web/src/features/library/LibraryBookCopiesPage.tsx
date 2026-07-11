@@ -173,7 +173,7 @@ export function LibraryBookCopiesPage() {
                     Barcodes auto-generated using the prefix (if any).
                   </CardDescription>
                 </CardHeader>
-                <CardContent className="grid grid-cols-3 gap-3">
+                <CardContent className="grid grid-cols-1 gap-3 sm:grid-cols-3">
                   <div>
                     <Label>How many?</Label>
                     <Input

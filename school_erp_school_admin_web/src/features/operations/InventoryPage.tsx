@@ -159,7 +159,7 @@ export function InventoryMovementsPage() {
                     {activeItem.on_hand} {activeItem.unit} on hand
                   </CardDescription>
                 </CardHeader>
-                <CardContent className="grid grid-cols-5 gap-3">
+                <CardContent className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-5">
                   <div>
                     <Label>Kind</Label>
                     <select

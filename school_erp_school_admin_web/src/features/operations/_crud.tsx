@@ -348,7 +348,7 @@ function FormDialog({
 
   return (
     <ModalShell title={title} onClose={onClose}>
-      <div className="grid max-h-[70vh] grid-cols-2 gap-3 overflow-y-auto pr-1">
+      <div className="grid max-h-[70vh] grid-cols-1 gap-3 overflow-y-auto pr-1 sm:grid-cols-2">
         {formFields.map((f) => (
           <div
             key={f.key}
@@ -440,10 +440,12 @@ function ModalShell({
   children: React.ReactNode;
 }) {
   return (
-    <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/40 p-4">
-      <div className="w-full max-w-3xl rounded-lg border border-saffron-pale bg-warm-white p-6 shadow-lg">
+    <div className="fixed inset-0 z-40 flex items-end justify-center bg-black/40 p-0 sm:items-center sm:p-4">
+      <div className="max-h-[95vh] w-full max-w-3xl overflow-y-auto rounded-t-lg border-t border-saffron-pale bg-warm-white p-4 shadow-lg sm:rounded-lg sm:border sm:p-6">
         <div className="mb-4 flex items-start justify-between">
-          <h2 className="font-display text-xl text-indigo-dark">{title}</h2>
+          <h2 className="font-display text-lg text-indigo-dark sm:text-xl">
+            {title}
+          </h2>
           <button
             type="button"
             className="rounded-md p-1 text-muted-foreground hover:bg-muted"

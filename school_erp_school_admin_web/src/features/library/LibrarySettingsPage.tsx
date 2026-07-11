@@ -189,7 +189,7 @@ export function LibrarySettingsPage() {
             <CardTitle>Notifications</CardTitle>
             <CardDescription>Which channels the Notifications page can use.</CardDescription>
           </CardHeader>
-          <CardContent className="grid grid-cols-3 gap-3">
+          <CardContent className="grid grid-cols-1 gap-3 sm:grid-cols-3">
             <div>
               <Label>SMS</Label>
               {bool("notify_sms")}
