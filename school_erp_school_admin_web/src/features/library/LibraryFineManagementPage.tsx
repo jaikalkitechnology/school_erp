@@ -112,10 +112,19 @@ export function LibraryFineManagementPage() {
                       </td>
                       <td className="w-32">
                         <Input
+                          type="number"
+                          min={0}
+                          max={owed}
                           value={amt}
-                          onChange={(e) =>
-                            setAmounts({ ...amounts, [l.id]: e.target.value })
-                          }
+                          onChange={(e) => {
+                            // Clamp 0..owed so you can't collect a
+                            // negative amount or more than what's due.
+                            const n = Math.min(
+                              owed,
+                              Math.max(0, Number(e.target.value) || 0),
+                            );
+                            setAmounts({ ...amounts, [l.id]: String(n) });
+                          }}
                         />
                       </td>
                       <td className="text-right">
@@ -124,10 +133,10 @@ export function LibraryFineManagementPage() {
                           onClick={() =>
                             collect.mutate({
                               loanId: l.id,
-                              amount: Number(amt) || 0,
+                              amount: Math.min(owed, Math.max(0, Number(amt) || 0)),
                             })
                           }
-                          disabled={collect.isPending}
+                          disabled={collect.isPending || !(Number(amt) > 0)}
                         >
                           <CheckCircle2 className="mr-1 h-3 w-3" />
                           Collect

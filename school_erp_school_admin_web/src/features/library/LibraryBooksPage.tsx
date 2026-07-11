@@ -168,11 +168,11 @@ export function LibraryBooksPage() {
             </div>
             <div>
               <Label>Fine / day (₹)</Label>
-              <Input value={finePerDay} onChange={(e) => setFinePerDay(e.target.value)} />
+              <Input type="number" min={0} value={finePerDay} onChange={(e) => setFinePerDay(String(Math.max(0, Number(e.target.value) || 0)))} />
             </div>
             <div>
               <Label>Default loan (days)</Label>
-              <Input value={loanDays} onChange={(e) => setLoanDays(e.target.value)} />
+              <Input type="number" min={1} value={loanDays} onChange={(e) => setLoanDays(String(Math.max(1, Number(e.target.value) || 1)))} />
             </div>
           </div>
           <Button onClick={() => create.mutate()} disabled={!title || create.isPending}>
@@ -279,11 +279,11 @@ function EditBookDialog({
         </div>
         <div>
           <Label>Fine / day (₹)</Label>
-          <Input value={finePerDay} onChange={(e) => setFinePerDay(e.target.value)} />
+          <Input type="number" min={0} value={finePerDay} onChange={(e) => setFinePerDay(String(Math.max(0, Number(e.target.value) || 0)))} />
         </div>
         <div>
           <Label>Default loan (days)</Label>
-          <Input value={loanDays} onChange={(e) => setLoanDays(e.target.value)} />
+          <Input type="number" min={1} value={loanDays} onChange={(e) => setLoanDays(String(Math.max(1, Number(e.target.value) || 1)))} />
         </div>
       </div>
       {errorMsg && (

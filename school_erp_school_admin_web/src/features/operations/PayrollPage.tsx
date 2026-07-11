@@ -103,14 +103,28 @@ export function PayslipsPage() {
         <CardContent className="grid grid-cols-1 gap-3 sm:grid-cols-3">
           <div>
             <Label>User #</Label>
-            <Input value={userId} onChange={(e) => setUserId(e.target.value)} />
+            <Input
+              inputMode="numeric"
+              value={userId}
+              onChange={(e) => setUserId(e.target.value.replace(/\D/g, ""))}
+              placeholder="Staff user id"
+            />
           </div>
           <div>
-            <Label>Period (YYYY-MM)</Label>
-            <Input value={period} onChange={(e) => setPeriod(e.target.value)} placeholder="2026-07" />
+            <Label>Period</Label>
+            {/* type=month always yields a valid YYYY-MM string, so the
+                backend's strict period check can't be tripped. */}
+            <Input
+              type="month"
+              value={period}
+              onChange={(e) => setPeriod(e.target.value)}
+            />
           </div>
           <div className="flex items-end">
-            <Button onClick={() => gen.mutate()} disabled={!userId || !period || gen.isPending}>
+            <Button
+              onClick={() => gen.mutate()}
+              disabled={!userId || !period || gen.isPending}
+            >
               <Play className="mr-1 h-4 w-4" /> Generate
             </Button>
           </div>

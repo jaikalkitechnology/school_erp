@@ -174,7 +174,12 @@ export function InventoryMovementsPage() {
                   </div>
                   <div>
                     <Label>Qty</Label>
-                    <Input type="number" value={qty} onChange={(e) => setQty(e.target.value)} />
+                    <Input
+                      type="number"
+                      min={1}
+                      value={qty}
+                      onChange={(e) => setQty(e.target.value)}
+                    />
                   </div>
                   <div>
                     <Label>Reference</Label>
@@ -185,7 +190,10 @@ export function InventoryMovementsPage() {
                     <Input value={notes} onChange={(e) => setNotes(e.target.value)} />
                   </div>
                   <div className="flex items-end">
-                    <Button onClick={() => move.mutate()} disabled={move.isPending}>
+                    <Button
+                      onClick={() => move.mutate()}
+                      disabled={move.isPending || !(Number(qty) > 0)}
+                    >
                       Log
                     </Button>
                   </div>

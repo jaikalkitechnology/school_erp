@@ -378,8 +378,8 @@ function StructuresPanel() {
             { value: "annual", label: "Annual" },
             { value: "one_time", label: "One-time" },
           ]} />
-          <FieldNum label="Amount (₹)" value={amount} onChange={setAmount} />
-          <FieldNum label="Due day" value={dueDay} onChange={setDueDay} />
+          <FieldNum label="Amount (₹)" value={amount} onChange={setAmount} min={0} />
+          <FieldNum label="Due day" value={dueDay} onChange={setDueDay} min={1} max={28} />
           {structureError && (
             <p className="col-span-5 text-sm text-destructive">{structureError}</p>
           )}
@@ -408,7 +408,7 @@ function StructuresPanel() {
         <CardContent className="grid gap-3 lg:grid-cols-3">
           <FieldDate label="Period start *" value={periodStart} onChange={setPeriodStart} />
           <FieldDate label="Period end *" value={periodEnd} onChange={setPeriodEnd} />
-          <FieldNum label="Sibling discount %" value={siblingPct} onChange={setSiblingPct} />
+          <FieldNum label="Sibling discount %" value={siblingPct} onChange={setSiblingPct} min={0} max={100} />
         </CardContent>
         {(!periodStart || !periodEnd) && (
           <CardContent className="pt-0">
@@ -454,10 +454,11 @@ function StructuresPanel() {
                         </p>
                         <Input
                           type="number"
+                          min={0}
                           value={editingStruct!.amount}
                           onChange={(e) => setEditingStruct({
                             ...editingStruct!,
-                            amount: Number(e.target.value) || 0,
+                            amount: Math.max(0, Number(e.target.value) || 0),
                           })}
                           className="w-28"
                           placeholder="Amount"
@@ -656,7 +657,7 @@ function CollectionPanel() {
               <CardTitle className="flex items-center gap-2"><Receipt className="h-5 w-5" /> Record payment</CardTitle>
             </CardHeader>
             <CardContent className="grid gap-3 lg:grid-cols-3">
-              <FieldNum label="Amount (₹)" value={amount} onChange={setAmount} />
+              <FieldNum label="Amount (₹)" value={amount} onChange={setAmount} min={0} />
               <Select label="Method" value={method} onChange={(v) => setMethod(v as PaymentMethod)} options={[
                 { value: "cash", label: "Cash" },
                 { value: "upi", label: "UPI" },
@@ -763,11 +764,36 @@ function Field({ label, value, onChange, placeholder }: { label: string; value: 
   );
 }
 
-function FieldNum({ label, value, onChange }: { label: string; value: number; onChange: (v: number) => void }) {
+function FieldNum({
+  label,
+  value,
+  onChange,
+  min,
+  max,
+}: {
+  label: string;
+  value: number;
+  onChange: (v: number) => void;
+  min?: number;
+  max?: number;
+}) {
   return (
     <div className="space-y-1.5">
       <Label>{label}</Label>
-      <Input type="number" value={value} onChange={(e) => onChange(Number(e.target.value) || 0)} />
+      <Input
+        type="number"
+        min={min}
+        max={max}
+        value={value}
+        onChange={(e) => {
+          let v = Number(e.target.value) || 0;
+          // Clamp to the given bounds so a stray keypress / paste can't
+          // submit a negative amount, an over-100 percentage, etc.
+          if (min !== undefined && v < min) v = min;
+          if (max !== undefined && v > max) v = max;
+          onChange(v);
+        }}
+      />
     </div>
   );
 }
