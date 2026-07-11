@@ -66,7 +66,7 @@ export function LibraryShelvesPage() {
           <CardTitle>Add a shelf</CardTitle>
           <CardDescription>eg. Rack A, Shelf 3 → code "A-3"</CardDescription>
         </CardHeader>
-        <CardContent className="grid grid-cols-4 gap-3">
+        <CardContent className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
           <div>
             <label className="text-xs uppercase tracking-wide text-muted-foreground">Code</label>
             <Input value={code} onChange={(e) => setCode(e.target.value)} placeholder="A-3" />

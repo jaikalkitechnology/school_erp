@@ -211,7 +211,7 @@ export function LibraryIssueBooksPage() {
                     ID.
                   </CardDescription>
                 </CardHeader>
-                <CardContent className="grid grid-cols-3 gap-3">
+                <CardContent className="grid grid-cols-1 gap-3 sm:grid-cols-3">
                   <div>
                     <Label>Borrower type</Label>
                     <select

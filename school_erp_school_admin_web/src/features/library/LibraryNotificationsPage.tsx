@@ -291,7 +291,7 @@ function DiagnosticsPanel() {
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
-        <div className="grid grid-cols-[140px_1fr_auto_auto] gap-3">
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-[140px_1fr_auto_auto]">
           <div>
             <Label>Borrower type</Label>
             <select

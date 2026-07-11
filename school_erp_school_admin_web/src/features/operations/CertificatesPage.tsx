@@ -121,7 +121,7 @@ export function IssueCertificatePage() {
           <CardTitle>Fill in</CardTitle>
           <CardDescription>Placeholders are substituted {"{{like this}}"} on issue.</CardDescription>
         </CardHeader>
-        <CardContent className="grid grid-cols-3 gap-3">
+        <CardContent className="grid grid-cols-1 gap-3 sm:grid-cols-3">
           <div>
             <Label>Template</Label>
             <select

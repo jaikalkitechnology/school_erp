@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { NavLink, Outlet, useLocation, useNavigate } from "react-router-dom";
 import {
   AlertOctagon,
@@ -27,6 +27,7 @@ import {
   FileText,
   Library,
   LogOut,
+  Menu,
   MessageCircle,
   PenTool,
   Printer,
@@ -39,6 +40,7 @@ import {
   ShieldCheck,
   Users,
   Warehouse,
+  X,
   type LucideIcon,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -334,6 +336,15 @@ export function SchoolAdminLayout() {
     [user?.roles, user?.granted_admin_pages],
   );
 
+  // Mobile drawer state. Closed by default; opens via the hamburger
+  // in the top bar and auto-closes whenever the route changes so
+  // navigating to a new page always leaves the reader on the page,
+  // not the menu.
+  const [mobileOpen, setMobileOpen] = useState(false);
+  useEffect(() => {
+    setMobileOpen(false);
+  }, [location.pathname]);
+
   const onLogout = async () => {
     try {
       await logoutApi(tokens?.refresh_token);
@@ -346,68 +357,119 @@ export function SchoolAdminLayout() {
 
   const currentPath = location.pathname;
 
-  return (
-    <div className="grid h-full grid-cols-[260px_1fr] bg-ivory">
-      <aside className="flex h-full flex-col border-r border-saffron-pale bg-warm-white px-5 py-7">
-        <div className="mb-6">
-          <p className="font-mono text-[11px] uppercase tracking-[0.22em] text-saffron-dark">
-            {user?.tenant_subdomain ?? "your-school"}.jaikalki.com
+  const sidebarBody = (
+    <>
+      <div className="mb-6">
+        <p className="font-mono text-[11px] uppercase tracking-[0.22em] text-saffron-dark">
+          {user?.tenant_subdomain ?? "your-school"}.jaikalki.com
+        </p>
+        <p className="mt-1 font-display text-lg font-semibold text-indigo-dark">
+          {user?.school_name ?? "School Admin"}
+        </p>
+      </div>
+
+      <nav className="flex flex-1 flex-col gap-1 overflow-y-auto">
+        {visibleNav.length === 0 && (
+          <p className="rounded-md bg-marigold-pale/40 px-3 py-2 text-xs text-marigold-dark">
+            You don't have any admin pages assigned yet. Please use the
+            mobile app, or ask your school admin to grant page access.
           </p>
-          <p className="mt-1 font-display text-lg font-semibold text-indigo-dark">
+        )}
+        {visibleNav.map((item) => {
+          if (item.kind === "leaf") {
+            return (
+              <NavLink key={item.to} to={item.to} className={leafClass}>
+                <item.icon className="h-4 w-4" />
+                {item.label}
+              </NavLink>
+            );
+          }
+          const forceOpen = item.children.some(
+            (c) => currentPath === c.to || currentPath.startsWith(c.to + "/"),
+          );
+          return (
+            <NavGroupSection
+              key={item.key}
+              group={item}
+              forceOpen={forceOpen}
+            />
+          );
+        })}
+      </nav>
+
+      <div className="mt-6 space-y-3 border-t border-saffron-pale pt-4">
+        {user && (
+          <div className="text-xs text-muted-foreground">
+            <p className="font-medium text-indigo-dark">{user.full_name}</p>
+            <p className="truncate">{user.primary_role?.replace(/_/g, " ") ?? "Staff"}</p>
+          </div>
+        )}
+        <Button variant="ghost" size="sm" className="w-full justify-start" onClick={onLogout}>
+          <LogOut className="h-4 w-4" />
+          Sign out
+        </Button>
+        <p className="text-[11px] uppercase tracking-[0.18em] text-muted-foreground">
+          Powered by Jaikalki · v0.1.0
+        </p>
+      </div>
+    </>
+  );
+
+  return (
+    <div className="flex h-full flex-col bg-ivory md:grid md:grid-cols-[260px_1fr]">
+      {/* Mobile top bar — hamburger + school label */}
+      <header className="flex items-center gap-3 border-b border-saffron-pale bg-warm-white px-4 py-3 md:hidden">
+        <button
+          type="button"
+          className="rounded-md p-2 text-indigo-dark hover:bg-saffron-pale/60"
+          onClick={() => setMobileOpen(true)}
+          aria-label="Open menu"
+        >
+          <Menu className="h-5 w-5" />
+        </button>
+        <div className="min-w-0 flex-1">
+          <p className="truncate font-display text-sm font-semibold text-indigo-dark">
             {user?.school_name ?? "School Admin"}
           </p>
-        </div>
-
-        <nav className="flex flex-1 flex-col gap-1 overflow-y-auto">
-          {visibleNav.length === 0 && (
-            <p className="rounded-md bg-marigold-pale/40 px-3 py-2 text-xs text-marigold-dark">
-              You don't have any admin pages assigned yet. Please use the
-              mobile app, or ask your school admin to grant page access.
-            </p>
-          )}
-          {visibleNav.map((item) => {
-            if (item.kind === "leaf") {
-              return (
-                <NavLink key={item.to} to={item.to} className={leafClass}>
-                  <item.icon className="h-4 w-4" />
-                  {item.label}
-                </NavLink>
-              );
-            }
-            // Auto-expand the group when the active route is one of its
-            // children so the librarian doesn't have to click Library
-            // to re-open it every time they navigate.
-            const forceOpen = item.children.some(
-              (c) => currentPath === c.to || currentPath.startsWith(c.to + "/"),
-            );
-            return (
-              <NavGroupSection
-                key={item.key}
-                group={item}
-                forceOpen={forceOpen}
-              />
-            );
-          })}
-        </nav>
-
-        <div className="mt-6 space-y-3 border-t border-saffron-pale pt-4">
-          {user && (
-            <div className="text-xs text-muted-foreground">
-              <p className="font-medium text-indigo-dark">{user.full_name}</p>
-              <p className="truncate">{user.primary_role?.replace(/_/g, " ") ?? "Staff"}</p>
-            </div>
-          )}
-          <Button variant="ghost" size="sm" className="w-full justify-start" onClick={onLogout}>
-            <LogOut className="h-4 w-4" />
-            Sign out
-          </Button>
-          <p className="text-[11px] uppercase tracking-[0.18em] text-muted-foreground">
-            Powered by Jaikalki · v0.1.0
+          <p className="truncate font-mono text-[10px] uppercase tracking-widest text-saffron-dark">
+            {user?.tenant_subdomain ?? "your-school"}.jaikalki.com
           </p>
         </div>
+      </header>
+
+      {/* Sidebar — permanent on md+, drawer on mobile */}
+      <aside className="hidden h-full md:flex md:flex-col md:border-r md:border-saffron-pale md:bg-warm-white md:px-5 md:py-7">
+        {sidebarBody}
       </aside>
 
-      <main className="overflow-y-auto px-10 py-8">
+      {/* Mobile drawer overlay */}
+      {mobileOpen && (
+        <div
+          className="fixed inset-0 z-40 bg-black/40 md:hidden"
+          onClick={() => setMobileOpen(false)}
+          aria-hidden
+        />
+      )}
+      <aside
+        className={cn(
+          "fixed inset-y-0 left-0 z-50 flex w-72 max-w-[85%] transform flex-col border-r border-saffron-pale bg-warm-white px-5 py-5 transition-transform md:hidden",
+          mobileOpen ? "translate-x-0" : "-translate-x-full",
+        )}
+      >
+        <div className="mb-3 flex items-center justify-end">
+          <button
+            type="button"
+            className="rounded-md p-2 text-muted-foreground hover:bg-muted"
+            onClick={() => setMobileOpen(false)}
+            aria-label="Close menu"
+          >
+            <X className="h-5 w-5" />
+          </button>
+        </div>
+        {sidebarBody}
+      </aside>
+
+      <main className="min-w-0 flex-1 overflow-y-auto px-4 py-4 md:px-10 md:py-8">
         <Outlet />
       </main>
     </div>

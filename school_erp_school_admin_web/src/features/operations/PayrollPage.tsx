@@ -100,7 +100,7 @@ export function PayslipsPage() {
           <CardTitle>Generate payslip</CardTitle>
           <CardDescription>Fails if a slip already exists for the same user + period.</CardDescription>
         </CardHeader>
-        <CardContent className="grid grid-cols-3 gap-3">
+        <CardContent className="grid grid-cols-1 gap-3 sm:grid-cols-3">
           <div>
             <Label>User #</Label>
             <Input value={userId} onChange={(e) => setUserId(e.target.value)} />
