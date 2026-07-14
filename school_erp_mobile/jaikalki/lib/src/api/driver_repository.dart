@@ -269,7 +269,11 @@ class DriverStudent {
     required this.routeId,
     required this.routeName,
     required this.pickupStopName,
+    required this.pickupLat,
+    required this.pickupLng,
     required this.dropStopName,
+    required this.dropLat,
+    required this.dropLng,
     required this.skippedToday,
   });
 
@@ -286,8 +290,15 @@ class DriverStudent {
   final int routeId;
   final String? routeName;
   final String? pickupStopName;
+  final double? pickupLat;
+  final double? pickupLng;
   final String? dropStopName;
+  final double? dropLat;
+  final double? dropLng;
   final bool skippedToday;
+
+  /// True when we have a precise pickup coordinate to navigate to.
+  bool get hasPickupGeo => pickupLat != null && pickupLng != null;
 
   factory DriverStudent.fromJson(Map<String, dynamic> j) => DriverStudent(
         allocationId: (j['allocation_id'] as num?)?.toInt() ?? 0,
@@ -303,7 +314,11 @@ class DriverStudent {
         routeId: (j['route_id'] as num?)?.toInt() ?? 0,
         routeName: j['route_name'] as String?,
         pickupStopName: j['pickup_stop_name'] as String?,
+        pickupLat: (j['pickup_lat'] as num?)?.toDouble(),
+        pickupLng: (j['pickup_lng'] as num?)?.toDouble(),
         dropStopName: j['drop_stop_name'] as String?,
+        dropLat: (j['drop_lat'] as num?)?.toDouble(),
+        dropLng: (j['drop_lng'] as num?)?.toDouble(),
         skippedToday: (j['skipped_today'] as bool?) ?? false,
       );
 }

@@ -167,6 +167,48 @@ class _StudentCard extends StatelessWidget {
     }
   }
 
+  /// Open turn-by-turn directions to this student's pickup point so the
+  /// driver can confirm they're heading the right way. Prefers the exact
+  /// pickup-stop coordinates; falls back to the free-text address as a
+  /// map search query when the stop has no lat/lng set.
+  Future<void> _navigate(BuildContext context) async {
+    Uri uri;
+    if (student.hasPickupGeo) {
+      // Universal Google Maps directions link → opens the Maps app with
+      // driving navigation from the driver's current location.
+      uri = Uri.parse(
+        'https://www.google.com/maps/dir/?api=1'
+        '&destination=${student.pickupLat},${student.pickupLng}'
+        '&travelmode=driving',
+      );
+    } else if ((student.address ?? '').trim().isNotEmpty) {
+      uri = Uri.parse(
+        'https://www.google.com/maps/dir/?api=1'
+        '&destination=${Uri.encodeComponent(student.address!.trim())}'
+        '&travelmode=driving',
+      );
+    } else {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text(
+              'No pickup location for this student yet. Ask the office to '
+              'set lat/lng on the pickup stop or add an address.',
+            ),
+          ),
+        );
+      }
+      return;
+    }
+    if (await canLaunchUrl(uri)) {
+      await launchUrl(uri, mode: LaunchMode.externalApplication);
+    } else if (context.mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Could not open the maps app.')),
+      );
+    }
+  }
+
   String _initials(String n) {
     final parts = n.trim().split(RegExp(r'\s+'));
     if (parts.isEmpty || parts[0].isEmpty) return '?';
@@ -255,6 +297,39 @@ class _StudentCard extends StatelessWidget {
           _row('Pickup stop', student.pickupStopName),
           _row('Drop stop', student.dropStopName),
           _row('Address', student.address),
+          const SizedBox(height: 8),
+          SizedBox(
+            width: double.infinity,
+            child: FilledButton.icon(
+              onPressed: () => _navigate(context),
+              icon: const Icon(Icons.navigation_outlined),
+              label: Text(
+                student.hasPickupGeo
+                    ? 'Navigate to pickup'
+                    : (student.address ?? '').trim().isNotEmpty
+                        ? 'Navigate to address'
+                        : 'No location set',
+              ),
+              style: FilledButton.styleFrom(
+                backgroundColor: JaikalkiBrand.tealDark,
+                disabledBackgroundColor: Colors.grey.shade300,
+              ),
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.only(top: 4),
+            child: Text(
+              student.hasPickupGeo
+                  ? 'Opens driving directions to ${student.pickupStopName ?? 'the pickup stop'} — follow the arrow to stay on route.'
+                  : (student.address ?? '').trim().isNotEmpty
+                      ? 'No stop coordinates — directions use the saved address, so double-check the destination.'
+                      : 'Ask the office to set the pickup stop location.',
+              style: const TextStyle(
+                fontSize: 10.5,
+                color: JaikalkiBrand.textSecondary,
+              ),
+            ),
+          ),
           if (hasMedical) ...[
             const SizedBox(height: 4),
             Container(
