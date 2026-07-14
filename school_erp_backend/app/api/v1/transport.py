@@ -1114,6 +1114,8 @@ async def driver_student_roster_route(
         if s is None:
             continue
         r = routes.get(a.route_id)
+        pickup_stop = stops.get(a.pickup_stop_id) if a.pickup_stop_id else None
+        drop_stop = stops.get(a.drop_stop_id) if a.drop_stop_id else None
         out.append({
             "allocation_id": a.id,
             "student_id": s.id,
@@ -1129,10 +1131,18 @@ async def driver_student_roster_route(
             "allergies": s.allergies,
             "route_id": a.route_id,
             "route_name": r.name if r else None,
-            "pickup_stop_name": stops[a.pickup_stop_id].name
-                if a.pickup_stop_id and a.pickup_stop_id in stops else None,
-            "drop_stop_name": stops[a.drop_stop_id].name
-                if a.drop_stop_id and a.drop_stop_id in stops else None,
+            "pickup_stop_id": a.pickup_stop_id,
+            "pickup_stop_name": pickup_stop.name if pickup_stop else None,
+            "pickup_lat": float(pickup_stop.latitude)
+                if pickup_stop and pickup_stop.latitude is not None else None,
+            "pickup_lng": float(pickup_stop.longitude)
+                if pickup_stop and pickup_stop.longitude is not None else None,
+            "drop_stop_id": a.drop_stop_id,
+            "drop_stop_name": drop_stop.name if drop_stop else None,
+            "drop_lat": float(drop_stop.latitude)
+                if drop_stop and drop_stop.latitude is not None else None,
+            "drop_lng": float(drop_stop.longitude)
+                if drop_stop and drop_stop.longitude is not None else None,
             "skipped_today": s.id in skipped_today,
         })
     return out
