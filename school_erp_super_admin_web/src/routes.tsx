@@ -35,6 +35,8 @@ export const routes: RouteObject[] = [
       { path: "plans", element: <PlansPage /> },
       { path: "billing", element: <BillingPage /> },
       { path: "staff", element: <Placeholder title="Platform Staff" phase="Phase 4 (school admin foundation)" /> },
+      { path: "reports", element: <Placeholder title="Reports" phase="an upcoming phase (platform analytics)" /> },
+      { path: "announcements", element: <Placeholder title="Announcements" phase="an upcoming phase (platform-wide broadcasts)" /> },
       { path: "audit", element: <AuditPage /> },
       { path: "settings", element: <Placeholder title="Platform Settings" phase="Phase 3.8 (system config)" /> },
     ],

@@ -1,17 +1,30 @@
 import { NavLink, Outlet, useNavigate } from "react-router-dom";
-import { Building2, CreditCard, Gauge, LogOut, Receipt, Settings, ShieldCheck, Users2 } from "lucide-react";
+import {
+  BarChart3,
+  Building2,
+  CreditCard,
+  LayoutDashboard,
+  LogOut,
+  Megaphone,
+  ScrollText,
+  Settings,
+  Users2,
+  Wallet,
+} from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { logout as logoutApi } from "@/lib/auth-api";
 import { useAuth } from "@/stores/auth";
 
 const nav = [
-  { to: "/dashboard", label: "Overview", icon: Gauge },
-  { to: "/schools", label: "Schools", icon: Building2 },
-  { to: "/plans", label: "Plans", icon: Receipt },
-  { to: "/billing", label: "Billing", icon: CreditCard },
-  { to: "/audit", label: "Audit log", icon: ShieldCheck },
-  { to: "/staff", label: "Platform Staff", icon: Users2 },
+  { to: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
+  { to: "/schools", label: "Organizations", icon: Building2 },
+  { to: "/plans", label: "Plans", icon: CreditCard },
+  { to: "/billing", label: "Billing", icon: Wallet },
+  { to: "/staff", label: "Staff", icon: Users2 },
+  { to: "/reports", label: "Reports", icon: BarChart3 },
+  { to: "/announcements", label: "Announcements", icon: Megaphone },
+  { to: "/audit", label: "Audit Logs", icon: ScrollText },
   { to: "/settings", label: "Settings", icon: Settings },
 ];
 
