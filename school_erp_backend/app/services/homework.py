@@ -460,13 +460,37 @@ async def list_for_student(
     student = (
         await session.execute(select(Student).where(Student.id == student_id))
     ).scalar_one_or_none()
-    if student is None or student.section_id is None:
+    if student is None:
+        return []
+    if student.section_id is not None:
+        # Normal path: homework posted to the child's exact section.
+        section_filter = Homework.section_id == student.section_id
+    elif student.class_def_id is not None:
+        # The child has a class but no section assigned yet — a very common
+        # data gap that would otherwise leave the parent with an empty
+        # homework screen forever. Fall back to every section of that class
+        # so homework for the class the child belongs to still shows up.
+        section_ids = [
+            sid
+            for (sid,) in (
+                await session.execute(
+                    select(Section.id).where(
+                        Section.class_def_id == student.class_def_id
+                    )
+                )
+            ).all()
+        ]
+        if not section_ids:
+            return []
+        section_filter = Homework.section_id.in_(section_ids)
+    else:
+        # No section and no class — nothing to match on.
         return []
     homeworks = list(
         (
             await session.execute(
                 select(Homework)
-                .where(Homework.section_id == student.section_id)
+                .where(section_filter)
                 .order_by(Homework.due_date.desc())
             )
         ).scalars().all()
