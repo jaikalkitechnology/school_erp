@@ -1,0 +1,114 @@
+================================================================================
+JAIKALKI SCHOOL ERP — REMAINING TASKS
+Branch: claude/analyze-school-erp-Kk7Z4
+================================================================================
+
+Legend:  [ ] not started   [~] partial   [x] done   [!] blocking/deploy
+
+--------------------------------------------------------------------------------
+0. DEPLOYMENT / RELEASE (do these first — code is written, not live)
+--------------------------------------------------------------------------------
+[!] Run Alembic migrations on prod DB:  alembic upgrade head
+    - a5c2d9e11f28  (Phase 28 operations: 16 tables)
+    - b7d3e9a10c44  (users.google_sub for Google Sign-In)
+[!] Redeploy the BACKEND — several recent fixes are server-side only:
+    - Parent homework "no section" fallback
+    - New /v1/student/* API (StudentShell)
+    - Bus-staff pickup coordinates in /driver/students
+[!] Rebuild + redeploy the ADMIN WEB and SUPER-ADMIN WEB (npm run build).
+[!] Rebuild the MOBILE APP (new StudentShell + leave page + google_sign_in).
+    - flutter pub get && flutter clean && flutter build apk
+[!] Google Cloud console: JS origins per subdomain, Android SHA-1,
+    OAuth consent screen test users / publish.
+
+--------------------------------------------------------------------------------
+1. RECENTLY COMPLETED (this session)
+--------------------------------------------------------------------------------
+[x] Bus staff → "Navigate" to a student's pickup point (turn-by-turn
+    Google Maps directions; backend now returns pickup/drop lat/lng).
+[x] Super Admin sidebar reshaped to a clean 9-item nav (Dashboard,
+    Organizations, Plans, Billing, Staff, Reports, Announcements,
+    Audit Logs, Settings) + Reports/Announcements placeholder routes.
+[x] Parent homework fix: show class homework when a child has no section.
+[x] STUDENT role: dedicated StudentShell + /v1/student/* self API.
+[x] Role routing: student→StudentShell, generic teacher→TeacherShell,
+    hod/management→PrincipalShell.
+[x] Parent app: "Apply for leave" page (More menu), wired to existing
+    /v1/parent/leave-applications endpoints.
+
+--------------------------------------------------------------------------------
+2. MOBILE — STILL PENDING BY ROLE
+--------------------------------------------------------------------------------
+Parent
+[ ] Fee payment via gateway (Razorpay) from the app.
+    NEEDS: razorpay_flutter (currently commented out in pubspec.yaml),
+    Razorpay key id/secret, and a backend order-create + signature-verify
+    endpoint. Cannot function without keys.
+[ ] Parent-side view of admissions status (if they applied).
+
+Teacher
+[ ] Enter EXAM MARKS from the app.
+    The mark-entry API exists (/v1/school-admin/exams/marks/bulk, already
+    teacher-accessible) but is keyed on exam_subject_id + section_id with
+    NO name resolution, and the roster needs a section_id the
+    ExamSubjectRead payload doesn't carry. Cleanest path: add a small
+    teacher-facing endpoint that, for (exam_id, section the teacher
+    teaches), returns subjects with {name, exam_subject_id, max_marks},
+    then a roster+marks screen. ~1 backend endpoint + 1 mobile page.
+[ ] Offline-first attendance + sync.
+
+Student (new shell — polish)
+[ ] Timetable tab/page (endpoint exists: /v1/student/timetable).
+[ ] Attendance by-subject view (endpoint exists).
+[ ] Homework attachments on submit (text-only today).
+
+Bus staff
+[ ] Fuel / expense log entry.
+[ ] Driver leave / unavailability marking.
+
+--------------------------------------------------------------------------------
+3. ADMIN PANEL (school_erp_school_admin_web)
+--------------------------------------------------------------------------------
+[~] Fee Management + Communication sub-nav are tabs on one page — split
+    into real routes if per-item deep-linking is wanted.
+[ ] Users & credentials: phone (10-digit) + email format validation.
+[ ] Academic year / Term / Holiday: enforce end_date >= start_date.
+[ ] Student aadhaar: 12-digit validation.
+[ ] Pickers instead of raw IDs: Payroll payslip (User #), Certificates
+    (Student #), Library borrower.
+[ ] Library localStorage-only features need server tables: Shelves,
+    Settings, Import/Export, Audit Logs, Barcode SVG, Inventory verify.
+
+--------------------------------------------------------------------------------
+4. SUPER ADMIN (school_erp_super_admin_web + app/api/admin)
+--------------------------------------------------------------------------------
+[ ] Finish tenant CRUD (create/suspend/cancel, limits editing).
+[ ] Plans management (create/edit plans, feature flags).
+[ ] Billing (invoice generation, payment status, dunning).
+[ ] Impersonation ("log in as" a school_admin, audited).
+[ ] Global cross-tenant audit log viewer.
+[ ] Tenant onboarding wizard (seed RBAC, first admin, branding).
+[ ] Build out Reports + Announcements (placeholder pages now).
+[ ] Form validation on super-admin forms.
+
+--------------------------------------------------------------------------------
+5. BACKEND — VALIDATION & DATA MODEL
+--------------------------------------------------------------------------------
+[ ] SIS/teacher PHONE fields still bare Optional[str] — add format.
+[ ] aadhaar backend validation (12 digits).
+[ ] max_length caps on free-text Optional[str] columns.
+[ ] Mirror exam marks bounds into the Pydantic schema.
+
+--------------------------------------------------------------------------------
+6. AUTH / NICE-TO-HAVE
+--------------------------------------------------------------------------------
+[ ] Role x platform login gate (was reverted) — re-implement if wanted.
+[x] Google Sign-In backend + web + mobile — DONE (needs deploy + GCloud).
+[ ] iOS Google Sign-In (deferred).
+[ ] Global search, multi-language UI toggle, bulk CSV import, API
+    keys/webhooks, bundle chunk-splitting, rate limiting + Sentry.
+
+================================================================================
+NOTE: This file is UNTRACKED by git and lives only in the container. It
+was lost once on a container reset — commit it if you want it to persist.
+================================================================================
