@@ -95,6 +95,39 @@ class ChildDashboard {
       );
 }
 
+class LeaveApplicationRow {
+  const LeaveApplicationRow({
+    required this.id,
+    required this.studentId,
+    required this.startDate,
+    required this.endDate,
+    required this.reason,
+    required this.status,
+    required this.decisionRemarks,
+  });
+
+  final int id;
+  final int studentId;
+  final String startDate;
+  final String endDate;
+  final String reason;
+
+  /// Backend enum: pending / approved / rejected.
+  final String status;
+  final String? decisionRemarks;
+
+  factory LeaveApplicationRow.fromJson(Map<String, dynamic> j) =>
+      LeaveApplicationRow(
+        id: (j['id'] as num?)?.toInt() ?? 0,
+        studentId: (j['student_id'] as num?)?.toInt() ?? 0,
+        startDate: (j['start_date'] as String?) ?? '',
+        endDate: (j['end_date'] as String?) ?? '',
+        reason: (j['reason'] as String?) ?? '',
+        status: (j['status'] as String?) ?? 'pending',
+        decisionRemarks: j['decision_remarks'] as String?,
+      );
+}
+
 class ParentRepository {
   ParentRepository(this._api);
 
@@ -139,6 +172,21 @@ class ParentRepository {
         'reason': reason,
       },
     );
+  }
+
+  /// Every leave application this parent has filed (across all children),
+  /// newest first. Used by the Leave application page's history list.
+  Future<List<LeaveApplicationRow>> myLeaves() async {
+    try {
+      final res = await _api.dio.get<List<dynamic>>(
+        '/v1/parent/leave-applications',
+      );
+      return (res.data ?? const [])
+          .map((e) => LeaveApplicationRow.fromJson(e as Map<String, dynamic>))
+          .toList();
+    } on DioException {
+      return const [];
+    }
   }
 
   Future<List<AttendanceRow>> attendance(int studentId, {int limit = 30}) async {
