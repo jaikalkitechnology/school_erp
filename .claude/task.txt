@@ -55,8 +55,8 @@ Teacher
 [ ] Offline-first attendance + sync.
 
 Student (new shell — polish)
-[ ] Timetable tab/page (endpoint exists: /v1/student/timetable).
-[ ] Attendance by-subject view (endpoint exists).
+[x] Timetable page (More → Timetable) — DONE.
+[x] Attendance by-subject view (More → Attendance by subject) — DONE.
 [ ] Homework attachments on submit (text-only today).
 
 Bus staff

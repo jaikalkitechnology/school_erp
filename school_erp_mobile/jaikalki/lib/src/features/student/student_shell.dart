@@ -3,7 +3,14 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../api/parent_repository.dart'
-    show AttendanceRow, ChildDashboard, HomeworkItem, ResultCardRow, StudentProfile;
+    show
+        AttendanceRow,
+        ChildDashboard,
+        HomeworkItem,
+        ResultCardRow,
+        StudentProfile,
+        SubjectAttendanceReport,
+        TimetableView;
 import '../../api/student_repository.dart';
 import '../../core/auth_cubit.dart';
 import '../../core/service_locator.dart';
@@ -654,6 +661,20 @@ class _StudentMorePage extends StatelessWidget {
             ),
           ),
           _Tile(
+            icon: Icons.calendar_view_week_outlined,
+            label: 'Timetable',
+            onTap: () => Navigator.of(context).push(
+              MaterialPageRoute(builder: (_) => const _StudentTimetablePage()),
+            ),
+          ),
+          _Tile(
+            icon: Icons.insights_outlined,
+            label: 'Attendance by subject',
+            onTap: () => Navigator.of(context).push(
+              MaterialPageRoute(builder: (_) => const _StudentBySubjectPage()),
+            ),
+          ),
+          _Tile(
             icon: Icons.menu_book_outlined,
             label: 'Library',
             onTap: () => _open(context, 'Library', const LibraryCatalogPage()),
@@ -900,6 +921,248 @@ class _StudentResultsPageState extends State<_StudentResultsPage> {
                             )),
                       ),
                     ],
+                  ],
+                ),
+              );
+            },
+          );
+        },
+      ),
+    );
+  }
+}
+
+// ---- Timetable -------------------------------------------------------------
+
+class _StudentTimetablePage extends StatefulWidget {
+  const _StudentTimetablePage();
+
+  @override
+  State<_StudentTimetablePage> createState() => _StudentTimetablePageState();
+}
+
+class _StudentTimetablePageState extends State<_StudentTimetablePage> {
+  late Future<TimetableView?> _future;
+
+  static const _days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+
+  @override
+  void initState() {
+    super.initState();
+    _future = locator<StudentRepository>().timetable();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(title: const Text('Timetable')),
+      body: FutureBuilder<TimetableView?>(
+        future: _future,
+        builder: (context, snap) {
+          if (snap.connectionState != ConnectionState.done) {
+            return const Center(child: CircularProgressIndicator());
+          }
+          final tt = snap.data;
+          if (tt == null || !tt.hasData) {
+            return Center(
+              child: Padding(
+                padding: const EdgeInsets.all(24),
+                child: Text(
+                  tt?.note ?? 'No timetable published yet.',
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(color: JaikalkiBrand.textSecondary),
+                ),
+              ),
+            );
+          }
+          // Only render weekdays that actually have cells.
+          final activeDays = <int>[];
+          for (var d = 0; d < 7; d++) {
+            if (tt.dayCells(d).isNotEmpty) activeDays.add(d);
+          }
+          return ListView(
+            padding: const EdgeInsets.fromLTRB(16, 12, 16, 32),
+            children: [
+              for (final d in activeDays) ...[
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(4, 10, 4, 6),
+                  child: Text(
+                    _days[d].toUpperCase(),
+                    style: const TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w800,
+                      letterSpacing: 0.8,
+                      color: JaikalkiBrand.saffronDark,
+                    ),
+                  ),
+                ),
+                for (final c in tt.dayCells(d))
+                  Container(
+                    margin: const EdgeInsets.only(bottom: 6),
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: JaikalkiBrand.warmWhite,
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: JaikalkiBrand.saffronPale),
+                    ),
+                    child: Row(
+                      children: [
+                        Container(
+                          width: 34,
+                          height: 34,
+                          alignment: Alignment.center,
+                          decoration: BoxDecoration(
+                            color: JaikalkiBrand.saffronPale,
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: Text('${c.periodNumber}',
+                              style: const TextStyle(
+                                fontWeight: FontWeight.w800,
+                                color: JaikalkiBrand.saffronDarker,
+                              )),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(c.subjectName ?? 'Free period',
+                                  style: const TextStyle(
+                                    fontWeight: FontWeight.w700,
+                                    color: JaikalkiBrand.indigoDark,
+                                  )),
+                              Text(
+                                [
+                                  if (c.teacherName != null) c.teacherName!,
+                                  if (c.room != null) 'Room ${c.room}',
+                                ].join(' · '),
+                                style: const TextStyle(
+                                  fontSize: 12,
+                                  color: JaikalkiBrand.textSecondary,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        if (c.startTime != null)
+                          Text(
+                            c.startTime!.substring(0, 5),
+                            style: const TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w600,
+                              color: JaikalkiBrand.textSecondary,
+                            ),
+                          ),
+                      ],
+                    ),
+                  ),
+              ],
+            ],
+          );
+        },
+      ),
+    );
+  }
+}
+
+// ---- Attendance by subject -------------------------------------------------
+
+class _StudentBySubjectPage extends StatefulWidget {
+  const _StudentBySubjectPage();
+
+  @override
+  State<_StudentBySubjectPage> createState() => _StudentBySubjectPageState();
+}
+
+class _StudentBySubjectPageState extends State<_StudentBySubjectPage> {
+  late Future<SubjectAttendanceReport?> _future;
+
+  @override
+  void initState() {
+    super.initState();
+    _future = locator<StudentRepository>().attendanceBySubject();
+  }
+
+  Color _tone(double pct) => pct >= 80
+      ? JaikalkiBrand.teal
+      : pct >= 60
+          ? JaikalkiBrand.marigold
+          : const Color(0xFFD32F2F);
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(title: const Text('Attendance by subject')),
+      body: FutureBuilder<SubjectAttendanceReport?>(
+        future: _future,
+        builder: (context, snap) {
+          if (snap.connectionState != ConnectionState.done) {
+            return const Center(child: CircularProgressIndicator());
+          }
+          final rep = snap.data;
+          if (rep == null || rep.isEmpty) {
+            return Center(
+              child: Padding(
+                padding: const EdgeInsets.all(24),
+                child: Text(
+                  rep?.note ?? 'No subject attendance yet.',
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(color: JaikalkiBrand.textSecondary),
+                ),
+              ),
+            );
+          }
+          return ListView.separated(
+            padding: const EdgeInsets.fromLTRB(16, 12, 16, 32),
+            itemCount: rep.rows.length,
+            separatorBuilder: (_, __) => const SizedBox(height: 8),
+            itemBuilder: (_, i) {
+              final r = rep.rows[i];
+              final tone = _tone(r.percentage);
+              return Container(
+                padding: const EdgeInsets.all(14),
+                decoration: BoxDecoration(
+                  color: JaikalkiBrand.warmWhite,
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: JaikalkiBrand.saffronPale),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Expanded(
+                          child: Text(r.subjectName,
+                              style: const TextStyle(
+                                fontWeight: FontWeight.w700,
+                                color: JaikalkiBrand.indigoDark,
+                              )),
+                        ),
+                        Text('${r.percentage.toStringAsFixed(0)}%',
+                            style: TextStyle(
+                              fontWeight: FontWeight.w800,
+                              color: tone,
+                            )),
+                      ],
+                    ),
+                    const SizedBox(height: 6),
+                    ClipRRect(
+                      borderRadius: BorderRadius.circular(4),
+                      child: LinearProgressIndicator(
+                        value: (r.percentage / 100).clamp(0, 1),
+                        minHeight: 6,
+                        backgroundColor: JaikalkiBrand.saffronPale,
+                        valueColor: AlwaysStoppedAnimation(tone),
+                      ),
+                    ),
+                    const SizedBox(height: 6),
+                    Text(
+                      'Present ${r.present} · Late ${r.late} · Absent ${r.absent} · of ${r.total}',
+                      style: const TextStyle(
+                        fontSize: 11,
+                        color: JaikalkiBrand.textSecondary,
+                      ),
+                    ),
                   ],
                 ),
               );
