@@ -898,17 +898,26 @@ async def list_events_for_parent(
 async def profile_for_parent(
     session: AsyncSession, *, user_id: int, student_id: int, tenant_id: int
 ):
+    """Parent-facing profile: verify linkage, then build the blob."""
+    await _require_linked_child(
+        session, tenant_id=tenant_id, user_id=user_id, student_id=student_id,
+    )
+    return await build_student_profile(
+        session, student_id=student_id, tenant_id=tenant_id,
+    )
+
+
+async def build_student_profile(
+    session: AsyncSession, *, student_id: int, tenant_id: int
+):
     """Build a self-contained profile blob with everything the mobile
     side needs to render the profile page *and* the in-app ID card —
-    no follow-up calls required."""
+    no follow-up calls required. Caller is responsible for authorising
+    access to ``student_id`` (parent linkage, or the student themselves)."""
     from app.models.academic import ClassDef, Section
     from app.models.curriculum import House
     from app.models.tenant import Tenant
     from app.schemas.parent import ParentContact, StudentProfileView
-
-    await _require_linked_child(
-        session, tenant_id=tenant_id, user_id=user_id, student_id=student_id,
-    )
 
     student = (
         await session.execute(select(Student).where(Student.id == student_id))

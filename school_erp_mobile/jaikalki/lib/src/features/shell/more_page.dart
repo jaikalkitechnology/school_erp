@@ -8,6 +8,7 @@ import '../../core/settings_cubit.dart';
 import '../../theme/brand.dart';
 import '../calendar/calendar_page.dart';
 import '../directory/directory_page.dart';
+import '../leave/leave_application_page.dart';
 import '../library/library_catalog_page.dart';
 import '../messages/messages_page.dart';
 import '../notifications/notifications_page.dart';
@@ -60,6 +61,14 @@ class MorePage extends StatelessWidget {
             icon: Icons.event_outlined,
             label: 'Calendar',
             onTap: () => _open(context, 'Calendar', const CalendarPage()),
+          ),
+          _Tile(
+            icon: Icons.beach_access_outlined,
+            label: 'Apply for leave',
+            subtitle: "Request leave for your child + track status",
+            onTap: () => Navigator.of(context).push(
+              MaterialPageRoute(builder: (_) => const LeaveApplicationPage()),
+            ),
           ),
           _Tile(
             icon: Icons.directions_bus_outlined,
