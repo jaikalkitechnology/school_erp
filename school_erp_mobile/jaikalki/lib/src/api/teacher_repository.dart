@@ -383,6 +383,52 @@ class TeacherRepository {
     return ExamTimetable.fromJson(res.data ?? const {});
   }
 
+  // ---- Exam mark entry ---------------------------------------------------
+
+  /// Every {section × subject} the teacher can enter marks for, for a
+  /// given exam. Each target carries the exam_subject_id + section_id the
+  /// roster + submit calls need.
+  Future<List<MarkEntryTarget>> markEntryTargets(int examId) async {
+    try {
+      final res = await _api.dio.get<Map<String, dynamic>>(
+        '/v1/teacher/exams/$examId/mark-entry',
+      );
+      final targets = (res.data?['targets'] as List<dynamic>?) ?? const [];
+      return targets
+          .map((e) => MarkEntryTarget.fromJson(e as Map<String, dynamic>))
+          .toList();
+    } on DioException {
+      return const [];
+    }
+  }
+
+  Future<ExamRoster> examRoster({
+    required int examSubjectId,
+    required int sectionId,
+  }) async {
+    final res = await _api.dio.get<Map<String, dynamic>>(
+      '/v1/teacher/exams/exam-subjects/$examSubjectId/roster',
+      queryParameters: {'section_id': sectionId},
+    );
+    return ExamRoster.fromJson(res.data ?? const {});
+  }
+
+  Future<int> submitExamMarks({
+    required int examSubjectId,
+    required int sectionId,
+    required List<Map<String, dynamic>> entries,
+  }) async {
+    final res = await _api.dio.post<Map<String, dynamic>>(
+      '/v1/teacher/exams/marks/bulk',
+      queryParameters: {'section_id': sectionId},
+      data: {
+        'exam_subject_id': examSubjectId,
+        'entries': entries,
+      },
+    );
+    return (res.data?['written'] as num?)?.toInt() ?? 0;
+  }
+
   // ---- Create homework -------------------------------------------------
 
   Future<String> uploadFile({
@@ -1391,4 +1437,90 @@ class ExamPaper {
         maxMarks: _toDoubleOrNull(j['max_marks']),
         passingMarks: _toDoubleOrNull(j['passing_marks']),
       );
+}
+
+// ---- Exam mark entry models ----------------------------------------------
+
+class MarkEntryTarget {
+  const MarkEntryTarget({
+    required this.examSubjectId,
+    required this.sectionId,
+    required this.sectionName,
+    required this.classLabel,
+    required this.subjectId,
+    required this.subjectName,
+    required this.maxMarks,
+    required this.passingMarks,
+    required this.examDate,
+  });
+
+  final int examSubjectId;
+  final int sectionId;
+  final String sectionName;
+  final String? classLabel;
+  final int subjectId;
+  final String subjectName;
+  final double maxMarks;
+  final double passingMarks;
+  final String? examDate;
+
+  factory MarkEntryTarget.fromJson(Map<String, dynamic> j) => MarkEntryTarget(
+        examSubjectId: (j['exam_subject_id'] as num?)?.toInt() ?? 0,
+        sectionId: (j['section_id'] as num?)?.toInt() ?? 0,
+        sectionName: (j['section_name'] as String?) ?? '',
+        classLabel: j['class_label'] as String?,
+        subjectId: (j['subject_id'] as num?)?.toInt() ?? 0,
+        subjectName: (j['subject_name'] as String?) ?? 'Subject',
+        maxMarks: _toDoubleOrNull(j['max_marks']) ?? 0,
+        passingMarks: _toDoubleOrNull(j['passing_marks']) ?? 0,
+        examDate: j['exam_date'] as String?,
+      );
+}
+
+class ExamRosterRow {
+  ExamRosterRow({
+    required this.studentId,
+    required this.studentName,
+    required this.obtainedMarks,
+  });
+
+  final int studentId;
+  final String studentName;
+
+  /// Local editable value; null = not entered yet.
+  double? obtainedMarks;
+}
+
+class ExamRoster {
+  const ExamRoster({
+    required this.examSubjectId,
+    required this.maxMarks,
+    required this.passingMarks,
+    required this.rows,
+  });
+
+  final int examSubjectId;
+  final double maxMarks;
+  final double passingMarks;
+  final List<ExamRosterRow> rows;
+
+  factory ExamRoster.fromJson(Map<String, dynamic> j) {
+    final names = (j['student_names'] as Map<String, dynamic>?) ?? const {};
+    final rawRows = (j['rows'] as List<dynamic>?) ?? const [];
+    final rows = rawRows.map((e) {
+      final m = e as Map<String, dynamic>;
+      final sid = (m['student_id'] as num?)?.toInt() ?? 0;
+      return ExamRosterRow(
+        studentId: sid,
+        studentName: (names['$sid'] as String?) ?? 'Student #$sid',
+        obtainedMarks: _toDoubleOrNull(m['obtained_marks']),
+      );
+    }).toList();
+    return ExamRoster(
+      examSubjectId: (j['exam_subject_id'] as num?)?.toInt() ?? 0,
+      maxMarks: _toDoubleOrNull(j['max_marks']) ?? 0,
+      passingMarks: _toDoubleOrNull(j['passing_marks']) ?? 0,
+      rows: rows,
+    );
+  }
 }
