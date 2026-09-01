@@ -60,6 +60,7 @@ class ChildDashboard {
     required this.upcomingEventsCount,
     required this.todayAttendance,
     required this.feeDueAmount,
+    this.pendingHomework = 0,
   });
 
   final int studentId;
@@ -73,6 +74,7 @@ class ChildDashboard {
   final int upcomingEventsCount;
   final String? todayAttendance;
   final double feeDueAmount;
+  final int pendingHomework;
 
   factory ChildDashboard.fromJson(Map<String, dynamic> j) => ChildDashboard(
         studentId: j['student_id'] as int,
@@ -89,6 +91,7 @@ class ChildDashboard {
         upcomingEventsCount: (j['upcoming_events_count'] as num?)?.toInt() ?? 0,
         todayAttendance: j['today_attendance'] as String?,
         feeDueAmount: _toDoubleOrZero(j['fee_due_amount']),
+        pendingHomework: (j['pending_homework'] as num?)?.toInt() ?? 0,
       );
 }
 

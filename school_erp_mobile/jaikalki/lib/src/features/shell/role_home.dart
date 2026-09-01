@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
 import '../../core/auth_cubit.dart';
+import '../student/student_shell.dart';
 import '../teacher/teacher_shell.dart';
 import 'home_shell.dart';
 import 'principal_shell.dart';
@@ -25,9 +26,12 @@ class RoleHome extends StatelessWidget {
   static const _principalRoles = <String>{
     'principal',
     'vice_principal',
+    'hod',
+    'management',
   };
 
   static const _teacherRoles = <String>{
+    'teacher',
     'class_teacher',
     'subject_teacher',
     'coordinator',
@@ -61,6 +65,10 @@ class RoleHome extends StatelessWidget {
           return const PrincipalShell();
         }
         if (roles.any(_teacherRoles.contains)) return const TeacherShell();
+        // Students get their own self-service shell (own attendance,
+        // homework, results, profile) — never the parent shell, which is
+        // built around a child-switcher and "your child" framing.
+        if (roles.contains('student')) return const StudentShell();
         return const HomeShell();
       },
     );
