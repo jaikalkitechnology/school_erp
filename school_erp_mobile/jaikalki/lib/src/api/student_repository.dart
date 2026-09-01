@@ -7,7 +7,9 @@ import 'parent_repository.dart'
         ChildDashboard,
         HomeworkItem,
         ResultCardRow,
-        StudentProfile;
+        StudentProfile,
+        SubjectAttendanceReport,
+        TimetableView;
 
 /// Student self-service wrapper around the /v1/student/* endpoints.
 ///
@@ -97,22 +99,32 @@ class StudentRepository {
     }
   }
 
-  /// Weekly timetable as returned by the backend. Kept as raw maps because
-  /// the shape mirrors the parent timetable view, which the UI renders
-  /// generically.
-  Future<List<Map<String, dynamic>>> timetable() async {
+  /// The student's own weekly timetable (same shape as the parent view).
+  Future<TimetableView?> timetable() async {
     try {
-      final res = await _api.dio.get<dynamic>('/v1/student/timetable');
+      final res =
+          await _api.dio.get<Map<String, dynamic>>('/v1/student/timetable');
       final data = res.data;
-      if (data is List) {
-        return data.cast<Map<String, dynamic>>();
-      }
-      if (data is Map && data['slots'] is List) {
-        return (data['slots'] as List).cast<Map<String, dynamic>>();
-      }
-      return const [];
+      if (data == null) return null;
+      return TimetableView.fromJson(data);
     } on DioException {
-      return const [];
+      return null;
+    }
+  }
+
+  /// Attendance broken down per subject over a window.
+  Future<SubjectAttendanceReport?> attendanceBySubject(
+      {int windowDays = 90}) async {
+    try {
+      final res = await _api.dio.get<Map<String, dynamic>>(
+        '/v1/student/attendance/by-subject',
+        queryParameters: {'window_days': windowDays},
+      );
+      final data = res.data;
+      if (data == null) return null;
+      return SubjectAttendanceReport.fromJson(data);
+    } on DioException {
+      return null;
     }
   }
 }

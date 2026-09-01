@@ -28,6 +28,7 @@ from app.schemas.homework import (
     HomeworkWrite,
     SubmissionRead,
 )
+from app.schemas.exams import MarkBulkRequest
 from app.schemas.parent import LeaveDecide, LeaveRead
 from app.services.attendance import (
     mark_section_attendance,
@@ -992,3 +993,135 @@ async def teacher_exam_timetable_route(
             for (es, subj, cls) in rows
         ],
     }
+
+
+# ---- Exam mark entry ------------------------------------------------------
+
+
+@router.get("/exams/{exam_id}/mark-entry")
+async def teacher_mark_entry_targets_route(
+    exam_id: int,
+    principal: AuthPrincipal = Depends(_teacher),
+    session: AsyncSession = Depends(tenant_scoped_session),
+):
+    """Every {section × exam-subject} the logged-in teacher can enter
+    marks for, with all names + ids the mobile screen needs. Each target
+    is an ExamSubject (a paper for a class) paired with a section the
+    teacher teaches that belongs to that class."""
+    from app.models.academic import ClassDef, Section, Subject
+    from app.models.exams import Exam, ExamSubject
+    from app.schemas.exams import TeacherMarkEntryTarget, TeacherMarkEntryTargets
+    from app.services.teacher_app import _accessible_sections
+
+    exam = (
+        await session.execute(select(Exam).where(Exam.id == exam_id))
+    ).scalar_one_or_none()
+    if exam is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Exam not found"
+        )
+
+    section_ids = await _accessible_sections(session, user_id=principal.user_id)
+    if not section_ids:
+        return TeacherMarkEntryTargets(
+            exam_id=exam.id, exam_name=exam.name, targets=[]
+        )
+
+    sections = list(
+        (
+            await session.execute(
+                select(Section).where(Section.id.in_(section_ids))
+            )
+        ).scalars().all()
+    )
+    class_ids = {s.class_def_id for s in sections if s.class_def_id is not None}
+    class_names = {
+        cid: name
+        for cid, name in (
+            await session.execute(
+                select(ClassDef.id, ClassDef.name).where(ClassDef.id.in_(class_ids))
+            )
+        ).all()
+    } if class_ids else {}
+
+    exam_subjects = list(
+        (
+            await session.execute(
+                select(ExamSubject).where(ExamSubject.exam_id == exam_id)
+            )
+        ).scalars().all()
+    )
+    subject_ids = {es.subject_id for es in exam_subjects}
+    subject_names = {
+        sid: name
+        for sid, name in (
+            await session.execute(
+                select(Subject.id, Subject.name).where(Subject.id.in_(subject_ids))
+            )
+        ).all()
+    } if subject_ids else {}
+
+    # Index exam subjects by class so we only pair a section with the
+    # papers set for that section's class.
+    by_class: dict[int, list[ExamSubject]] = {}
+    for es in exam_subjects:
+        by_class.setdefault(es.class_def_id, []).append(es)
+
+    targets: list[TeacherMarkEntryTarget] = []
+    for sec in sections:
+        for es in by_class.get(sec.class_def_id, []):
+            targets.append(
+                TeacherMarkEntryTarget(
+                    exam_subject_id=es.id,
+                    section_id=sec.id,
+                    section_name=sec.name,
+                    class_label=class_names.get(sec.class_def_id),
+                    subject_id=es.subject_id,
+                    subject_name=subject_names.get(es.subject_id, "Subject"),
+                    max_marks=es.max_marks,
+                    passing_marks=es.passing_marks,
+                    exam_date=es.exam_date,
+                )
+            )
+    # Stable order: by section, then subject name.
+    targets.sort(key=lambda t: (t.section_name, t.subject_name))
+    return TeacherMarkEntryTargets(
+        exam_id=exam.id, exam_name=exam.name, targets=targets
+    )
+
+
+@router.get("/exams/exam-subjects/{exam_subject_id}/roster")
+async def teacher_exam_roster_route(
+    exam_subject_id: int,
+    section_id: int = Query(...),
+    principal: AuthPrincipal = Depends(_teacher),
+    session: AsyncSession = Depends(tenant_scoped_session),
+):
+    """Roster for a paper + section with any marks already saved. Gated
+    to sections the teacher actually teaches."""
+    from app.services.exams import section_roster as exam_section_roster
+
+    await assert_section_access(
+        session, user_id=principal.user_id, section_id=section_id,
+    )
+    return await exam_section_roster(session, exam_subject_id, section_id)
+
+
+@router.post("/exams/marks/bulk")
+async def teacher_bulk_marks_route(
+    payload: MarkBulkRequest,
+    section_id: int = Query(...),
+    principal: AuthPrincipal = Depends(_teacher),
+    session: AsyncSession = Depends(tenant_scoped_session),
+):
+    """Upsert marks for a paper. section_id is required so we can verify
+    the teacher teaches the section before writing."""
+    from app.services.exams import upsert_marks
+
+    await assert_section_access(
+        session, user_id=principal.user_id, section_id=section_id,
+    )
+    written = await upsert_marks(
+        session, principal.tenant_id, principal.user_id, payload
+    )
+    return {"written": written}

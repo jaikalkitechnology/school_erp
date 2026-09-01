@@ -99,6 +99,27 @@ class SectionRoster(BaseModel):
     student_names: dict  # student_id -> full_name
 
 
+class TeacherMarkEntryTarget(BaseModel):
+    """One gradeable {section × exam-subject} the teacher can enter marks
+    for. Carries every name + id the mobile screen needs so it can load a
+    roster and post marks without extra lookups."""
+    exam_subject_id: int
+    section_id: int
+    section_name: str
+    class_label: Optional[str] = None
+    subject_id: int
+    subject_name: str
+    max_marks: Decimal
+    passing_marks: Decimal
+    exam_date: Optional[date] = None
+
+
+class TeacherMarkEntryTargets(BaseModel):
+    exam_id: int
+    exam_name: str
+    targets: List[TeacherMarkEntryTarget]
+
+
 # ---- Grade scale -----------------------------------------------------------
 
 

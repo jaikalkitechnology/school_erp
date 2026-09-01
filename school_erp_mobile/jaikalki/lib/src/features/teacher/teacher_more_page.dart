@@ -12,6 +12,7 @@ import '../operations/notice_board_page.dart';
 import '../operations/sports_page.dart';
 import '../settings/settings_page.dart';
 import 'chat_list_page.dart';
+import 'enter_marks_page.dart';
 import 'homework_list_page.dart';
 import 'leaves_page.dart';
 import 'my_leaves_page.dart';
@@ -107,6 +108,15 @@ class _TeacherMorePageState extends State<TeacherMorePage> {
                   onTap: () => Navigator.of(context).push(
                     MaterialPageRoute(
                         builder: (_) => const HomeworkListPage()),
+                  ),
+                ),
+                _ActionCard(
+                  icon: Icons.grading_outlined,
+                  label: 'Enter exam marks',
+                  subtitle: 'Roster marks entry',
+                  tint: JaikalkiBrand.indigo,
+                  onTap: () => Navigator.of(context).push(
+                    MaterialPageRoute(builder: (_) => const EnterMarksPage()),
                   ),
                 ),
                 _ActionCard(

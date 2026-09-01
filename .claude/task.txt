@@ -47,19 +47,16 @@ Parent
 [ ] Parent-side view of admissions status (if they applied).
 
 Teacher
-[ ] Enter EXAM MARKS from the app.
-    The mark-entry API exists (/v1/school-admin/exams/marks/bulk, already
-    teacher-accessible) but is keyed on exam_subject_id + section_id with
-    NO name resolution, and the roster needs a section_id the
-    ExamSubjectRead payload doesn't carry. Cleanest path: add a small
-    teacher-facing endpoint that, for (exam_id, section the teacher
-    teaches), returns subjects with {name, exam_subject_id, max_marks},
-    then a roster+marks screen. ~1 backend endpoint + 1 mobile page.
+[x] Enter EXAM MARKS from the app — DONE. New teacher endpoints:
+    GET /v1/teacher/exams/{id}/mark-entry (targets with names +
+    exam_subject_id + section_id), GET .../exam-subjects/{id}/roster,
+    POST .../marks/bulk (section-access checked). Mobile: More →
+    "Enter exam marks" (pick exam → paper → roster → save).
 [ ] Offline-first attendance + sync.
 
 Student (new shell — polish)
-[ ] Timetable tab/page (endpoint exists: /v1/student/timetable).
-[ ] Attendance by-subject view (endpoint exists).
+[x] Timetable page (More → Timetable) — DONE.
+[x] Attendance by-subject view (More → Attendance by subject) — DONE.
 [ ] Homework attachments on submit (text-only today).
 
 Bus staff
