@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import re
 from datetime import date
 from typing import Annotated, List, Optional
 
@@ -27,10 +28,40 @@ def _blank_to_none(v):
     return v
 
 
+def _clean_phone(v):
+    """Blank → None; otherwise normalise to a 10-digit number (tolerating
+    spaces, dashes, a +91 or leading-0 prefix) and reject anything else."""
+    v = _blank_to_none(v)
+    if v is None:
+        return None
+    digits = re.sub(r"\D", "", str(v))
+    if len(digits) == 12 and digits.startswith("91"):
+        digits = digits[2:]
+    elif len(digits) == 11 and digits.startswith("0"):
+        digits = digits[1:]
+    if len(digits) != 10:
+        raise ValueError("Phone must be a 10-digit number")
+    return digits
+
+
+def _clean_aadhaar(v):
+    """Blank → None; otherwise require exactly 12 digits."""
+    v = _blank_to_none(v)
+    if v is None:
+        return None
+    digits = re.sub(r"\D", "", str(v))
+    if len(digits) != 12:
+        raise ValueError("Aadhaar must be a 12-digit number")
+    return digits
+
+
 # Optional email that (a) maps blank → None, (b) validates format when
 # a value is present. Used for every student/parent email field so a
 # malformed address can't silently persist into login / notify flows.
 OptionalEmail = Annotated[Optional[EmailStr], BeforeValidator(_blank_to_none)]
+# Optional phone / aadhaar with the same blank→None + format guarantees.
+OptionalPhone = Annotated[Optional[str], BeforeValidator(_clean_phone)]
+OptionalAadhaar = Annotated[Optional[str], BeforeValidator(_clean_aadhaar)]
 
 
 # ---- Documents -------------------------------------------------------------
@@ -59,41 +90,41 @@ class StudentDocumentWrite(BaseModel):
 
 class StudentBase(BaseModel):
     full_name: str = Field(min_length=2, max_length=180)
-    first_name: Optional[str] = None
-    last_name: Optional[str] = None
+    first_name: Optional[str] = Field(default=None, max_length=90)
+    last_name: Optional[str] = Field(default=None, max_length=90)
     date_of_birth: Optional[date] = None
     gender: Optional[Gender] = None
-    blood_group: Optional[str] = None
-    photo_url: Optional[str] = None
+    blood_group: Optional[str] = Field(default=None, max_length=8)
+    photo_url: Optional[str] = Field(default=None, max_length=500)
 
     class_def_id: Optional[int] = None
     section_id: Optional[int] = None
     house_id: Optional[int] = None
     admission_date: Optional[date] = None
-    previous_school: Optional[str] = None
+    previous_school: Optional[str] = Field(default=None, max_length=180)
 
-    address: Optional[str] = None
-    phone: Optional[str] = None
+    address: Optional[str] = Field(default=None, max_length=500)
+    phone: OptionalPhone = None
     email: OptionalEmail = None
-    aadhaar: Optional[str] = None
-    religion: Optional[str] = None
-    caste: Optional[str] = None
+    aadhaar: OptionalAadhaar = None
+    religion: Optional[str] = Field(default=None, max_length=60)
+    caste: Optional[str] = Field(default=None, max_length=60)
     category: Optional[Category] = None
 
-    father_name: Optional[str] = None
-    mother_name: Optional[str] = None
-    guardian_name: Optional[str] = None
-    parent_phone: Optional[str] = None
+    father_name: Optional[str] = Field(default=None, max_length=120)
+    mother_name: Optional[str] = Field(default=None, max_length=120)
+    guardian_name: Optional[str] = Field(default=None, max_length=120)
+    parent_phone: OptionalPhone = None
     parent_email: OptionalEmail = None
-    parent_occupation: Optional[str] = None
+    parent_occupation: Optional[str] = Field(default=None, max_length=120)
 
-    allergies: Optional[str] = None
-    medical_conditions: Optional[str] = None
-    emergency_contact_name: Optional[str] = None
-    emergency_phone: Optional[str] = None
+    allergies: Optional[str] = Field(default=None, max_length=500)
+    medical_conditions: Optional[str] = Field(default=None, max_length=1000)
+    emergency_contact_name: Optional[str] = Field(default=None, max_length=120)
+    emergency_phone: OptionalPhone = None
 
-    roll_no: Optional[str] = None
-    remarks: Optional[str] = None
+    roll_no: Optional[str] = Field(default=None, max_length=20)
+    remarks: Optional[str] = Field(default=None, max_length=1000)
 
 
 class StudentCreate(StudentBase):

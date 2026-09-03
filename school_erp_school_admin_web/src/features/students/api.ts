@@ -84,6 +84,7 @@ export interface StudentCreatePayload {
   blood_group?: string;
   address?: string;
   phone?: string;
+  aadhaar?: string;
   admission_number?: string;
   category?: Category;
   photo_url?: string;

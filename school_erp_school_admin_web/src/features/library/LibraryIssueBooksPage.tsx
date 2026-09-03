@@ -14,6 +14,7 @@ import {
   type BorrowerKind,
 } from "./api";
 import { LOAN_TONE, LibraryHeader } from "./_shared";
+import { fetchStudentOptions, fetchTeacherOptions } from "@/features/operations/_pickers";
 
 /** Issue-book desk. Two-step flow that stops the librarian from
  * typing a copy ID that doesn't exist (which was hitting a 404):
@@ -52,6 +53,15 @@ export function LibraryIssueBooksPage() {
   // --- Step 3: borrower + issue -------------------------------------
   const [borrowerId, setBorrowerId] = useState("");
   const [borrowerKind, setBorrowerKind] = useState<BorrowerKind>("student");
+  const { data: studentOpts = [] } = useQuery({
+    queryKey: ["operations-student-options"],
+    queryFn: fetchStudentOptions,
+  });
+  const { data: teacherOpts = [] } = useQuery({
+    queryKey: ["operations-teacher-options"],
+    queryFn: fetchTeacherOptions,
+  });
+  const borrowerOpts = borrowerKind === "student" ? studentOpts : teacherOpts;
   const [loanDays, setLoanDays] = useState("");
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
@@ -217,21 +227,29 @@ export function LibraryIssueBooksPage() {
                     <select
                       className="mt-1 h-9 w-full rounded border border-input bg-transparent px-2 text-sm"
                       value={borrowerKind}
-                      onChange={(e) =>
-                        setBorrowerKind(e.target.value as BorrowerKind)
-                      }
+                      onChange={(e) => {
+                        setBorrowerKind(e.target.value as BorrowerKind);
+                        setBorrowerId("");
+                      }}
                     >
                       <option value="student">Student</option>
                       <option value="teacher">Teacher</option>
                     </select>
                   </div>
                   <div>
-                    <Label>Borrower ID</Label>
-                    <Input
+                    <Label>Borrower</Label>
+                    <select
+                      className="mt-1 h-9 w-full rounded border border-input bg-transparent px-2 text-sm"
                       value={borrowerId}
-                      inputMode="numeric"
-                      onChange={(e) => setBorrowerId(e.target.value.replace(/\D/g, ""))}
-                    />
+                      onChange={(e) => setBorrowerId(e.target.value)}
+                    >
+                      <option value="">Select {borrowerKind}…</option>
+                      {borrowerOpts.map((o) => (
+                        <option key={o.id} value={o.id}>
+                          {o.label}{o.hint ? ` · ${o.hint}` : ""}
+                        </option>
+                      ))}
+                    </select>
                   </div>
                   <div>
                     <Label>Loan days (blank = default)</Label>

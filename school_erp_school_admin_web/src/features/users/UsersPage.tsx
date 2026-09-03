@@ -369,7 +369,13 @@ function CreateOrEditDialog({
     onError: (e: any) => setError(e?.response?.data?.detail ?? "Could not save"),
   });
 
+  const phoneError =
+    phone.length > 0 && phone.length !== 10 ? "Phone must be exactly 10 digits." : null;
+  const emailError =
+    email.length > 0 && !EMAIL_RE.test(email) ? "Enter a valid email address." : null;
+
   const canSubmit = fullName.length >= 1 && selectedRoles.length > 0
+    && !phoneError && !emailError
     && (mode === "edit" || password.length >= 6);
 
   return (
@@ -387,8 +393,8 @@ function CreateOrEditDialog({
 
         <div className="mt-4 space-y-3">
           <Field label="Full name *" value={fullName} onChange={setFullName} />
-          <Field label="Email" value={email} onChange={setEmail} type="email" />
-          <Field label="Phone" value={phone} onChange={setPhone} />
+          <Field label="Email" value={email} onChange={setEmail} type="email" kind="email" error={emailError} />
+          <Field label="Phone" value={phone} onChange={setPhone} kind="phone" error={phoneError} hint="10-digit mobile number." />
           {mode === "create" && (
             <Field label="Password *" value={password} onChange={setPassword} type="password" hint="At least 6 characters." />
           )}
@@ -567,16 +573,35 @@ function SetPasswordDialog({ user, onClose }: { user: UserRow; onClose: () => vo
   );
 }
 
+const EMAIL_RE = /^[a-zA-Z0-9.-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
+
 function Field({
-  label, value, onChange, hint, type = "text",
+  label, value, onChange, hint, type = "text", kind, error,
 }: {
-  label: string; value: string; onChange: (v: string) => void; hint?: string; type?: string;
+  label: string; value: string; onChange: (v: string) => void; hint?: string;
+  type?: string; kind?: "phone" | "email"; error?: string | null;
 }) {
+  const sanitize = (v: string) =>
+    kind === "phone"
+      ? v.replace(/\D/g, "").slice(0, 10)
+      : kind === "email"
+        // Strip symbols an email address can never contain.
+        ? v.replace(/[~!#$%^&*()|?><":{},; ]/g, "")
+        : v;
   return (
     <div className="space-y-1.5">
       <Label>{label}</Label>
-      <Input type={type} value={value} onChange={(e) => onChange(e.target.value)} />
-      {hint && <p className="text-[11px] text-muted-foreground">{hint}</p>}
+      <Input
+        type={type}
+        inputMode={kind === "phone" ? "numeric" : undefined}
+        maxLength={kind === "phone" ? 10 : undefined}
+        value={value}
+        onChange={(e) => onChange(sanitize(e.target.value))}
+        className={error ? "border-destructive focus-visible:ring-destructive" : undefined}
+      />
+      {error
+        ? <p className="text-[11px] text-destructive">{error}</p>
+        : hint && <p className="text-[11px] text-muted-foreground">{hint}</p>}
     </div>
   );
 }

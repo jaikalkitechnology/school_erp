@@ -1,5 +1,6 @@
 import { api } from "@/lib/api";
 import { listStudents } from "@/features/students/api";
+import { listTeachers } from "@/features/teachers/api";
 import type { PickerOption } from "./_crud";
 
 /** Fetchers used by the FK picker fields. Each returns the shape
@@ -56,6 +57,17 @@ export const fetchStudentOptions = async (): Promise<PickerOption[]> => {
     hint: `${s.admission_number}${
       s.current_class_label ? ` · ${s.current_class_label}` : ""
     }`,
+  }));
+};
+
+/** Teacher picker — returns Teacher.id (not user id), which is the id
+ * space the library borrower / other teacher FKs expect. */
+export const fetchTeacherOptions = async (): Promise<PickerOption[]> => {
+  const res = await listTeachers({ limit: 200 });
+  return res.items.map((t) => ({
+    id: t.id,
+    label: t.full_name,
+    hint: [t.employee_no, t.designation ?? undefined].filter(Boolean).join(" · ") || undefined,
   }));
 };
 
