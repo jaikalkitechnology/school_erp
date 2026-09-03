@@ -1,14 +1,49 @@
-import { useQuery } from "@tanstack/react-query";
+import { useRef, useState } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Download, Upload } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { listBooks, listLoans } from "./api";
+import { importBooks, listBooks, listLoans } from "./api";
 import { LibraryHeader, StatTile } from "./_shared";
+
+/** Minimal quote-aware CSV parser → array of row objects keyed by the
+ * header row. Good enough for spreadsheets exported by Excel / Sheets. */
+function parseCsv(text: string): Array<Record<string, string>> {
+  const rows: string[][] = [];
+  let field = "";
+  let row: string[] = [];
+  let inQuotes = false;
+  for (let i = 0; i < text.length; i++) {
+    const c = text[i];
+    if (inQuotes) {
+      if (c === '"') {
+        if (text[i + 1] === '"') { field += '"'; i++; }
+        else inQuotes = false;
+      } else field += c;
+    } else if (c === '"') inQuotes = true;
+    else if (c === ",") { row.push(field); field = ""; }
+    else if (c === "\n" || c === "\r") {
+      if (c === "\r" && text[i + 1] === "\n") i++;
+      row.push(field); field = "";
+      if (row.some((f) => f !== "")) rows.push(row);
+      row = [];
+    } else field += c;
+  }
+  if (field !== "" || row.length) { row.push(field); if (row.some((f) => f !== "")) rows.push(row); }
+  if (rows.length < 2) return [];
+  const header = rows[0].map((h) => h.trim().toLowerCase());
+  return rows.slice(1).map((r) => {
+    const obj: Record<string, string> = {};
+    header.forEach((h, idx) => { obj[h] = (r[idx] ?? "").trim(); });
+    return obj;
+  });
+}
 
 /** Bulk data in / out. Export uses existing endpoints and builds
  * CSVs client-side; import is a preview-only stub until the
  * backend gets a bulk-ingest endpoint. */
 export function LibraryImportExportPage() {
+  const qc = useQueryClient();
   const { data: books = [] } = useQuery({
     queryKey: ["library-books"],
     queryFn: () => listBooks({}),
@@ -17,6 +52,33 @@ export function LibraryImportExportPage() {
     queryKey: ["library-loans", "all"],
     queryFn: () => listLoans({}),
   });
+
+  const fileRef = useRef<HTMLInputElement>(null);
+  const [importing, setImporting] = useState(false);
+  const [importMsg, setImportMsg] = useState<string | null>(null);
+
+  const onImportFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (fileRef.current) fileRef.current.value = "";
+    if (!file) return;
+    setImporting(true);
+    setImportMsg(null);
+    try {
+      const text = await file.text();
+      const rows = parseCsv(text);
+      if (rows.length === 0) {
+        setImportMsg("No data rows found. Include a header row with a 'title' column.");
+        return;
+      }
+      const res = await importBooks(rows);
+      setImportMsg(`Imported ${res.created} book(s)${res.skipped ? `, skipped ${res.skipped}` : ""}.`);
+      qc.invalidateQueries({ queryKey: ["library-books"] });
+    } catch {
+      setImportMsg("Import failed. Check the file is a valid CSV.");
+    } finally {
+      setImporting(false);
+    }
+  };
 
   const downloadCsv = (name: string, rows: string[][]) => {
     const csv = rows
@@ -114,14 +176,27 @@ export function LibraryImportExportPage() {
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-3">
-          <label className="flex cursor-not-allowed items-center gap-3 rounded-md border border-dashed border-input bg-muted/40 px-4 py-6 opacity-70">
+          <input
+            ref={fileRef}
+            type="file"
+            accept=".csv,text/csv"
+            className="hidden"
+            onChange={onImportFile}
+          />
+          <button
+            type="button"
+            disabled={importing}
+            onClick={() => fileRef.current?.click()}
+            className="flex w-full cursor-pointer items-center gap-3 rounded-md border border-dashed border-input bg-muted/40 px-4 py-6 text-left hover:bg-muted disabled:opacity-60"
+          >
             <Upload className="h-5 w-5 text-muted-foreground" />
             <span className="text-sm">
-              Drop a CSV here or click to browse — <em>backend endpoint coming next</em>.
+              {importing ? "Importing…" : "Click to choose a CSV of books to bulk-add."}
             </span>
-          </label>
+          </button>
+          {importMsg && <p className="text-sm text-teal-dark">{importMsg}</p>}
           <p className="text-xs text-muted-foreground">
-            Expected columns: <span className="font-mono">title, author, isbn, publisher, category, default_loan_days, default_fine_per_day, copies</span>.
+            Expected columns (header row): <span className="font-mono">title, author, isbn, publisher, category</span>. Only <span className="font-mono">title</span> is required.
           </p>
         </CardContent>
       </Card>
