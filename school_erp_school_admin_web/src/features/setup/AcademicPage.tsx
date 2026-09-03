@@ -87,6 +87,7 @@ function YearForm({
   const [start, setStart] = useState("");
   const [end, setEnd] = useState("");
   const [active, setActive] = useState(false);
+  const dateError = start && end && end < start ? "End date must be on or after the start date." : null;
   return (
     <Card>
       <CardHeader>
@@ -98,6 +99,7 @@ function YearForm({
           className="grid grid-cols-2 gap-4 lg:grid-cols-5"
           onSubmit={(e) => {
             e.preventDefault();
+            if (dateError) return;
             onCreate({ code, name, start_date: start, end_date: end, is_active: active });
             setCode(""); setName(""); setStart(""); setEnd(""); setActive(false);
           }}
@@ -117,8 +119,11 @@ function YearForm({
               Mark active
             </label>
           </div>
+          {dateError && (
+            <p className="col-span-2 lg:col-span-5 text-xs text-destructive">{dateError}</p>
+          )}
           <div className="col-span-2 lg:col-span-5 flex justify-end">
-            <Button type="submit" disabled={pending}>
+            <Button type="submit" disabled={pending || !!dateError}>
               <Plus className="h-4 w-4" />
               {pending ? "Adding…" : "Add year"}
             </Button>
@@ -205,10 +210,12 @@ function TermInline({
   const [name, setName] = useState("");
   const [start, setStart] = useState("");
   const [end, setEnd] = useState("");
+  const dateError = start && end && end < start ? "End must be on or after start." : null;
   return (
     <form
       onSubmit={(e) => {
         e.preventDefault();
+        if (dateError) return;
         onSubmit(year_id, { name, start_date: start, end_date: end });
         setName(""); setStart(""); setEnd("");
       }}
@@ -219,10 +226,11 @@ function TermInline({
         <Input placeholder="Term name" value={name} onChange={(e) => setName(e.target.value)} className="min-w-[140px] flex-1" />
         <Input type="date" value={start} onChange={(e) => setStart(e.target.value)} className="w-44" />
         <Input type="date" value={end} onChange={(e) => setEnd(e.target.value)} className="w-44" />
-        <Button size="sm" type="submit" disabled={!name || !start || !end}>
+        <Button size="sm" type="submit" disabled={!name || !start || !end || !!dateError}>
           Add
         </Button>
       </div>
+      {dateError && <p className="text-xs text-destructive">{dateError}</p>}
     </form>
   );
 }

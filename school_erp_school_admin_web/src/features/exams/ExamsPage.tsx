@@ -128,6 +128,21 @@ function ExamsPanel() {
   const [paperDate, setPaperDate] = useState("");
   const [startsAt, setStartsAt] = useState("");
   const [endsAt, setEndsAt] = useState("");
+
+  // Relational submit-time guards.
+  const examDateError =
+    startDate && endDate && endDate < startDate
+      ? "Exam end date must be on or after the start date."
+      : null;
+  const passingError =
+    passing > examMax
+      ? "Passing marks can't exceed max marks."
+      : null;
+  const timeError =
+    startsAt && endsAt && endsAt < startsAt
+      ? "End time must be after the start time."
+      : null;
+
   const schedule = useMutation({
     mutationFn: () =>
       scheduleSubject(activeExamId!, {
@@ -181,7 +196,8 @@ function ExamsPanel() {
             From / To set the overall window. Per-paper date + time go on each
             scheduled subject row below.
           </p>
-          <Button onClick={() => create.mutate()} disabled={!name || create.isPending}>
+          {examDateError && <p className="text-xs text-destructive">{examDateError}</p>}
+          <Button onClick={() => create.mutate()} disabled={!name || !!examDateError || create.isPending}>
             <Plus className="h-4 w-4" /> Create
           </Button>
         </CardContent>
@@ -256,11 +272,17 @@ function ExamsPanel() {
               <FieldTime label="Starts at" value={startsAt} onChange={setStartsAt} />
               <FieldTime label="Ends at" value={endsAt} onChange={setEndsAt} />
               <div className="flex items-end lg:col-start-5">
-                <Button disabled={classDefId === "" || subjectId === "" || schedule.isPending} onClick={() => schedule.mutate()}>
+                <Button
+                  disabled={classDefId === "" || subjectId === "" || !!passingError || !!timeError || schedule.isPending}
+                  onClick={() => schedule.mutate()}
+                >
                   <Plus className="h-4 w-4" /> Schedule
                 </Button>
               </div>
             </div>
+            {(passingError || timeError) && (
+              <p className="text-xs text-destructive">{passingError ?? timeError}</p>
+            )}
             <ul className="divide-y divide-saffron-pale border-t border-saffron-pale">
               {(examSubjects.data ?? []).map((es) => (
                 <li key={es.id} className="flex flex-wrap items-center justify-between gap-2 px-2 py-2 text-sm">

@@ -80,6 +80,9 @@ export function AdmitStudentPage() {
       errs.parent_phone = "Enter a 10-digit phone number";
     if (pEmail && !/^[a-zA-Z0-9.-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/.test(pEmail))
       errs.parent_email = "Enter a valid email address";
+    const aadhaar = (form.aadhaar ?? "").trim();
+    if (aadhaar && aadhaar.replace(/\D/g, "").length !== 12)
+      errs.aadhaar = "Aadhaar must be 12 digits";
     return errs;
   };
 
@@ -205,6 +208,7 @@ export function AdmitStudentPage() {
 
             <Field label="Address" value={form.address ?? ""} onChange={(v) => set("address", v)} />
             <Field label="Student phone" kind="phone" error={fieldErrors.phone} value={form.phone ?? ""} onChange={(v) => set("phone", v)} />
+            <Field label="Aadhaar" kind="aadhaar" error={fieldErrors.aadhaar} value={form.aadhaar ?? ""} onChange={(v) => set("aadhaar", v)} />
 
             {error && <p className="col-span-2 text-sm text-destructive">{error}</p>}
             <div className="col-span-2 flex justify-end gap-2 border-t border-saffron-pale pt-4">
