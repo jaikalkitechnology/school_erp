@@ -42,12 +42,3 @@ Legend — ⏳ not started · 🔶 partial (works, has a gap) · 🔴 blocked (n
 | Role × platform login gate | ⏳ | Was reverted; block parents/students from admin web & back-office from app, if wanted |
 | iOS Google Sign-In | ⏳ | iOS OAuth client + URL scheme (Android + web already done) |
 | Password reset via OTP | 🔶 | Verify end-to-end on prod SMS gateway |
-
----
-
-## 🚀 Deployment — required for ANY app change to go live
-
-| Task | Status | Detail |
-|------|:------:|--------|
-| Redeploy backend | ⏳ | Student API, homework fix, exam-marks, bus coords are server-side |
-| Rebuild mobile APK | ⏳ | `flutter pub get && flutter clean && flutter build apk` — new StudentShell, leave, exam-marks, `google_sign_in` native plugin |
