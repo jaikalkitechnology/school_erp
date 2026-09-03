@@ -1,4 +1,5 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   Calculator, Pencil, Plus, Receipt, TrendingDown, Trash2, UserPlus,
@@ -44,7 +45,21 @@ const TABS = ["Categories", "Structures", "Collection", "Reports"] as const;
 type Tab = (typeof TABS)[number];
 
 export function FeesPage() {
-  const [tab, setTab] = useState<Tab>("Categories");
+  const [params, setParams] = useSearchParams();
+  const paramTab = params.get("tab") as Tab | null;
+  const [tab, setTab] = useState<Tab>(
+    paramTab && TABS.includes(paramTab) ? paramTab : "Categories",
+  );
+  // Keep the tab in sync when the sidebar deep-links to ?tab=…
+  useEffect(() => {
+    const t = params.get("tab") as Tab | null;
+    if (t && TABS.includes(t) && t !== tab) setTab(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [params]);
+  const selectTab = (t: Tab) => {
+    setTab(t);
+    setParams({ tab: t }, { replace: true });
+  };
   return (
     <div className="space-y-6">
       <header>
@@ -60,7 +75,7 @@ export function FeesPage() {
           <button
             key={label}
             type="button"
-            onClick={() => setTab(label)}
+            onClick={() => selectTab(label)}
             className={cn(
               "px-4 py-2 text-sm font-medium",
               tab === label ? "border-b-2 border-saffron text-saffron-darker" : "text-muted-foreground hover:text-indigo-dark",
