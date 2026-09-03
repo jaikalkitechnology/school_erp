@@ -51,4 +51,3 @@ Legend — ⏳ not started · 🔶 partial (works, has a gap) · 🔴 blocked (n
 |------|:------:|--------|
 | Redeploy backend | ⏳ | Student API, homework fix, exam-marks, bus coords are server-side |
 | Rebuild mobile APK | ⏳ | `flutter pub get && flutter clean && flutter build apk` — new StudentShell, leave, exam-marks, `google_sign_in` native plugin |
-| Google Cloud console config | ⏳ | JS origins per subdomain, Android SHA-1 (debug+release), OAuth consent screen test users / publish |

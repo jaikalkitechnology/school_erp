@@ -66,4 +66,3 @@ Legend — ⏳ not started · 🔶 partial (works, has a gap)
 |------|:------:|--------|
 | Run Alembic migrations on prod | ⏳ | phase28 operations (16 tables) + `google_sub` |
 | Rebuild + redeploy admin web | ⏳ | `npm install && npm run build` → deploy `dist/`, hard-refresh browsers |
-| Google Cloud console config | ⏳ | JS origins per subdomain + `localhost:5173` for the Google button |
