@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Megaphone, Inbox, FileSliders, MessageSquareText, Send, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -45,7 +46,20 @@ const TABS = ["Announcements", "Messages", "Templates", "Outbox"] as const;
 type Tab = (typeof TABS)[number];
 
 export function CommunicationPage() {
-  const [tab, setTab] = useState<Tab>("Announcements");
+  const [params, setParams] = useSearchParams();
+  const paramTab = params.get("tab") as Tab | null;
+  const [tab, setTab] = useState<Tab>(
+    paramTab && TABS.includes(paramTab) ? paramTab : "Announcements",
+  );
+  useEffect(() => {
+    const t = params.get("tab") as Tab | null;
+    if (t && TABS.includes(t) && t !== tab) setTab(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [params]);
+  const selectTab = (t: Tab) => {
+    setTab(t);
+    setParams({ tab: t }, { replace: true });
+  };
   return (
     <div className="space-y-6">
       <header>
@@ -61,7 +75,7 @@ export function CommunicationPage() {
           <button
             key={label}
             type="button"
-            onClick={() => setTab(label)}
+            onClick={() => selectTab(label)}
             className={cn(
               "px-4 py-2 text-sm font-medium",
               tab === label ? "border-b-2 border-saffron text-saffron-darker" : "text-muted-foreground hover:text-indigo-dark",

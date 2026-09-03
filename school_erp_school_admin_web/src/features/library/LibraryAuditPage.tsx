@@ -3,7 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { BookPlus, BoxSelect, Hand, RotateCcw } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import { recentActivity, type ActivityEvent } from "./api";
+import { listAuditLogs, recentActivity, type ActivityEvent } from "./api";
 import { LibraryHeader, StatTile } from "./_shared";
 
 const KIND_META: Record<
@@ -42,6 +42,10 @@ export function LibraryAuditPage() {
   const { data: events = [], isLoading } = useQuery({
     queryKey: ["library-activity"],
     queryFn: () => recentActivity(150),
+  });
+  const { data: auditRows = [] } = useQuery({
+    queryKey: ["library-audit-logs"],
+    queryFn: () => listAuditLogs(200),
   });
 
   const filtered = useMemo(() => {
@@ -131,6 +135,50 @@ export function LibraryAuditPage() {
                 );
               })}
             </ul>
+          )}
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>System audit log</CardTitle>
+          <CardDescription>
+            Persistent trail of write actions (shelves, settings, imports,
+            verification…) recorded in the dedicated audit table.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          {auditRows.length === 0 ? (
+            <p className="text-sm text-muted-foreground">No audit entries yet.</p>
+          ) : (
+            <table className="w-full text-sm">
+              <thead className="text-left text-xs uppercase tracking-wide text-muted-foreground">
+                <tr>
+                  <th className="py-2">When</th>
+                  <th>Action</th>
+                  <th>Entity</th>
+                  <th>Summary</th>
+                  <th>By</th>
+                </tr>
+              </thead>
+              <tbody>
+                {auditRows.map((r) => (
+                  <tr key={r.id} className="border-t border-saffron-pale">
+                    <td className="py-2 text-xs text-muted-foreground">
+                      {r.created_at ? new Date(r.created_at).toLocaleString() : "—"}
+                    </td>
+                    <td className="font-medium text-indigo-dark">{r.action}</td>
+                    <td className="text-xs text-muted-foreground">
+                      {r.entity_type ?? "—"}{r.entity_id ? ` #${r.entity_id}` : ""}
+                    </td>
+                    <td className="text-xs">{r.summary ?? "—"}</td>
+                    <td className="text-xs text-muted-foreground">
+                      {r.actor_user_id ? `#${r.actor_user_id}` : "—"}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           )}
         </CardContent>
       </Card>

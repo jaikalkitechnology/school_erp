@@ -5,12 +5,21 @@ from __future__ import annotations
 from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, status
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.auth_deps import AuthPrincipal, require_roles
 from app.core.tenant_session import platform_session, tenant_scoped_session
-from app.models.library import BorrowerKind
+from app.models.library import (
+    BorrowerKind,
+    Book,
+    BookCopy,
+    LibraryAuditLog,
+    LibrarySetting,
+    Shelf,
+    VerificationScan,
+    VerificationSession,
+)
 from app.models.parent import Parent, ParentChildMapping
 from app.schemas.library import (
     BookRead,
@@ -989,3 +998,314 @@ async def parent_library_catalog(
         }
         for b in books
     ]
+
+
+# ===========================================================================
+# Phase 29 — server-backed shelves / settings / audit / verification / import
+# ===========================================================================
+
+from datetime import datetime, timezone  # noqa: E402
+
+
+def _now() -> datetime:
+    return datetime.now(timezone.utc)
+
+
+async def _audit(
+    session: AsyncSession, *, tenant_id: int, actor_user_id: int | None,
+    action: str, entity_type: str | None = None, entity_id: int | None = None,
+    summary: str | None = None,
+) -> None:
+    """Append one row to the library audit log. Best-effort — never let an
+    audit write break the primary action."""
+    try:
+        session.add(LibraryAuditLog(
+            tenant_id=tenant_id,
+            action=action,
+            entity_type=entity_type,
+            entity_id=entity_id,
+            summary=summary,
+            actor_user_id=actor_user_id,
+            created_at=_now(),
+        ))
+    except Exception:  # pragma: no cover - defensive
+        pass
+
+
+# ---- Shelves --------------------------------------------------------------
+
+
+@router.get("/shelves")
+async def list_shelves_route(
+    session: AsyncSession = Depends(tenant_scoped_session),
+):
+    rows = list((await session.execute(select(Shelf).order_by(Shelf.code))).scalars().all())
+    return [
+        {"id": s.id, "code": s.code, "section": s.section, "capacity": s.capacity}
+        for s in rows
+    ]
+
+
+@router.post("/shelves", status_code=status.HTTP_201_CREATED)
+async def create_shelf_route(
+    payload: dict,
+    principal: AuthPrincipal = Depends(_librarian),
+    session: AsyncSession = Depends(tenant_scoped_session),
+):
+    code = str(payload.get("code") or "").strip()
+    if not code:
+        raise HTTPException(status_code=400, detail="code is required")
+    section = (str(payload.get("section")).strip() if payload.get("section") else None)
+    try:
+        capacity = max(1, int(payload.get("capacity") or 40))
+    except (TypeError, ValueError):
+        raise HTTPException(status_code=400, detail="capacity must be a number")
+    obj = Shelf(tenant_id=principal.tenant_id, code=code, section=section, capacity=capacity)
+    session.add(obj)
+    await _audit(session, tenant_id=principal.tenant_id, actor_user_id=principal.user_id,
+                 action="create_shelf", entity_type="shelf", summary=f"Shelf {code}")
+    await session.commit()
+    await session.refresh(obj)
+    return {"id": obj.id, "code": obj.code, "section": obj.section, "capacity": obj.capacity}
+
+
+@router.delete("/shelves/{shelf_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_shelf_route(
+    shelf_id: int,
+    principal: AuthPrincipal = Depends(_librarian),
+    session: AsyncSession = Depends(tenant_scoped_session),
+):
+    obj = (await session.execute(select(Shelf).where(Shelf.id == shelf_id))).scalar_one_or_none()
+    if obj is None:
+        raise HTTPException(status_code=404, detail="Shelf not found")
+    await session.delete(obj)
+    await _audit(session, tenant_id=principal.tenant_id, actor_user_id=principal.user_id,
+                 action="delete_shelf", entity_type="shelf", entity_id=shelf_id)
+    await session.commit()
+
+
+# ---- Settings (one row per tenant) ----------------------------------------
+
+
+async def _get_or_make_settings(session: AsyncSession, tenant_id: int) -> LibrarySetting:
+    row = (await session.execute(select(LibrarySetting))).scalars().first()
+    if row is None:
+        row = LibrarySetting(tenant_id=tenant_id)
+        session.add(row)
+        await session.commit()
+        await session.refresh(row)
+    return row
+
+
+@router.get("/settings")
+async def get_settings_route(
+    principal: AuthPrincipal = Depends(_reader),
+    session: AsyncSession = Depends(tenant_scoped_session),
+):
+    s = await _get_or_make_settings(session, principal.tenant_id)
+    return {
+        "loan_days": s.loan_days,
+        "fine_per_day": float(s.fine_per_day),
+        "max_books_per_borrower": s.max_books_per_borrower,
+        "reservation_expiry_days": s.reservation_expiry_days,
+    }
+
+
+@router.put("/settings")
+async def update_settings_route(
+    payload: dict,
+    principal: AuthPrincipal = Depends(_librarian),
+    session: AsyncSession = Depends(tenant_scoped_session),
+):
+    s = await _get_or_make_settings(session, principal.tenant_id)
+    if "loan_days" in payload:
+        s.loan_days = max(1, int(payload["loan_days"]))
+    if "fine_per_day" in payload:
+        s.fine_per_day = max(0, float(payload["fine_per_day"]))
+    if "max_books_per_borrower" in payload:
+        s.max_books_per_borrower = max(1, int(payload["max_books_per_borrower"]))
+    if "reservation_expiry_days" in payload:
+        s.reservation_expiry_days = max(1, int(payload["reservation_expiry_days"]))
+    await _audit(session, tenant_id=principal.tenant_id, actor_user_id=principal.user_id,
+                 action="update_settings", entity_type="settings")
+    await session.commit()
+    await session.refresh(s)
+    return {
+        "loan_days": s.loan_days,
+        "fine_per_day": float(s.fine_per_day),
+        "max_books_per_borrower": s.max_books_per_borrower,
+        "reservation_expiry_days": s.reservation_expiry_days,
+    }
+
+
+# ---- Audit logs -----------------------------------------------------------
+
+
+@router.get("/audit-logs")
+async def list_audit_logs_route(
+    limit: int = 100,
+    session: AsyncSession = Depends(tenant_scoped_session),
+):
+    limit = max(1, min(limit, 500))
+    rows = list((
+        await session.execute(
+            select(LibraryAuditLog).order_by(LibraryAuditLog.created_at.desc()).limit(limit)
+        )
+    ).scalars().all())
+    return [
+        {
+            "id": r.id,
+            "action": r.action,
+            "entity_type": r.entity_type,
+            "entity_id": r.entity_id,
+            "summary": r.summary,
+            "actor_user_id": r.actor_user_id,
+            "created_at": r.created_at.isoformat() if r.created_at else None,
+        }
+        for r in rows
+    ]
+
+
+# ---- Inventory verification ----------------------------------------------
+
+
+@router.get("/verification/current")
+async def verification_current_route(
+    session: AsyncSession = Depends(tenant_scoped_session),
+):
+    sess = (await session.execute(
+        select(VerificationSession).where(VerificationSession.status == "open")
+        .order_by(VerificationSession.started_at.desc())
+    )).scalars().first()
+    if sess is None:
+        return {"session": None}
+    scans = list((await session.execute(
+        select(VerificationScan).where(VerificationScan.session_id == sess.id)
+    )).scalars().all())
+    total_copies = (await session.execute(
+        select(func.count(BookCopy.id))
+    )).scalar_one()
+    return {
+        "session": {"id": sess.id, "status": sess.status,
+                    "started_at": sess.started_at.isoformat() if sess.started_at else None},
+        "scanned": len(scans),
+        "total_copies": int(total_copies),
+        "missing": max(0, int(total_copies) - len(scans)),
+        "scans": [{"barcode": s.barcode, "copy_id": s.copy_id, "found": s.found} for s in scans],
+    }
+
+
+@router.post("/verification/start", status_code=status.HTTP_201_CREATED)
+async def verification_start_route(
+    principal: AuthPrincipal = Depends(_librarian),
+    session: AsyncSession = Depends(tenant_scoped_session),
+):
+    existing = (await session.execute(
+        select(VerificationSession).where(VerificationSession.status == "open")
+    )).scalars().first()
+    if existing is not None:
+        return {"id": existing.id, "status": existing.status, "resumed": True}
+    sess = VerificationSession(
+        tenant_id=principal.tenant_id, status="open",
+        started_by_user_id=principal.user_id, started_at=_now(),
+    )
+    session.add(sess)
+    await _audit(session, tenant_id=principal.tenant_id, actor_user_id=principal.user_id,
+                 action="verification_start", entity_type="verification")
+    await session.commit()
+    await session.refresh(sess)
+    return {"id": sess.id, "status": sess.status, "resumed": False}
+
+
+@router.post("/verification/{session_id}/scan")
+async def verification_scan_route(
+    session_id: int,
+    payload: dict,
+    principal: AuthPrincipal = Depends(_librarian),
+    session: AsyncSession = Depends(tenant_scoped_session),
+):
+    sess = (await session.execute(
+        select(VerificationSession).where(VerificationSession.id == session_id)
+    )).scalar_one_or_none()
+    if sess is None or sess.status != "open":
+        raise HTTPException(status_code=404, detail="No open session")
+    barcode = str(payload.get("barcode") or "").strip()
+    if not barcode:
+        raise HTTPException(status_code=400, detail="barcode is required")
+    copy = (await session.execute(
+        select(BookCopy).where(BookCopy.barcode == barcode)
+    )).scalar_one_or_none()
+    # Skip duplicates within the session.
+    dup = (await session.execute(
+        select(VerificationScan).where(
+            VerificationScan.session_id == session_id,
+            VerificationScan.barcode == barcode,
+        )
+    )).scalar_one_or_none()
+    if dup is None:
+        session.add(VerificationScan(
+            tenant_id=principal.tenant_id, session_id=session_id,
+            copy_id=copy.id if copy else None, barcode=barcode,
+            found=copy is not None, scanned_at=_now(),
+        ))
+        await session.commit()
+    return {"barcode": barcode, "recognised": copy is not None}
+
+
+@router.post("/verification/{session_id}/complete")
+async def verification_complete_route(
+    session_id: int,
+    principal: AuthPrincipal = Depends(_librarian),
+    session: AsyncSession = Depends(tenant_scoped_session),
+):
+    sess = (await session.execute(
+        select(VerificationSession).where(VerificationSession.id == session_id)
+    )).scalar_one_or_none()
+    if sess is None:
+        raise HTTPException(status_code=404, detail="Session not found")
+    sess.status = "completed"
+    sess.completed_at = _now()
+    await _audit(session, tenant_id=principal.tenant_id, actor_user_id=principal.user_id,
+                 action="verification_complete", entity_type="verification", entity_id=session_id)
+    await session.commit()
+    return {"id": sess.id, "status": sess.status}
+
+
+# ---- Bulk import (books) --------------------------------------------------
+
+
+@router.post("/import/books")
+async def import_books_route(
+    payload: dict,
+    principal: AuthPrincipal = Depends(_librarian),
+    session: AsyncSession = Depends(tenant_scoped_session),
+):
+    """Bulk-create books from a parsed CSV/JSON. Body: {"rows": [{title,
+    author, isbn, category, ...}]}. Rows without a title are skipped."""
+    rows = payload.get("rows")
+    if not isinstance(rows, list):
+        raise HTTPException(status_code=400, detail="rows must be a list")
+    created = 0
+    skipped = 0
+    for r in rows:
+        if not isinstance(r, dict):
+            skipped += 1
+            continue
+        title = str(r.get("title") or "").strip()
+        if not title:
+            skipped += 1
+            continue
+        book = Book(
+            tenant_id=principal.tenant_id,
+            title=title[:200],
+            author=(str(r.get("author")).strip()[:160] if r.get("author") else None),
+            isbn=(str(r.get("isbn")).strip()[:20] if r.get("isbn") else None),
+            publisher=(str(r.get("publisher")).strip()[:160] if r.get("publisher") else None),
+            category=(str(r.get("category")).strip()[:60] if r.get("category") else None),
+        )
+        session.add(book)
+        created += 1
+    await _audit(session, tenant_id=principal.tenant_id, actor_user_id=principal.user_id,
+                 action="import_books", entity_type="book", summary=f"{created} imported")
+    await session.commit()
+    return {"created": created, "skipped": skipped}

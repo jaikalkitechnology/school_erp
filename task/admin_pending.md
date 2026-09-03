@@ -5,43 +5,31 @@ App: `school_erp_school_admin_web`
 
 Legend — ⏳ not started · 🔶 partial (works, has a gap)
 
-> Validation (users phone/email, academic date-order, student aadhaar, exam
-> guards), the raw-ID pickers (payslip / certificate / library borrower), and
-> backend phone/aadhaar/max_length caps are **DONE** — see `admin_complete.md`.
-> What remains below are larger server-side features (new tables, migrations,
-> report engine) that need dedicated, testable work.
+> Nearly the whole admin_pending list is now **DONE** — see `admin_complete.md`:
+> validation, pickers, backend phone/aadhaar/max_length, Fee/Communication
+> deep-link routes, and every Library server-table item (shelves, settings,
+> audit log, import, barcode, inventory verification).
+>
+> What remains are three **large features** that need dedicated design +
+> new infrastructure (a report-query engine, a background scheduler + SMTP,
+> file-upload models). They are intentionally NOT stubbed — each deserves its
+> own focused, testable build rather than a blind half-implementation.
 
 ---
 
-## Navigation / structure
+## Reports & depth (large — need infrastructure)
 
-| Task | Status | What's needed |
+| Task | Status | What it needs |
 |------|:------:|---------------|
-| Fee Management sub-nav → real routes | 🔶 | Structure / Collection / Reports are tabs on one `/fees` page; split for deep-linking |
-| Communication sub-nav → real routes | 🔶 | SMS / Email / Push / Circulars all point to one page |
+| Reports: **custom report builder** | ⏳ | A query-builder engine (pick entity, columns, filters, grouping) + saved-report storage. Multi-day feature. |
+| Reports: **scheduled email delivery** | ⏳ | A background scheduler (cron/worker) + SMTP/email service + per-report schedule config. New infra. |
+| Timetable builder **depth / substitution UI** | 🔶 | Base timetable works; needs conflict detection, teacher-availability, and a substitute-assignment flow. |
+| Report cards: **portfolio (project uploads, achievements)** | ⏳ | New upload model + per-student portfolio store + UI. (The grade-scheme editor is already built — Exams → Grade scale.) |
 
-## Library — localStorage-only (need server tables)
+---
 
-| Task | Status | What's needed |
-|------|:------:|---------------|
-| Shelves & Racks | ⏳ | Real table + CRUD API + migration (browser-local now) |
-| Library Settings (loan days / fines policy) | ⏳ | Server-backed settings model + migration |
-| Import / Export | 🔶 | Export works client-side; bulk-import endpoint is a stub |
-| Audit Logs | 🔶 | Synthesised from timestamps; dedicated audit table |
-| Barcode Management | 🔶 | Monospace text labels; real Code-128/QR SVG rendering |
-| Inventory Verification | 🔶 | In-memory per walk-through; server-side verification sessions |
-
-## Reports & depth
-
-| Task | Status | What's needed |
-|------|:------:|---------------|
-| Reports: custom builder + scheduled email delivery | ⏳ | Report-builder engine, beyond standard reports |
-| Timetable builder depth / substitution UI | 🔶 | Polish |
-| Report cards: portfolio + grade-scheme editor | ⏳ | Project uploads, achievements, editable grade scheme |
-
-## Backend validation (remaining)
-
-| Task | Status | What's needed |
-|------|:------:|---------------|
-| Teacher schema phone fields format | ⏳ | Apply the same 10-digit guard used on SIS to teacher create/update |
-| Exam-marks bounds mirrored into Pydantic | ⏳ | Defense-in-depth on the marks bulk schema |
+## Suggested order when picking these up
+1. **Report cards portfolio** — most self-contained: one upload model + a tab.
+2. **Custom report builder** — high value; start read-only over existing data.
+3. **Scheduled email** — only after an email/worker service exists.
+4. **Timetable substitution** — depends on availability data.

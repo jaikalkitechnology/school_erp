@@ -7,6 +7,7 @@ import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 import { listBooks, listCopies } from "./api";
 import { LibraryHeader } from "./_shared";
+import { Barcode128 } from "./_barcode128";
 
 /** Barcode label preview + print. Pick a title, see printable
  * labels for every copy, click Print (opens the browser print
@@ -114,11 +115,11 @@ export function LibraryBarcodePage() {
                     <p className="text-[10px] uppercase tracking-wider text-muted-foreground print:text-black">
                       {active.title.slice(0, 30)}
                     </p>
-                    <div
-                      className="my-2 border-y border-black py-2 font-mono text-lg font-bold tracking-[0.35em] text-black"
-                      style={{ fontFamily: "Menlo, Consolas, monospace" }}
-                    >
-                      {c.barcode}
+                    <div className="my-2">
+                      <Barcode128 value={c.barcode} height={40} />
+                      <p className="mt-1 font-mono text-xs tracking-widest text-black">
+                        {c.barcode}
+                      </p>
                     </div>
                     <p className="text-[10px] text-muted-foreground print:text-black">
                       #{c.id}

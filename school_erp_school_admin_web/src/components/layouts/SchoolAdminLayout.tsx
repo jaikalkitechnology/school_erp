@@ -137,9 +137,10 @@ const nav: NavItem[] = [
   {
     kind: "group", key: "fees", label: "Fee Management", icon: Receipt,
     children: [
-      leaf("/fees", "Fee Structure", Layers),
-      leaf("/fees", "Fee Collection", Receipt),
-      leaf("/fees", "Fee Reports", BarChart3),
+      leaf("/fees?tab=Categories", "Fee Categories", Layers),
+      leaf("/fees?tab=Structures", "Fee Structure", Layers),
+      leaf("/fees?tab=Collection", "Fee Collection", Receipt),
+      leaf("/fees?tab=Reports", "Fee Reports", BarChart3),
     ],
   },
 
@@ -149,10 +150,10 @@ const nav: NavItem[] = [
     icon: MessageCircle,
     children: [
       leaf("/notice-board", "Notice Board", Bell),
-      leaf("/communication", "SMS", MessageCircle),
-      leaf("/communication", "Email", Send),
-      leaf("/communication", "Push Notifications", Bell),
-      leaf("/notice-board", "Circulars", FileText),
+      leaf("/communication?tab=Announcements", "Announcements", Bell),
+      leaf("/communication?tab=Messages", "Messages", MessageCircle),
+      leaf("/communication?tab=Templates", "Templates", FileText),
+      leaf("/communication?tab=Outbox", "Outbox (SMS/Email/Push)", Send),
     ],
   },
 
@@ -251,8 +252,9 @@ function filterNav(
   const grantedSlugs = new Set(
     granted.map((s) => (s.startsWith("/") ? s.slice(1) : s)),
   );
+  // Match on the pathname only — a leaf's `to` may carry a ?tab= deep-link.
   const isVisible = (l: NavLeaf) =>
-    grantedSlugs.has(l.to.replace(/^\//, ""));
+    grantedSlugs.has(l.to.split("?")[0].replace(/^\//, ""));
   const out: NavItem[] = [];
   for (const item of items) {
     if (item.kind === "leaf") {
@@ -384,9 +386,10 @@ export function SchoolAdminLayout() {
               </NavLink>
             );
           }
-          const forceOpen = item.children.some(
-            (c) => currentPath === c.to || currentPath.startsWith(c.to + "/"),
-          );
+          const forceOpen = item.children.some((c) => {
+            const path = c.to.split("?")[0];
+            return currentPath === path || currentPath.startsWith(path + "/");
+          });
           return (
             <NavGroupSection
               key={item.key}

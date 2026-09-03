@@ -274,6 +274,34 @@ async def _ensure_operations_tables() -> None:
         log.exception("Operations tables auto-create failed")
 
 
+async def _ensure_library_extra_tables() -> None:
+    """Safety net for the Phase 29 library tables (shelves, settings,
+    audit logs, verification sessions/scans) — same resilience pattern as
+    the operations tables. create_all is a no-op for tables that already
+    exist, so this only creates the new ones."""
+    try:
+        from app.database import engine
+        from app.models import library as lib_module
+
+        target_tables = [
+            t for t in lib_module.TenantBase.metadata.tables.values()
+            if t.name in {
+                "library_shelves", "library_settings", "library_audit_logs",
+                "library_verification_sessions", "library_verification_scans",
+            }
+        ]
+        async with engine.begin() as conn:
+            await conn.run_sync(
+                lambda sync_conn: lib_module.TenantBase.metadata.create_all(
+                    sync_conn, tables=target_tables, checkfirst=True,
+                )
+            )
+        log.info("Library extra tables verified (%s tables checked)",
+                 len(target_tables))
+    except Exception:
+        log.exception("Library extra tables auto-create failed")
+
+
 async def _ensure_google_sub_column() -> None:
     """Add users.google_sub if the Google-Sign-In migration hasn't run
     yet — same resilience pattern as the operations tables. Idempotent:
@@ -311,6 +339,7 @@ async def lifespan(_: FastAPI):
     # Auto-create any operations tables that are missing — covers the
     # window between a code deploy and the alembic migration.
     await _ensure_operations_tables()
+    await _ensure_library_extra_tables()
     await _ensure_google_sub_column()
     # Replay RBAC so new role codes shipped in the catalogue land in
     # every tenant's roles table. Safe + idempotent — runs once per
