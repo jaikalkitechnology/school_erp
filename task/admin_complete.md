@@ -84,3 +84,19 @@ App: `school_erp_school_admin_web` · 🆕 = built in the latest work session
 | Backend: student/parent/emergency phone 10-digit | ✅ 🆕 | `OptionalPhone` in SIS schemas |
 | Backend: aadhaar 12-digit | ✅ 🆕 | `OptionalAadhaar` |
 | Backend: max_length caps on free-text student fields | ✅ 🆕 | address, religion, caste, remarks, names, etc. |
+| Backend: teacher phone format + caps | ✅ 🆕 | TeacherBase OptionalPhone + max_length |
+| Backend: exam-marks bounds in Pydantic | ✅ 🆕 | MarkEntry ge=0, remarks cap |
+
+## Library server tables + nav (Phase 29) 🆕
+
+| Item | Status | Notes |
+|------|:------:|-------|
+| Shelves & Racks → server table + CRUD | ✅ 🆕 | Was localStorage; now shared across the team |
+| Library Settings → server model | ✅ 🆕 | Loan days, fine/day, max books, reservation hold (one row/tenant) |
+| Audit Logs → dedicated table | ✅ 🆕 | Persistent write-action trail + kept the synthesized activity feed |
+| Import / Export → working import | ✅ 🆕 | CSV parse → POST /import/books (was a disabled stub) |
+| Barcode Management → real Code-128 SVG | ✅ 🆕 | Self-contained encoder, no external dep |
+| Inventory Verification → server sessions | ✅ 🆕 | Start/scan/complete, persists + resumes across devices |
+| Alembic migration + boot safety net | ✅ 🆕 | c1e4f8a20b31 + _ensure_library_extra_tables |
+| Fee / Communication deep-link sub-routes | ✅ 🆕 | ?tab= routes, query-safe sidebar filter |
+| Report cards: grade-scheme editor | ✅ | Already built — Exams → Grade scale |
