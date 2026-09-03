@@ -71,9 +71,11 @@ class ExamSubjectWrite(BaseModel):
 
 class MarkEntry(BaseModel):
     student_id: int
-    obtained_marks: Optional[Decimal] = None
+    # Defense-in-depth: marks can't be negative. The per-paper upper bound
+    # (<= max_marks) is enforced in the service, which knows the paper.
+    obtained_marks: Optional[Decimal] = Field(default=None, ge=0)
     status: Optional[MarkStatus] = None
-    remarks: Optional[str] = None
+    remarks: Optional[str] = Field(default=None, max_length=255)
 
 
 class MarkBulkRequest(BaseModel):

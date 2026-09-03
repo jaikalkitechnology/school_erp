@@ -8,6 +8,7 @@ from typing import List, Optional
 from pydantic import BaseModel, ConfigDict, EmailStr, Field
 
 from app.models.teacher import AttendanceStatus, EmploymentStatus
+from app.schemas.sis import OptionalPhone
 
 
 # ---- Teacher ----------------------------------------------------------------
@@ -15,25 +16,25 @@ from app.models.teacher import AttendanceStatus, EmploymentStatus
 
 class TeacherBase(BaseModel):
     full_name: str = Field(min_length=2, max_length=180)
-    first_name: Optional[str] = None
-    last_name: Optional[str] = None
-    photo_url: Optional[str] = None
+    first_name: Optional[str] = Field(default=None, max_length=90)
+    last_name: Optional[str] = Field(default=None, max_length=90)
+    photo_url: Optional[str] = Field(default=None, max_length=500)
     date_of_birth: Optional[date] = None
-    gender: Optional[str] = None
-    blood_group: Optional[str] = None
-    phone: Optional[str] = None
+    gender: Optional[str] = Field(default=None, max_length=16)
+    blood_group: Optional[str] = Field(default=None, max_length=8)
+    phone: OptionalPhone = None
     email: Optional[EmailStr] = None
-    address: Optional[str] = None
-    emergency_contact: Optional[str] = None
-    emergency_phone: Optional[str] = None
+    address: Optional[str] = Field(default=None, max_length=500)
+    emergency_contact: Optional[str] = Field(default=None, max_length=120)
+    emergency_phone: OptionalPhone = None
     department_id: Optional[int] = None
-    designation: Optional[str] = None
+    designation: Optional[str] = Field(default=None, max_length=120)
     date_of_joining: Optional[date] = None
     qualifications: List[str] = Field(default_factory=list)
     experience_years: int = Field(default=0, ge=0, le=80)
     is_class_teacher: bool = False
     is_available_for_substitution: bool = True
-    notes: Optional[str] = None
+    notes: Optional[str] = Field(default=None, max_length=2000)
 
 
 class TeacherCreate(TeacherBase):
