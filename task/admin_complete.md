@@ -69,3 +69,18 @@ App: `school_erp_school_admin_web` · 🆕 = built in the latest work session
 | Crash-proof operations validation layer | ✅ | Enum/length/negative guards, friendly 400s, FK translation |
 | Staff picker endpoint (salary structure staff list fix) | ✅ | `/operations/_staff-options` |
 | Google Sign-In button on login | ✅ | Needs Google Cloud config to go live |
+
+## Validation & pickers (latest session) 🆕
+
+| Item | Status | Notes |
+|------|:------:|-------|
+| Users & credentials: phone 10-digit + strict email | ✅ 🆕 | Inline errors, submit gated |
+| Academic year + term: end_date ≥ start_date | ✅ 🆕 | Relational guard on both forms |
+| Admit student: Aadhaar field + 12-digit validation | ✅ 🆕 | New editable field |
+| Exam schedule guards | ✅ 🆕 | end ≥ start, passing ≤ max, paper end-time > start-time |
+| Payroll payslip → staff picker | ✅ 🆕 | Dropdown replaces raw User # |
+| Certificates issue → student picker | ✅ 🆕 | Auto-fills name on pick |
+| Library Issue + Reservations → borrower picker | ✅ 🆕 | Student/Teacher dropdown; `fetchTeacherOptions` (Teacher.id) added |
+| Backend: student/parent/emergency phone 10-digit | ✅ 🆕 | `OptionalPhone` in SIS schemas |
+| Backend: aadhaar 12-digit | ✅ 🆕 | `OptionalAadhaar` |
+| Backend: max_length caps on free-text student fields | ✅ 🆕 | address, religion, caste, remarks, names, etc. |

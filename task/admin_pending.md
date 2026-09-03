@@ -5,6 +5,12 @@ App: `school_erp_school_admin_web`
 
 Legend — ⏳ not started · 🔶 partial (works, has a gap)
 
+> Validation (users phone/email, academic date-order, student aadhaar, exam
+> guards), the raw-ID pickers (payslip / certificate / library borrower), and
+> backend phone/aadhaar/max_length caps are **DONE** — see `admin_complete.md`.
+> What remains below are larger server-side features (new tables, migrations,
+> report engine) that need dedicated, testable work.
+
 ---
 
 ## Navigation / structure
@@ -14,46 +20,28 @@ Legend — ⏳ not started · 🔶 partial (works, has a gap)
 | Fee Management sub-nav → real routes | 🔶 | Structure / Collection / Reports are tabs on one `/fees` page; split for deep-linking |
 | Communication sub-nav → real routes | 🔶 | SMS / Email / Push / Circulars all point to one page |
 
-## Validation still missing
-
-| Task | Status | What's needed |
-|------|:------:|---------------|
-| Users & credentials: phone (10-digit) + email format | ⏳ | Partial guard; enforce on create/edit |
-| Academic year / Term / Holiday: end_date ≥ start_date | ⏳ | Relational guard |
-| Student aadhaar: 12-digit validation | ⏳ | Currently unbounded |
-| Exam schedule: passing ≤ max + end ≥ start (submit-time) | 🔶 | Clamped on input; add relational guard |
-
-## Pickers instead of raw IDs
-
-| Task | Status | What's needed |
-|------|:------:|---------------|
-| Payroll "Generate payslip" User # → staff picker | ⏳ | Raw numeric id today |
-| Certificates "Issue" Student # → student picker | ⏳ | Raw id today |
-| Library Issue/Reservations Borrower ID → picker | ⏳ | Digits-only text today |
-
 ## Library — localStorage-only (need server tables)
 
 | Task | Status | What's needed |
 |------|:------:|---------------|
-| Shelves & Racks | ⏳ | Real table + CRUD API (browser-local now) |
-| Library Settings (loan days / fines policy) | ⏳ | Server-backed settings model |
+| Shelves & Racks | ⏳ | Real table + CRUD API + migration (browser-local now) |
+| Library Settings (loan days / fines policy) | ⏳ | Server-backed settings model + migration |
 | Import / Export | 🔶 | Export works client-side; bulk-import endpoint is a stub |
 | Audit Logs | 🔶 | Synthesised from timestamps; dedicated audit table |
-| Barcode Management | 🔶 | Monospace text labels; real Code-128/QR SVG |
-| Inventory Verification | 🔶 | In-memory per walk-through; server-side sessions |
+| Barcode Management | 🔶 | Monospace text labels; real Code-128/QR SVG rendering |
+| Inventory Verification | 🔶 | In-memory per walk-through; server-side verification sessions |
 
 ## Reports & depth
 
 | Task | Status | What's needed |
 |------|:------:|---------------|
-| Reports: custom builder + scheduled email delivery | ⏳ | Beyond standard reports |
+| Reports: custom builder + scheduled email delivery | ⏳ | Report-builder engine, beyond standard reports |
 | Timetable builder depth / substitution UI | 🔶 | Polish |
-| Report cards: portfolio + grade-scheme editor | ⏳ | |
+| Report cards: portfolio + grade-scheme editor | ⏳ | Project uploads, achievements, editable grade scheme |
 
-## Backend validation (supports admin forms)
+## Backend validation (remaining)
 
 | Task | Status | What's needed |
 |------|:------:|---------------|
-| SIS/teacher phone fields format | ⏳ | Bare `Optional[str]` |
-| Aadhaar 12-digit (backend) | ⏳ | |
-| max_length caps on free-text columns | ⏳ | address, remarks, religion, caste… |
+| Teacher schema phone fields format | ⏳ | Apply the same 10-digit guard used on SIS to teacher create/update |
+| Exam-marks bounds mirrored into Pydantic | ⏳ | Defense-in-depth on the marks bulk schema |
