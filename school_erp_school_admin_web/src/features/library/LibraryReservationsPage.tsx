@@ -14,6 +14,7 @@ import {
   type BorrowerKind,
 } from "./api";
 import { LibraryHeader, RES_TONE } from "./_shared";
+import { fetchStudentOptions, fetchTeacherOptions } from "@/features/operations/_pickers";
 
 /** Reservations — the librarian (or a student at the desk) can
  * queue for a title that's currently on loan. When a copy comes
@@ -32,6 +33,15 @@ export function LibraryReservationsPage() {
 
   const [borrowerKind, setBorrowerKind] = useState<BorrowerKind>("student");
   const [borrowerId, setBorrowerId] = useState("");
+  const { data: studentOpts = [] } = useQuery({
+    queryKey: ["operations-student-options"],
+    queryFn: fetchStudentOptions,
+  });
+  const { data: teacherOpts = [] } = useQuery({
+    queryKey: ["operations-teacher-options"],
+    queryFn: fetchTeacherOptions,
+  });
+  const borrowerOpts = borrowerKind === "student" ? studentOpts : teacherOpts;
 
   const { data: rows = [] } = useQuery({
     queryKey: ["library-reservations"],
@@ -118,19 +128,29 @@ export function LibraryReservationsPage() {
               <select
                 className="mt-1 h-9 w-full rounded border border-input bg-transparent px-2 text-sm"
                 value={borrowerKind}
-                onChange={(e) => setBorrowerKind(e.target.value as BorrowerKind)}
+                onChange={(e) => {
+                  setBorrowerKind(e.target.value as BorrowerKind);
+                  setBorrowerId("");
+                }}
               >
                 <option value="student">Student</option>
                 <option value="teacher">Teacher</option>
               </select>
             </div>
             <div>
-              <Label>Borrower ID</Label>
-              <Input
+              <Label>Borrower</Label>
+              <select
+                className="mt-1 h-9 w-full rounded border border-input bg-transparent px-2 text-sm"
                 value={borrowerId}
-                inputMode="numeric"
-                      onChange={(e) => setBorrowerId(e.target.value.replace(/\D/g, ""))}
-              />
+                onChange={(e) => setBorrowerId(e.target.value)}
+              >
+                <option value="">Select {borrowerKind}…</option>
+                {borrowerOpts.map((o) => (
+                  <option key={o.id} value={o.id}>
+                    {o.label}{o.hint ? ` · ${o.hint}` : ""}
+                  </option>
+                ))}
+              </select>
             </div>
             <div className="flex items-end">
               <Button onClick={() => create.mutate()} disabled={!canSubmit}>

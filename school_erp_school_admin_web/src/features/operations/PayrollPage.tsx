@@ -55,6 +55,11 @@ export function PayslipsPage() {
     queryFn: () => api.get<Payslip[]>("/v1/operations/payslips").then((r) => r.data),
   });
 
+  const { data: staff = [] } = useQuery({
+    queryKey: ["operations-staff-options"],
+    queryFn: fetchStaffUserOptions,
+  });
+
   const gen = useMutation({
     mutationFn: () =>
       api.post("/v1/operations/payslips/generate", {
@@ -102,13 +107,20 @@ export function PayslipsPage() {
         </CardHeader>
         <CardContent className="grid grid-cols-1 gap-3 sm:grid-cols-3">
           <div>
-            <Label>User #</Label>
-            <Input
-              inputMode="numeric"
+            <Label>Staff member</Label>
+            <select
+              className="mt-1 h-10 w-full rounded-md border border-input bg-background px-2 text-sm"
               value={userId}
-              onChange={(e) => setUserId(e.target.value.replace(/\D/g, ""))}
-              placeholder="Staff user id"
-            />
+              onChange={(e) => setUserId(e.target.value)}
+            >
+              <option value="">Select staff…</option>
+              {staff.map((s) => (
+                <option key={s.id} value={s.id}>
+                  {s.label}
+                  {s.hint ? ` · ${s.hint}` : ""}
+                </option>
+              ))}
+            </select>
           </div>
           <div>
             <Label>Period</Label>

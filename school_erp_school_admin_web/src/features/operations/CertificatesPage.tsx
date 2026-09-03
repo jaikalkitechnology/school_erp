@@ -7,6 +7,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { SimpleCrudPage, type FieldSpec } from "./_crud";
+import { fetchStudentOptions } from "./_pickers";
 
 const TEMPLATE_FIELDS: FieldSpec[] = [
   { key: "code", label: "Code", required: true, placeholder: "bonafide / tc / character" },
@@ -62,6 +63,10 @@ export function IssueCertificatePage() {
     queryKey: ["operations-issued-certificates"],
     queryFn: () =>
       api.get<Issued[]>("/v1/operations/issued-certificates").then((r) => r.data),
+  });
+  const { data: students = [] } = useQuery({
+    queryKey: ["operations-student-options"],
+    queryFn: fetchStudentOptions,
   });
 
   const [code, setCode] = useState("");
@@ -138,12 +143,29 @@ export function IssueCertificatePage() {
             </select>
           </div>
           <div>
-            <Label>For (student's name)</Label>
-            <Input value={forName} onChange={(e) => setForName(e.target.value)} />
+            <Label>Student</Label>
+            <select
+              className="mt-1 h-9 w-full rounded border border-input bg-transparent px-2 text-sm"
+              value={studentId}
+              onChange={(e) => {
+                setStudentId(e.target.value);
+                // Auto-fill the name from the picked student.
+                const picked = students.find((s) => String(s.id) === e.target.value);
+                if (picked) setForName(picked.label);
+              }}
+            >
+              <option value="">Pick a student (optional)…</option>
+              {students.map((s) => (
+                <option key={s.id} value={s.id}>
+                  {s.label}
+                  {s.hint ? ` · ${s.hint}` : ""}
+                </option>
+              ))}
+            </select>
           </div>
           <div>
-            <Label>Student # (optional)</Label>
-            <Input value={studentId} onChange={(e) => setStudentId(e.target.value)} />
+            <Label>For (name)</Label>
+            <Input value={forName} onChange={(e) => setForName(e.target.value)} />
           </div>
           <div className="col-span-3">
             <Label>Context (JSON, keys match {"{{placeholders}}"} in the template)</Label>
