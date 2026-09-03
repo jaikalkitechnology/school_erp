@@ -289,3 +289,55 @@ export const borrowerSearch = async (
   (await api.get<BorrowerRow[]>(`${base}/borrowers/search`, {
     params: { kind, q, limit },
   })).data;
+
+// ---- Phase 29: server-backed shelves / settings / audit / verification ----
+
+export interface Shelf { id: number; code: string; section: string | null; capacity: number; }
+export const listShelves = async () =>
+  (await api.get<Shelf[]>(`${base}/shelves`)).data;
+export const createShelf = async (p: { code: string; section?: string; capacity?: number }) =>
+  (await api.post<Shelf>(`${base}/shelves`, p)).data;
+export const deleteShelf = async (id: number) =>
+  (await api.delete(`${base}/shelves/${id}`)).data;
+
+export interface LibrarySettings {
+  loan_days: number;
+  fine_per_day: number;
+  max_books_per_borrower: number;
+  reservation_expiry_days: number;
+}
+export const getLibrarySettings = async () =>
+  (await api.get<LibrarySettings>(`${base}/settings`)).data;
+export const updateLibrarySettings = async (p: Partial<LibrarySettings>) =>
+  (await api.put<LibrarySettings>(`${base}/settings`, p)).data;
+
+export interface AuditLog {
+  id: number;
+  action: string;
+  entity_type: string | null;
+  entity_id: number | null;
+  summary: string | null;
+  actor_user_id: number | null;
+  created_at: string | null;
+}
+export const listAuditLogs = async (limit = 100) =>
+  (await api.get<AuditLog[]>(`${base}/audit-logs`, { params: { limit } })).data;
+
+export interface VerificationState {
+  session: { id: number; status: string; started_at: string | null } | null;
+  scanned?: number;
+  total_copies?: number;
+  missing?: number;
+  scans?: Array<{ barcode: string; copy_id: number | null; found: boolean }>;
+}
+export const getVerification = async () =>
+  (await api.get<VerificationState>(`${base}/verification/current`)).data;
+export const startVerification = async () =>
+  (await api.post<{ id: number; status: string; resumed: boolean }>(`${base}/verification/start`)).data;
+export const scanVerification = async (sessionId: number, barcode: string) =>
+  (await api.post<{ barcode: string; recognised: boolean }>(`${base}/verification/${sessionId}/scan`, { barcode })).data;
+export const completeVerification = async (sessionId: number) =>
+  (await api.post(`${base}/verification/${sessionId}/complete`)).data;
+
+export const importBooks = async (rows: Array<Record<string, unknown>>) =>
+  (await api.post<{ created: number; skipped: number }>(`${base}/import/books`, { rows })).data;
