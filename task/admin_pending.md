@@ -57,12 +57,3 @@ Legend — ⏳ not started · 🔶 partial (works, has a gap)
 | SIS/teacher phone fields format | ⏳ | Bare `Optional[str]` |
 | Aadhaar 12-digit (backend) | ⏳ | |
 | max_length caps on free-text columns | ⏳ | address, remarks, religion, caste… |
-
----
-
-## 🚀 Deployment — required for ANY admin change to go live
-
-| Task | Status | Detail |
-|------|:------:|--------|
-| Run Alembic migrations on prod | ⏳ | phase28 operations (16 tables) + `google_sub` |
-| Rebuild + redeploy admin web | ⏳ | `npm install && npm run build` → deploy `dist/`, hard-refresh browsers |
