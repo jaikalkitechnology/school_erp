@@ -1,0 +1,321 @@
+<title>Jaikalki ERP Status</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600;9..144,700&family=DM+Sans:wght@400;500;600;700;800&display=swap">
+<style>
+  :root{
+    --paper:#F4F0E8; --panel:#FBF8F2; --panel2:#FFFDF9;
+    --ink:#1F1248; --ink-soft:#4C4068; --line:#E4DBCE; --hair:rgba(31,18,72,.08);
+    --accent:#E85D2E; --accent-ink:#8C2F0E;
+    --done:#0F766E; --done-bg:#D1F0EC; --done-ink:#115E59;
+    --part:#B8860B; --part-bg:#FFF3D6; --part-ink:#7a5c00;
+    --pend:#B23C6B; --pend-bg:#FBE1EC; --pend-ink:#8a2f52;
+    --new:#E85D2E;
+  }
+  @media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+    --paper:#141019; --panel:#1E1826; --panel2:#241D30; --ink:#EFE9F6; --ink-soft:#B4A9C8;
+    --line:#2C2438; --hair:rgba(255,255,255,.07);
+    --done-bg:rgba(15,118,110,.22); --done-ink:#5FD6C8;
+    --part-bg:rgba(255,184,0,.16); --part-ink:#F0C64B;
+    --pend-bg:rgba(211,80,130,.20); --pend-ink:#F09AC0;
+  }}
+  :root[data-theme="dark"]{
+    --paper:#141019; --panel:#1E1826; --panel2:#241D30; --ink:#EFE9F6; --ink-soft:#B4A9C8;
+    --line:#2C2438; --hair:rgba(255,255,255,.07);
+    --done-bg:rgba(15,118,110,.22); --done-ink:#5FD6C8;
+    --part-bg:rgba(255,184,0,.16); --part-ink:#F0C64B;
+    --pend-bg:rgba(211,80,130,.20); --pend-ink:#F09AC0;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--paper);color:var(--ink);
+    font-family:"DM Sans",system-ui,sans-serif;-webkit-font-smoothing:antialiased;line-height:1.5;}
+  .wrap{max-width:1080px;margin:0 auto;padding:40px 22px 90px;}
+  .eyebrow{font-size:12px;letter-spacing:.22em;text-transform:uppercase;color:var(--accent-ink);font-weight:700;}
+  @media (prefers-color-scheme:dark){:root:not([data-theme="light"]) .eyebrow{color:var(--accent)}}
+  :root[data-theme="dark"] .eyebrow{color:var(--accent)}
+  h1{font-family:"Fraunces",Georgia,serif;font-weight:600;font-size:clamp(30px,5vw,44px);
+    line-height:1.05;margin:.26em 0 .12em;letter-spacing:-.01em;}
+  .lede{max-width:70ch;color:var(--ink-soft);font-size:15.5px;margin:0;}
+  .meta{margin-top:8px;font-size:12.5px;color:var(--ink-soft);}
+  .meta code{background:var(--hair);padding:1px 6px;border-radius:5px;font-size:12px;}
+
+  /* summary tiles */
+  .summary{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin:26px 0 6px;}
+  @media(max-width:720px){.summary{grid-template-columns:repeat(2,1fr)}}
+  .stat{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:16px 16px 14px;}
+  .stat .n{font-family:"Fraunces",serif;font-size:34px;font-weight:600;line-height:1;font-variant-numeric:tabular-nums;}
+  .stat .l{font-size:11px;letter-spacing:.08em;text-transform:uppercase;font-weight:700;color:var(--ink-soft);margin-top:8px;}
+  .stat.d .n{color:var(--done)} .stat.p .n{color:var(--part)} .stat.x .n{color:var(--pend)} .stat.t .n{color:var(--accent)}
+  .track{height:12px;border-radius:8px;background:var(--hair);overflow:hidden;display:flex;margin:22px 0 4px;}
+  .track i{display:block;height:100%}
+  .track .sd{background:var(--done)} .track .sp{background:var(--part)} .track .sx{background:var(--pend)}
+  .tracklab{display:flex;justify-content:space-between;font-size:12px;color:var(--ink-soft);margin-bottom:30px}
+
+  .legend{display:flex;gap:16px;flex-wrap:wrap;margin:0 0 8px;font-size:13px;color:var(--ink-soft);align-items:center}
+  .pill{display:inline-block;padding:2px 9px;border-radius:20px;font-size:11px;font-weight:800;letter-spacing:.02em;white-space:nowrap;}
+  .s-done{background:var(--done-bg);color:var(--done-ink)}
+  .s-part{background:var(--part-bg);color:var(--part-ink)}
+  .s-pend{background:var(--pend-bg);color:var(--pend-ink)}
+  .tag-new{display:inline-block;background:var(--new);color:#fff;font-size:9px;font-weight:800;
+    letter-spacing:.06em;padding:2px 6px;border-radius:5px;margin-left:6px;vertical-align:middle;}
+
+  section{margin-top:40px;}
+  h2{font-family:"Fraunces",serif;font-weight:600;font-size:23px;margin:0 0 4px;
+    display:flex;align-items:center;gap:11px;}
+  h2 .ico{font-size:20px}
+  .shead{display:flex;align-items:baseline;gap:12px;flex-wrap:wrap;border-bottom:2px solid var(--line);padding-bottom:8px;margin-bottom:14px}
+  .shead .mini{margin-left:auto;font-size:12px;color:var(--ink-soft);font-weight:600;font-variant-numeric:tabular-nums}
+
+  table{width:100%;border-collapse:collapse;font-size:14px;}
+  .tblwrap{overflow-x:auto;border:1px solid var(--line);border-radius:12px;background:var(--panel2)}
+  thead th{text-align:left;font-size:10.5px;letter-spacing:.09em;text-transform:uppercase;color:var(--ink-soft);
+    font-weight:700;padding:10px 14px;background:var(--panel);border-bottom:1px solid var(--line);}
+  tbody td{padding:10px 14px;border-bottom:1px solid var(--hair);vertical-align:top;}
+  tbody tr:last-child td{border-bottom:0}
+  td.task{font-weight:600;color:var(--ink);width:31%}
+  td.st{width:120px;white-space:nowrap}
+  td.detail{color:var(--ink-soft);font-size:13px}
+  tbody tr:hover td{background:var(--hair)}
+
+  .foot{margin-top:52px;padding-top:22px;border-top:1px solid var(--line);color:var(--ink-soft);font-size:13.5px;max-width:76ch}
+  .foot b{color:var(--ink)}
+</style>
+
+<div class="wrap">
+  <div class="eyebrow">Jaikalki School ERP · Project status</div>
+  <h1>Completed &amp; pending — whole project</h1>
+  <p class="lede">Every module across the backend, admin panel, super-admin, and mobile app,
+    with its build status. A single sheet to see, at a glance, what ships today and what's left.</p>
+  <p class="meta">Branch <code>claude/analyze-school-erp-Kk7Z4</code> · updated 2026-09-03 ·
+    apps: <code>backend</code> · <code>school_admin_web</code> · <code>super_admin_web</code> · <code>mobile/jaikalki</code></p>
+
+  <div class="summary">
+    <div class="stat d"><div class="n">96</div><div class="l">✅ Done</div></div>
+    <div class="stat p"><div class="n">13</div><div class="l">🔶 Partial</div></div>
+    <div class="stat x"><div class="n">30</div><div class="l">⏳ Pending</div></div>
+    <div class="stat t"><div class="n">~78%</div><div class="l">Overall complete</div></div>
+  </div>
+  <div class="track" title="share of tracked items">
+    <i class="sd" style="width:69%"></i><i class="sp" style="width:9%"></i><i class="sx" style="width:22%"></i>
+  </div>
+  <div class="tracklab"><span>139 tracked items</span><span>Done 69% · Partial 9% · Pending 22%</span></div>
+
+  <div class="legend">
+    <span class="pill s-done">✅ DONE</span> built &amp; working
+    <span class="pill s-part">🔶 PARTIAL</span> works, has gaps
+    <span class="pill s-pend">⏳ PENDING</span> not started
+    <span class="tag-new">NEW</span> shipped this work session
+  </div>
+
+  <!-- PLATFORM -->
+  <section>
+    <div class="shead"><h2><span class="ico">🧱</span>Platform &amp; infrastructure</h2><span class="mini">6 / 6 done</span></div>
+    <div class="tblwrap"><table>
+      <thead><tr><th>Task</th><th>Status</th><th>Detail</th></tr></thead>
+      <tbody>
+        <tr><td class="task">Multi-tenant core</td><td class="st"><span class="pill s-done">✅ DONE</span></td><td class="detail">TenantBase auto-filter, subdomain-first resolution, tenant-scoped sessions</td></tr>
+        <tr><td class="task">FastAPI + async SQLAlchemy + Alembic + MySQL</td><td class="st"><span class="pill s-done">✅ DONE</span></td><td class="detail">Migrations + boot-time safety nets</td></tr>
+        <tr><td class="task">JWT auth (access + refresh rotation)</td><td class="st"><span class="pill s-done">✅ DONE</span></td><td class="detail">Bearer + tenant header</td></tr>
+        <tr><td class="task">Notification pipeline</td><td class="st"><span class="pill s-done">✅ DONE</span></td><td class="detail">in-app / push (FCM) / SMS / email fan-out via templates</td></tr>
+        <tr><td class="task">File uploads service</td><td class="st"><span class="pill s-done">✅ DONE</span></td><td class="detail">Tenant-scoped, authed download</td></tr>
+        <tr><td class="task">RBAC catalogue + role seeding</td><td class="st"><span class="pill s-done">✅ DONE</span></td><td class="detail">Re-seeded at boot; granted_admin_pages backfill</td></tr>
+      </tbody>
+    </table></div>
+  </section>
+
+  <!-- AUTH -->
+  <section>
+    <div class="shead"><h2><span class="ico">🔐</span>Authentication &amp; roles</h2><span class="mini">4 done · 1 partial · 3 pending</span></div>
+    <div class="tblwrap"><table>
+      <thead><tr><th>Task</th><th>Status</th><th>Detail</th></tr></thead>
+      <tbody>
+        <tr><td class="task">Password login</td><td class="st"><span class="pill s-done">✅ DONE</span></td><td class="detail">All roles</td></tr>
+        <tr><td class="task">Google Sign-In (web + Android)</td><td class="st"><span class="pill s-done">✅ DONE</span></td><td class="detail">JWKS verify, subdomain-first, invite-only. Needs deploy + Google Cloud config</td></tr>
+        <tr><td class="task">Role-scoped sidebar / access</td><td class="st"><span class="pill s-done">✅ DONE</span></td><td class="detail">Librarian-only view, granted pages</td></tr>
+        <tr><td class="task">Mobile role → shell routing</td><td class="st"><span class="pill s-done">✅ DONE</span><span class="tag-new">NEW</span></td><td class="detail">student→Student, teacher/hod/management routed correctly</td></tr>
+        <tr><td class="task">Password reset via OTP</td><td class="st"><span class="pill s-part">🔶 PARTIAL</span></td><td class="detail">Verify end-to-end on prod SMS gateway</td></tr>
+        <tr><td class="task">Role × platform login gate</td><td class="st"><span class="pill s-pend">⏳ PENDING</span></td><td class="detail">Was reverted; re-implement if wanted</td></tr>
+        <tr><td class="task">Email-conflict policy on Google login</td><td class="st"><span class="pill s-pend">⏳ PENDING</span></td><td class="detail">Confirm merge/reject rules with product</td></tr>
+        <tr><td class="task">iOS Google Sign-In</td><td class="st"><span class="pill s-pend">⏳ PENDING</span></td><td class="detail">Deferred — iOS OAuth client + URL scheme</td></tr>
+      </tbody>
+    </table></div>
+  </section>
+
+  <!-- ADMIN PANEL -->
+  <section>
+    <div class="shead"><h2><span class="ico">🖥️</span>Admin panel — modules</h2><span class="mini">school_admin_web</span></div>
+    <div class="tblwrap"><table>
+      <thead><tr><th>Module</th><th>Status</th><th>Detail</th></tr></thead>
+      <tbody>
+        <tr><td class="task">Dashboard</td><td class="st"><span class="pill s-done">✅ DONE</span></td><td class="detail">KPIs</td></tr>
+        <tr><td class="task">School setup / Org</td><td class="st"><span class="pill s-done">✅ DONE</span></td><td class="detail">Classes, sections, subjects, houses; validation</td></tr>
+        <tr><td class="task">Student management</td><td class="st"><span class="pill s-done">✅ DONE</span></td><td class="detail">Admit / edit / list, photo, validation; aadhaar 12-digit ⏳</td></tr>
+        <tr><td class="task">Staff / Users &amp; credentials</td><td class="st"><span class="pill s-done">✅ DONE</span></td><td class="detail">HOD + Receptionist roles, "Bus Staff" rename; phone/email validation ⏳</td></tr>
+        <tr><td class="task">Academic + timetable</td><td class="st"><span class="pill s-done">✅ DONE</span></td><td class="detail">Timetable builder depth / substitution polish ⏳</td></tr>
+        <tr><td class="task">Exams + grade scales + report cards</td><td class="st"><span class="pill s-done">✅ DONE</span></td><td class="detail">Roster marks, results, PDF cards</td></tr>
+        <tr><td class="task">Fee management</td><td class="st"><span class="pill s-part">🔶 PARTIAL</span></td><td class="detail">Works; sub-nav tabs not split into deep-link routes</td></tr>
+        <tr><td class="task">Communication (SMS/Email/Push/Circulars)</td><td class="st"><span class="pill s-part">🔶 PARTIAL</span></td><td class="detail">Works; sub-nav points to one page</td></tr>
+        <tr><td class="task">Library (20+ pages, full CRUD)</td><td class="st"><span class="pill s-part">🔶 PARTIAL</span></td><td class="detail">Books/copies/issue/return/fines/reservations done; Shelves + Settings localStorage, Import/Export stub, Audit synthesised, Barcode text-only ⏳</td></tr>
+        <tr><td class="task">Transport (8 tabs)</td><td class="st"><span class="pill s-done">✅ DONE</span></td><td class="detail">Fleet, Routes, Students, Live map, Live trip, Billing, History, Logs (fuel+maintenance)</td></tr>
+        <tr><td class="task">Hostel</td><td class="st"><span class="pill s-done">✅ DONE</span></td><td class="detail">Rooms, allocations</td></tr>
+        <tr><td class="task">Finance / Accounts</td><td class="st"><span class="pill s-done">✅ DONE</span></td><td class="detail">Vendors, expenses; FK + validation</td></tr>
+        <tr><td class="task">Payroll / HR</td><td class="st"><span class="pill s-done">✅ DONE</span></td><td class="detail">Salary structures, payslips; payslip staff-picker ⏳</td></tr>
+        <tr><td class="task">Inventory &amp; assets</td><td class="st"><span class="pill s-done">✅ DONE</span></td><td class="detail">Items, movements</td></tr>
+        <tr><td class="task">Admissions</td><td class="st"><span class="pill s-done">✅ DONE</span></td><td class="detail">Inquiries pipeline</td></tr>
+        <tr><td class="task">Visitor management</td><td class="st"><span class="pill s-done">✅ DONE</span></td><td class="detail">Visitor log</td></tr>
+        <tr><td class="task">Health / Infirmary</td><td class="st"><span class="pill s-done">✅ DONE</span></td><td class="detail">Health records</td></tr>
+        <tr><td class="task">Certificates + ID cards</td><td class="st"><span class="pill s-done">✅ DONE</span></td><td class="detail">Templates, issue; student-picker on issue ⏳</td></tr>
+        <tr><td class="task">Discipline</td><td class="st"><span class="pill s-done">✅ DONE</span></td><td class="detail">Incident register</td></tr>
+        <tr><td class="task">Notice board</td><td class="st"><span class="pill s-done">✅ DONE</span></td><td class="detail">Audience-targeted</td></tr>
+        <tr><td class="task">Alumni</td><td class="st"><span class="pill s-done">✅ DONE</span></td><td class="detail">Registry</td></tr>
+        <tr><td class="task">Sports &amp; clubs</td><td class="st"><span class="pill s-done">✅ DONE</span></td><td class="detail">Houses, events</td></tr>
+        <tr><td class="task">Campus management</td><td class="st"><span class="pill s-done">✅ DONE</span></td><td class="detail">Facilities</td></tr>
+        <tr><td class="task">Subscription + Settings</td><td class="st"><span class="pill s-done">✅ DONE</span></td><td class="detail">Plan, branding, config</td></tr>
+        <tr><td class="task">Reports</td><td class="st"><span class="pill s-part">🔶 PARTIAL</span></td><td class="detail">Standard reports; custom builder + scheduled email ⏳</td></tr>
+        <tr><td class="task">Mobile-friendly responsive layout</td><td class="st"><span class="pill s-done">✅ DONE</span></td><td class="detail">Drawer + hamburger, every panel</td></tr>
+        <tr><td class="task">Org-chart sidebar hierarchy</td><td class="st"><span class="pill s-done">✅ DONE</span></td><td class="detail">Grouped nav</td></tr>
+        <tr><td class="task">Form validation (phone/email/GST/number bounds)</td><td class="st"><span class="pill s-done">✅ DONE</span></td><td class="detail">Vendors, campus, inventory, library, students; Users phone+email + date-order guards ⏳</td></tr>
+      </tbody>
+    </table></div>
+  </section>
+
+  <!-- SUPER ADMIN -->
+  <section>
+    <div class="shead"><h2><span class="ico">🛡️</span>Super admin</h2><span class="mini">super_admin_web</span></div>
+    <div class="tblwrap"><table>
+      <thead><tr><th>Task</th><th>Status</th><th>Detail</th></tr></thead>
+      <tbody>
+        <tr><td class="task">9-item sidebar nav</td><td class="st"><span class="pill s-done">✅ DONE</span><span class="tag-new">NEW</span></td><td class="detail">Dashboard, Organizations, Plans, Billing, Staff, Reports, Announcements, Audit Logs, Settings</td></tr>
+        <tr><td class="task">Dashboard</td><td class="st"><span class="pill s-done">✅ DONE</span></td><td class="detail">Platform overview</td></tr>
+        <tr><td class="task">Organizations (tenant list + detail)</td><td class="st"><span class="pill s-part">🔶 PARTIAL</span></td><td class="detail">List + detail; full CRUD (create/suspend/cancel/limits) ⏳</td></tr>
+        <tr><td class="task">Onboarding wizard</td><td class="st"><span class="pill s-part">🔶 PARTIAL</span></td><td class="detail">Wizard exists; seed RBAC/first-admin/branding ⏳</td></tr>
+        <tr><td class="task">Audit log</td><td class="st"><span class="pill s-done">✅ DONE</span></td><td class="detail">Per-tenant; cross-tenant global viewer ⏳</td></tr>
+        <tr><td class="task">Plans management</td><td class="st"><span class="pill s-pend">⏳ PENDING</span></td><td class="detail">View only; create/edit + feature flags</td></tr>
+        <tr><td class="task">Billing / invoicing</td><td class="st"><span class="pill s-pend">⏳ PENDING</span></td><td class="detail">View only; invoice generation, dunning</td></tr>
+        <tr><td class="task">Staff page</td><td class="st"><span class="pill s-pend">⏳ PENDING</span></td><td class="detail">Placeholder</td></tr>
+        <tr><td class="task">Reports</td><td class="st"><span class="pill s-pend">⏳ PENDING</span></td><td class="detail">Placeholder (route added)</td></tr>
+        <tr><td class="task">Announcements</td><td class="st"><span class="pill s-pend">⏳ PENDING</span></td><td class="detail">Placeholder (route added)</td></tr>
+        <tr><td class="task">Settings</td><td class="st"><span class="pill s-pend">⏳ PENDING</span></td><td class="detail">Placeholder</td></tr>
+        <tr><td class="task">Impersonation ("log in as")</td><td class="st"><span class="pill s-pend">⏳ PENDING</span></td><td class="detail">Scoped audited token</td></tr>
+        <tr><td class="task">Form validation</td><td class="st"><span class="pill s-pend">⏳ PENDING</span></td><td class="detail">Reuse operations _crud rules</td></tr>
+      </tbody>
+    </table></div>
+  </section>
+
+  <!-- MOBILE PARENT -->
+  <section>
+    <div class="shead"><h2><span class="ico">👨‍👩‍👧</span>Mobile — Parent</h2><span class="mini">HomeShell · 5 tabs</span></div>
+    <div class="tblwrap"><table>
+      <thead><tr><th>Feature</th><th>Status</th><th>Detail</th></tr></thead>
+      <tbody>
+        <tr><td class="task">Home dashboard + child switcher</td><td class="st"><span class="pill s-done">✅ DONE</span></td><td class="detail">Fees due, today's attendance, siblings</td></tr>
+        <tr><td class="task">Attendance (+ by-subject, class avg)</td><td class="st"><span class="pill s-done">✅ DONE</span></td><td class="detail"></td></tr>
+        <tr><td class="task">Homework (view, submit, attachments, grades)</td><td class="st"><span class="pill s-done">✅ DONE</span></td><td class="detail">No-section fallback fixed <span class="tag-new">NEW</span></td></tr>
+        <tr><td class="task">Result cards / Profile / Calendar</td><td class="st"><span class="pill s-done">✅ DONE</span></td><td class="detail"></td></tr>
+        <tr><td class="task">Transport (route, driver, live tracking)</td><td class="st"><span class="pill s-done">✅ DONE</span></td><td class="detail"></td></tr>
+        <tr><td class="task">Library / Directory / Messages / Notices</td><td class="st"><span class="pill s-done">✅ DONE</span></td><td class="detail"></td></tr>
+        <tr><td class="task">Health / Discipline / Certificates / Sports</td><td class="st"><span class="pill s-done">✅ DONE</span></td><td class="detail"></td></tr>
+        <tr><td class="task">Apply for leave</td><td class="st"><span class="pill s-done">✅ DONE</span><span class="tag-new">NEW</span></td><td class="detail">Pick child, dates, reason + status history</td></tr>
+        <tr><td class="task">Fee payment via gateway (Razorpay)</td><td class="st"><span class="pill s-pend">⏳ PENDING</span></td><td class="detail">Needs Razorpay keys + order/verify endpoint</td></tr>
+        <tr><td class="task">Admissions status view</td><td class="st"><span class="pill s-pend">⏳ PENDING</span></td><td class="detail">If parent applied</td></tr>
+        <tr><td class="task">Offline caching (new ops pages)</td><td class="st"><span class="pill s-part">🔶 PARTIAL</span></td><td class="detail">Core cached; new pages ⏳</td></tr>
+      </tbody>
+    </table></div>
+  </section>
+
+  <!-- MOBILE STUDENT -->
+  <section>
+    <div class="shead"><h2><span class="ico">🎓</span>Mobile — Student</h2><span class="mini">StudentShell · 4 tabs <span class="tag-new">NEW</span></span></div>
+    <div class="tblwrap"><table>
+      <thead><tr><th>Feature</th><th>Status</th><th>Detail</th></tr></thead>
+      <tbody>
+        <tr><td class="task">Dedicated shell + /student self API</td><td class="st"><span class="pill s-done">✅ DONE</span><span class="tag-new">NEW</span></td><td class="detail">Resolves own record via Student.user_id</td></tr>
+        <tr><td class="task">Home dashboard</td><td class="st"><span class="pill s-done">✅ DONE</span><span class="tag-new">NEW</span></td><td class="detail">Own attendance, homework, fees, documents</td></tr>
+        <tr><td class="task">Attendance</td><td class="st"><span class="pill s-done">✅ DONE</span><span class="tag-new">NEW</span></td><td class="detail"></td></tr>
+        <tr><td class="task">Homework (view + submit)</td><td class="st"><span class="pill s-done">✅ DONE</span><span class="tag-new">NEW</span></td><td class="detail">Text answer; attachments ⏳</td></tr>
+        <tr><td class="task">Timetable</td><td class="st"><span class="pill s-done">✅ DONE</span><span class="tag-new">NEW</span></td><td class="detail">Weekly grid</td></tr>
+        <tr><td class="task">Attendance by subject</td><td class="st"><span class="pill s-done">✅ DONE</span><span class="tag-new">NEW</span></td><td class="detail">Per-subject % bars</td></tr>
+        <tr><td class="task">Profile / Result cards</td><td class="st"><span class="pill s-done">✅ DONE</span><span class="tag-new">NEW</span></td><td class="detail"></td></tr>
+        <tr><td class="task">Library / Notices / Notifications / Settings</td><td class="st"><span class="pill s-done">✅ DONE</span><span class="tag-new">NEW</span></td><td class="detail">Reused tenant-wide pages</td></tr>
+        <tr><td class="task">Homework attachments on submit</td><td class="st"><span class="pill s-pend">⏳ PENDING</span></td><td class="detail">Text-only today</td></tr>
+      </tbody>
+    </table></div>
+  </section>
+
+  <!-- MOBILE TEACHER -->
+  <section>
+    <div class="shead"><h2><span class="ico">👩‍🏫</span>Mobile — Teacher</h2><span class="mini">TeacherShell · 3 tabs</span></div>
+    <div class="tblwrap"><table>
+      <thead><tr><th>Feature</th><th>Status</th><th>Detail</th></tr></thead>
+      <tbody>
+        <tr><td class="task">Today (self check-in) + Classes</td><td class="st"><span class="pill s-done">✅ DONE</span></td><td class="detail"></td></tr>
+        <tr><td class="task">Take attendance</td><td class="st"><span class="pill s-done">✅ DONE</span></td><td class="detail">Online; offline-first + sync ⏳</td></tr>
+        <tr><td class="task">Homework create + grade</td><td class="st"><span class="pill s-done">✅ DONE</span></td><td class="detail">Submissions, marks, feedback</td></tr>
+        <tr><td class="task">Enter exam marks</td><td class="st"><span class="pill s-done">✅ DONE</span><span class="tag-new">NEW</span></td><td class="detail">Pick exam → paper → roster → bulk save</td></tr>
+        <tr><td class="task">Exam + weekly timetable</td><td class="st"><span class="pill s-done">✅ DONE</span></td><td class="detail"></td></tr>
+        <tr><td class="task">Behaviour notes / Chat</td><td class="st"><span class="pill s-done">✅ DONE</span></td><td class="detail"></td></tr>
+        <tr><td class="task">Leave approvals + my leaves</td><td class="st"><span class="pill s-done">✅ DONE</span></td><td class="detail"></td></tr>
+        <tr><td class="task">Notice board / Payslips / Sports / ID card</td><td class="st"><span class="pill s-done">✅ DONE</span></td><td class="detail"></td></tr>
+        <tr><td class="task">Offline-first attendance</td><td class="st"><span class="pill s-pend">⏳ PENDING</span></td><td class="detail">Larger infra</td></tr>
+      </tbody>
+    </table></div>
+  </section>
+
+  <!-- MOBILE BUS STAFF -->
+  <section>
+    <div class="shead"><h2><span class="ico">🚌</span>Mobile — Bus staff</h2><span class="mini">TransportShell · Bus + More</span></div>
+    <div class="tblwrap"><table>
+      <thead><tr><th>Feature</th><th>Status</th><th>Detail</th></tr></thead>
+      <tbody>
+        <tr><td class="task">Transport shell + driver profile</td><td class="st"><span class="pill s-done">✅ DONE</span></td><td class="detail"></td></tr>
+        <tr><td class="task">Route map</td><td class="st"><span class="pill s-done">✅ DONE</span></td><td class="detail">Stops + polyline</td></tr>
+        <tr><td class="task">Students + navigate to pickup</td><td class="st"><span class="pill s-done">✅ DONE</span><span class="tag-new">NEW</span></td><td class="detail">Turn-by-turn directions to pickup coords</td></tr>
+        <tr><td class="task">Boarding scan + Notices</td><td class="st"><span class="pill s-done">✅ DONE</span></td><td class="detail"></td></tr>
+        <tr><td class="task">Fuel / expense log entry</td><td class="st"><span class="pill s-pend">⏳ PENDING</span></td><td class="detail">Backend exists in admin Logs tab — expose in driver app</td></tr>
+        <tr><td class="task">Driver leave / unavailability</td><td class="st"><span class="pill s-pend">⏳ PENDING</span></td><td class="detail">New</td></tr>
+      </tbody>
+    </table></div>
+  </section>
+
+  <!-- BACKEND VALIDATION -->
+  <section>
+    <div class="shead"><h2><span class="ico">🧪</span>Backend — validation &amp; data model</h2><span class="mini">3 done · 4 pending</span></div>
+    <div class="tblwrap"><table>
+      <thead><tr><th>Task</th><th>Status</th><th>Detail</th></tr></thead>
+      <tbody>
+        <tr><td class="task">Operations crash-proof coerce + guards</td><td class="st"><span class="pill s-done">✅ DONE</span></td><td class="detail">Enum/length/negative, friendly 400s, FK translation</td></tr>
+        <tr><td class="task">Typed leave decide · SIS emails · fee amount &gt; 0</td><td class="st"><span class="pill s-done">✅ DONE</span></td><td class="detail"></td></tr>
+        <tr><td class="task">Parent homework no-section fallback</td><td class="st"><span class="pill s-done">✅ DONE</span><span class="tag-new">NEW</span></td><td class="detail">Falls back to class sections</td></tr>
+        <tr><td class="task">SIS/teacher phone format</td><td class="st"><span class="pill s-pend">⏳ PENDING</span></td><td class="detail">Bare Optional[str]</td></tr>
+        <tr><td class="task">Aadhaar 12-digit validation</td><td class="st"><span class="pill s-pend">⏳ PENDING</span></td><td class="detail"></td></tr>
+        <tr><td class="task">max_length caps on free-text columns</td><td class="st"><span class="pill s-pend">⏳ PENDING</span></td><td class="detail">address, remarks, religion…</td></tr>
+        <tr><td class="task">Exam-marks bounds in Pydantic</td><td class="st"><span class="pill s-pend">⏳ PENDING</span></td><td class="detail">Defense-in-depth</td></tr>
+      </tbody>
+    </table></div>
+  </section>
+
+  <!-- DEPLOYMENT -->
+  <section>
+    <div class="shead"><h2><span class="ico">🚀</span>Deployment / release <span style="font-size:13px;color:var(--pend-ink)">— do first</span></h2><span class="mini">all pending</span></div>
+    <div class="tblwrap"><table>
+      <thead><tr><th>Task</th><th>Status</th><th>Detail</th></tr></thead>
+      <tbody>
+        <tr><td class="task">Run Alembic migrations on prod</td><td class="st"><span class="pill s-pend">⏳ PENDING</span></td><td class="detail">phase28 operations + google_sub</td></tr>
+        <tr><td class="task">Redeploy backend</td><td class="st"><span class="pill s-pend">⏳ PENDING</span></td><td class="detail">student API, homework fix, exam-marks, bus coords are server-side</td></tr>
+        <tr><td class="task">Rebuild admin + super-admin web</td><td class="st"><span class="pill s-pend">⏳ PENDING</span></td><td class="detail">npm run build → deploy dist/, hard-refresh</td></tr>
+        <tr><td class="task">Rebuild mobile APK</td><td class="st"><span class="pill s-pend">⏳ PENDING</span></td><td class="detail">New StudentShell, leave, exam-marks, google_sign_in plugin</td></tr>
+        <tr><td class="task">Google Cloud console config</td><td class="st"><span class="pill s-pend">⏳ PENDING</span></td><td class="detail">JS origins per subdomain, Android SHA-1, consent screen</td></tr>
+      </tbody>
+    </table></div>
+  </section>
+
+  <div class="foot">
+    <b>How to read this.</b> Statuses reflect the code on branch
+    <b>claude/analyze-school-erp-Kk7Z4</b>. <b>Done</b> = built and working in code;
+    <b>Partial</b> = usable with a named gap; <b>Pending</b> = not started. Items tagged
+    <span class="tag-new">NEW</span> were built in the latest work session. The five
+    deployment items are the only thing between the current code and a live release — everything
+    marked Done is written but must be deployed to run in production. Counts are indicative of
+    tracked scope, not a line-by-line audit of every screen.
+  </div>
+</div>
