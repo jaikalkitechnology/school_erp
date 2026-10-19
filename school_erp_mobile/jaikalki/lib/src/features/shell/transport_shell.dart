@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 
 import '../../core/auth_cubit.dart';
 import '../../theme/brand.dart';
+import '../driver/driver_drop_map_page.dart';
 import '../driver/driver_page.dart';
 import '../driver/driver_profile_page.dart';
 import '../driver/driver_routes_page.dart';
@@ -139,6 +140,25 @@ class _TransportMorePage extends StatelessWidget {
             onTap: () => Navigator.of(context).push(
               MaterialPageRoute(
                 builder: (_) => const DriverStopsMapPage(),
+              ),
+            ),
+          ),
+          ListTile(
+            leading: const Icon(Icons.pin_drop_outlined,
+                color: JaikalkiBrand.saffron),
+            title: const Text('Drop map'),
+            subtitle: const Text(
+              'Where to drop each student + directions',
+              style: TextStyle(
+                fontSize: 12,
+                color: JaikalkiBrand.textSecondary,
+              ),
+            ),
+            trailing: const Icon(Icons.chevron_right,
+                color: JaikalkiBrand.textSecondary),
+            onTap: () => Navigator.of(context).push(
+              MaterialPageRoute(
+                builder: (_) => const DriverDropMapPage(),
               ),
             ),
           ),
