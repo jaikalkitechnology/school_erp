@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Bus as BusIcon, MapPin, Plus, Play, Square, Wrench, Fuel } from "lucide-react";
+import { Bus as BusIcon, MapPin, Plus, Play, Square, Trash2, Wrench, Fuel } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -13,6 +13,8 @@ import {
   createBus,
   createDriver,
   createRoute,
+  deleteBus,
+  deleteDriver,
   generateMonthlyTransportInvoices,
   listAllAllocations,
   listBuses,
@@ -114,10 +116,63 @@ function FleetPanel() {
   // Driver row will be linked to. Without it the driver app can't
   // tell *which* routes belong to *this* logged-in user.
   const [drvUserId, setDrvUserId] = useState<string>("");
-  const { data: candidates = [] } = useQuery({
+  const {
+    data: candidates = [],
+    isLoading: candidatesLoading,
+    isError: candidatesError,
+  } = useQuery({
     queryKey: ["transport-driver-candidates"],
     queryFn: listDriverCandidates,
   });
+  const freeCandidates = candidates.filter((c) => !c.already_a_driver);
+
+  const [fleetError, setFleetError] = useState<string | null>(null);
+  const errText = (e: any, fallback: string) =>
+    (typeof e?.response?.data?.detail === "string" && e.response.data.detail) || fallback;
+
+  const removeDriver = useMutation({
+    mutationFn: (id: number) => deleteDriver(id),
+    onSuccess: () => {
+      setFleetError(null);
+      qc.invalidateQueries({ queryKey: ["transport-drivers"] });
+      // The freed login becomes selectable again.
+      qc.invalidateQueries({ queryKey: ["transport-driver-candidates"] });
+      qc.invalidateQueries({ queryKey: ["transport-routes"] });
+    },
+    onError: (e) => setFleetError(errText(e, "Could not delete driver.")),
+  });
+
+  const removeBus = useMutation({
+    mutationFn: (id: number) => deleteBus(id),
+    onSuccess: () => {
+      setFleetError(null);
+      qc.invalidateQueries({ queryKey: ["transport-buses"] });
+      qc.invalidateQueries({ queryKey: ["transport-routes"] });
+    },
+    onError: (e) => setFleetError(errText(e, "Could not delete bus.")),
+  });
+
+  const confirmDeleteDriver = (id: number, name: string) => {
+    if (
+      window.confirm(
+        `Delete driver "${name}"?\n\nAny route they drive becomes unassigned. ` +
+          "Their login is kept and can be linked again.",
+      )
+    ) {
+      removeDriver.mutate(id);
+    }
+  };
+
+  const confirmDeleteBus = (id: number, reg: string) => {
+    if (
+      window.confirm(
+        `Delete bus "${reg}"?\n\nRoutes using it become unassigned, and its ` +
+          "maintenance + fuel logs are permanently removed.",
+      )
+    ) {
+      removeBus.mutate(id);
+    }
+  };
 
   const newDriver = useMutation({
     mutationFn: () =>
@@ -152,6 +207,11 @@ function FleetPanel() {
 
   return (
     <div className="grid gap-6 md:grid-cols-2">
+      {fleetError && (
+        <p className="rounded-md bg-destructive/10 px-3 py-2 text-sm text-destructive md:col-span-2">
+          {fleetError}
+        </p>
+      )}
       <Card>
         <CardHeader>
           <CardTitle>Buses</CardTitle>
@@ -160,10 +220,21 @@ function FleetPanel() {
         <CardContent>
           <ul className="divide-y divide-saffron-pale">
             {buses.map((b) => (
-              <li key={b.id} className="flex items-center justify-between py-2 text-sm">
+              <li key={b.id} className="flex items-center justify-between gap-2 py-2 text-sm">
                 <span className="font-medium text-indigo-dark">{b.registration_number}</span>
                 <span className="text-xs text-muted-foreground">cap {b.capacity}</span>
-                <span className="rounded bg-teal-pale px-2 py-0.5 text-xs text-teal-dark">{b.status}</span>
+                <span className="flex items-center gap-1">
+                  <span className="rounded bg-teal-pale px-2 py-0.5 text-xs text-teal-dark">{b.status}</span>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    title={`Delete bus ${b.registration_number}`}
+                    disabled={removeBus.isPending}
+                    onClick={() => confirmDeleteBus(b.id, b.registration_number)}
+                  >
+                    <Trash2 className="h-4 w-4 text-destructive" />
+                  </Button>
+                </span>
               </li>
             ))}
           </ul>
@@ -194,7 +265,7 @@ function FleetPanel() {
         <CardContent>
           <ul className="divide-y divide-saffron-pale">
             {drivers.map((d) => (
-              <li key={d.id} className="flex items-center justify-between py-2 text-sm">
+              <li key={d.id} className="flex items-center justify-between gap-2 py-2 text-sm">
                 <span className="font-medium text-indigo-dark">
                   {d.full_name}
                   {d.user_id == null && (
@@ -206,8 +277,19 @@ function FleetPanel() {
                 <span className="text-xs text-muted-foreground">
                   {d.phone ?? "—"}
                 </span>
-                <span className="rounded bg-teal-pale px-2 py-0.5 text-xs text-teal-dark">
-                  {d.status}
+                <span className="flex items-center gap-1">
+                  <span className="rounded bg-teal-pale px-2 py-0.5 text-xs text-teal-dark">
+                    {d.status}
+                  </span>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    title={`Delete driver ${d.full_name}`}
+                    disabled={removeDriver.isPending}
+                    onClick={() => confirmDeleteDriver(d.id, d.full_name)}
+                  >
+                    <Trash2 className="h-4 w-4 text-destructive" />
+                  </Button>
                 </span>
               </li>
             ))}
@@ -220,33 +302,47 @@ function FleetPanel() {
 
             {/* Step 1 — pick the user account this Driver row maps to. */}
             <div className="space-y-1.5">
-              <Label>Driver account (transport_manager user)</Label>
+              <Label>Driver account (Bus Staff login)</Label>
+              {/* Status sits ABOVE the select so the open dropdown can't hide it. */}
+              {candidatesLoading ? (
+                <p className="text-xs text-muted-foreground">Loading bus-staff logins…</p>
+              ) : candidatesError ? (
+                <p className="text-xs text-destructive">
+                  Couldn't load bus-staff logins. Refresh the page; if it persists,
+                  check you're signed in as a school admin.
+                </p>
+              ) : candidates.length === 0 ? (
+                <p className="rounded bg-marigold-pale px-2 py-1.5 text-xs text-marigold-dark">
+                  No Bus Staff logins exist yet. Go to <strong>Users &amp; credentials</strong>{" "}
+                  → <strong>Add user</strong> → tick the <strong>Bus Staff</strong> role, then
+                  come back here.
+                </p>
+              ) : freeCandidates.length === 0 ? (
+                <p className="rounded bg-marigold-pale px-2 py-1.5 text-xs text-marigold-dark">
+                  All {candidates.length} Bus Staff login{candidates.length === 1 ? " is" : "s are"}{" "}
+                  already linked to a driver. Create a new Bus Staff user in{" "}
+                  <strong>Users &amp; credentials</strong>, or delete a driver below to free
+                  its login.
+                </p>
+              ) : (
+                <p className="text-xs text-muted-foreground">
+                  {freeCandidates.length} free login{freeCandidates.length === 1 ? "" : "s"} available.
+                </p>
+              )}
               <select
                 className="h-9 w-full rounded border border-input bg-transparent px-2 text-sm"
                 value={drvUserId}
                 onChange={(e) => pickCandidate(e.target.value)}
               >
                 <option value="">— select a user —</option>
-                {candidates
-                  .filter((c) => !c.already_a_driver)
-                  .map((c) => (
-                    <option key={c.user_id} value={c.user_id}>
-                      {c.full_name}
-                      {c.phone ? ` · ${c.phone}` : ""}
-                    </option>
-                  ))}
+                {candidates.map((c) => (
+                  <option key={c.user_id} value={c.user_id} disabled={c.already_a_driver}>
+                    {c.full_name}
+                    {c.phone ? ` · ${c.phone}` : ""}
+                    {c.already_a_driver ? " — already a driver" : ""}
+                  </option>
+                ))}
               </select>
-              {candidates.length === 0 ? (
-                <p className="text-xs text-muted-foreground">
-                  No transport_manager users yet. Create one on{" "}
-                  <strong>Users &amp; credentials</strong> with role
-                  "transport_manager" first.
-                </p>
-              ) : candidates.every((c) => c.already_a_driver) ? (
-                <p className="text-xs text-muted-foreground">
-                  Every transport_manager user already has a Driver row.
-                </p>
-              ) : null}
             </div>
 
             {/* Step 2 — confirm / override the details that get

@@ -139,6 +139,59 @@ async def update_driver_route(
     return await update_driver(session, driver_id, payload)
 
 
+@router.delete("/drivers/{driver_id}")
+async def delete_driver_route(
+    driver_id: int,
+    principal: AuthPrincipal = Depends(_school_admin),
+    session: AsyncSession = Depends(tenant_scoped_session),
+):
+    """Remove a Driver row. Routes it drove become unassigned (driver_id →
+    NULL). The linked login (User) is NOT deleted — it simply shows up
+    again as a free candidate in the "Driver account" dropdown."""
+    from sqlalchemy import update as _update
+
+    from app.models.transport import Driver, Route
+
+    driver = (
+        await session.execute(select(Driver).where(Driver.id == driver_id))
+    ).scalar_one_or_none()
+    if driver is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Driver not found")
+    unassigned = (
+        await session.execute(
+            _update(Route).where(Route.driver_id == driver_id).values(driver_id=None)
+        )
+    ).rowcount or 0
+    await session.delete(driver)
+    await session.commit()
+    return {"deleted": driver_id, "routes_unassigned": unassigned}
+
+
+@router.delete("/buses/{bus_id}")
+async def delete_bus_route(
+    bus_id: int,
+    principal: AuthPrincipal = Depends(_school_admin),
+    session: AsyncSession = Depends(tenant_scoped_session),
+):
+    """Remove a bus. Routes using it become unassigned (bus_id → NULL);
+    its maintenance + fuel log rows are removed with it (FK cascade)."""
+    from sqlalchemy import update as _update
+
+    from app.models.transport import Bus, Route
+
+    bus = (await session.execute(select(Bus).where(Bus.id == bus_id))).scalar_one_or_none()
+    if bus is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Bus not found")
+    unassigned = (
+        await session.execute(
+            _update(Route).where(Route.bus_id == bus_id).values(bus_id=None)
+        )
+    ).rowcount or 0
+    await session.delete(bus)
+    await session.commit()
+    return {"deleted": bus_id, "routes_unassigned": unassigned}
+
+
 # ---- Routes + stops -------------------------------------------------------
 
 

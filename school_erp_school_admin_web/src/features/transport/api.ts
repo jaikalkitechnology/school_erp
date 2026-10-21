@@ -125,6 +125,11 @@ export const updateDriver = async (
   p: Partial<Driver> & { full_name: string; license_number: string },
 ) => (await api.patch<Driver>(`${base}/drivers/${id}`, p)).data;
 
+export const deleteDriver = async (id: number) =>
+  (await api.delete<{ deleted: number; routes_unassigned: number }>(`${base}/drivers/${id}`)).data;
+export const deleteBus = async (id: number) =>
+  (await api.delete<{ deleted: number; routes_unassigned: number }>(`${base}/buses/${id}`)).data;
+
 export const listRoutes = async () => (await api.get<Route[]>(`${base}/routes`)).data;
 export const createRoute = async (p: Partial<Route> & { code: string; name: string }) =>
   (await api.post<Route>(`${base}/routes`, p)).data;
