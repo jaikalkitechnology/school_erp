@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, type KeyboardEvent } from "react";
 import { NavLink, Outlet, useLocation, useNavigate } from "react-router-dom";
 import {
   AlertOctagon,
@@ -35,6 +35,7 @@ import {
   ReceiptText,
   RefreshCw,
   RotateCcw,
+  Search,
   Send,
   Settings,
   ShieldCheck,
@@ -267,6 +268,82 @@ function filterNav(
   return out;
 }
 
+// ---- Sidebar search ------------------------------------------------------
+// Extra words people type for a page whose label doesn't contain them
+// (eg. "bus" → Transport). Keyed by route path without the ?tab= part.
+const KEYWORDS: Record<string, string> = {
+  "/dashboard": "home overview",
+  "/settings": "school profile logo address",
+  "/org": "class section department",
+  "/students": "pupil child admit enrol",
+  "/attendance": "absent present roll call",
+  "/teachers": "staff faculty",
+  "/users": "login password credentials account role access",
+  "/staff": "teacher attendance",
+  "/exams": "marks test grade result",
+  "/report-cards": "marks result grade",
+  "/fees": "payment invoice due receipt",
+  "/communication": "sms email push message whatsapp",
+  "/notice-board": "circular announcement",
+  "/transport": "bus driver route stop vehicle fleet gps",
+  "/hostel": "room warden dorm boarding",
+  "/finance-expenses": "expense money accounts",
+  "/payroll-structures": "salary pay",
+  "/payroll-payslips": "salary pay",
+  "/inventory-items": "stock store assets",
+  "/visitor-logs": "gate visitor entry",
+  "/health-records": "medical doctor sick nurse",
+};
+
+function leafMatches(l: NavLeaf, terms: string[]): boolean {
+  const path = l.to.split("?")[0];
+  const libraryWords = path.startsWith("/library") ? " book library" : "";
+  const hay = `${l.label} ${KEYWORDS[path] ?? ""}${libraryWords}`.toLowerCase();
+  return terms.every((t) => hay.includes(t));
+}
+
+/** Narrow the (already role-filtered) nav to items matching the query.
+ *  A group whose own name matches keeps all its pages; otherwise it keeps
+ *  only the matching pages, and disappears if none match. */
+function searchNav(items: NavItem[], query: string): NavItem[] {
+  const terms = query.toLowerCase().split(/\s+/).filter(Boolean);
+  if (terms.length === 0) return items;
+  const out: NavItem[] = [];
+  for (const item of items) {
+    if (item.kind === "leaf") {
+      if (leafMatches(item, terms)) out.push(item);
+      continue;
+    }
+    const groupHit = terms.every((t) => item.label.toLowerCase().includes(t));
+    const kids = groupHit ? item.children : item.children.filter((c) => leafMatches(c, terms));
+    if (kids.length > 0) out.push({ ...item, children: kids });
+  }
+  return out;
+}
+
+function firstLeaf(items: NavItem[]): NavLeaf | null {
+  for (const item of items) {
+    if (item.kind === "leaf") return item;
+    if (item.children.length > 0) return item.children[0];
+  }
+  return null;
+}
+
+/** Marks the typed text inside a menu label. Always one <span>, so the
+ *  label stays a single flex item inside the nav link. */
+function Highlight({ text, query }: { text: string; query: string }) {
+  const q = query.trim().toLowerCase();
+  const i = q ? text.toLowerCase().indexOf(q) : -1;
+  if (i < 0) return <span>{text}</span>;
+  return (
+    <span>
+      {text.slice(0, i)}
+      <mark className="rounded bg-marigold-pale px-0.5 text-inherit">{text.slice(i, i + q.length)}</mark>
+      {text.slice(i + q.length)}
+    </span>
+  );
+}
+
 const leafClass = ({ isActive }: { isActive: boolean }) =>
   cn(
     "flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors",
@@ -284,10 +361,11 @@ const nestedLeafClass = ({ isActive }: { isActive: boolean }) =>
   );
 
 function NavGroupSection({
-  group, forceOpen,
+  group, forceOpen, query = "",
 }: {
   group: NavGroup;
   forceOpen: boolean;
+  query?: string;
 }) {
   const [open, setOpen] = useState(forceOpen);
   // If the active route moves *into* the group, auto-expand.
@@ -305,7 +383,7 @@ function NavGroupSection({
         )}
       >
         <group.icon className="h-4 w-4" />
-        <span className="flex-1 text-left">{group.label}</span>
+        <span className="flex-1 text-left"><Highlight text={group.label} query={query} /></span>
         {effectiveOpen ? (
           <ChevronDown className="h-3.5 w-3.5" />
         ) : (
@@ -315,9 +393,9 @@ function NavGroupSection({
       {effectiveOpen && (
         <div className="mt-1 flex flex-col gap-0.5">
           {group.children.map((c) => (
-            <NavLink key={c.to} to={c.to} className={nestedLeafClass}>
+            <NavLink key={`${c.to}|${c.label}`} to={c.to} className={nestedLeafClass}>
               <c.icon className="h-3.5 w-3.5" />
-              {c.label}
+              <Highlight text={c.label} query={query} />
             </NavLink>
           ))}
         </div>
@@ -343,9 +421,49 @@ export function SchoolAdminLayout() {
   // navigating to a new page always leaves the reader on the page,
   // not the menu.
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [query, setQuery] = useState("");
+  // Leaving the page (or switching ?tab=) closes the drawer and resets
+  // the search so the full menu is back next time.
   useEffect(() => {
     setMobileOpen(false);
-  }, [location.pathname]);
+    setQuery("");
+  }, [location.pathname, location.search]);
+
+  const searching = query.trim().length > 0;
+  const shownNav = useMemo(() => searchNav(visibleNav, query), [visibleNav, query]);
+
+  const onSearchKey = (e: KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === "Enter") {
+      const hit = firstLeaf(shownNav);
+      if (hit) {
+        e.preventDefault();
+        navigate(hit.to);
+      }
+    } else if (e.key === "Escape") {
+      setQuery("");
+      e.currentTarget.blur();
+    }
+  };
+
+  // "/" or Ctrl/Cmd+K jumps to the sidebar search from anywhere, unless
+  // the user is already typing in a field.
+  useEffect(() => {
+    const onKey = (e: globalThis.KeyboardEvent) => {
+      const el = e.target as HTMLElement | null;
+      const typing = !!el && (el.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(el.tagName));
+      const shortcut = (e.key === "k" && (e.ctrlKey || e.metaKey)) || (e.key === "/" && !typing);
+      if (!shortcut) return;
+      e.preventDefault();
+      if (window.matchMedia("(max-width: 767px)").matches) setMobileOpen(true);
+      const input = Array.from(
+        document.querySelectorAll<HTMLInputElement>("[data-sidebar-search]"),
+      ).find((i) => i.offsetParent !== null);
+      input?.focus();
+      input?.select();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, []);
 
   const onLogout = async () => {
     try {
@@ -370,6 +488,38 @@ export function SchoolAdminLayout() {
         </p>
       </div>
 
+      {visibleNav.length > 0 && (
+        <div className="relative mb-4">
+          <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+          <input
+            data-sidebar-search
+            type="text"
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            onKeyDown={onSearchKey}
+            placeholder="Search menu…"
+            aria-label="Search menu"
+            autoComplete="off"
+            spellCheck={false}
+            className="h-9 w-full rounded-md border border-saffron-pale bg-ivory pl-9 pr-9 text-sm text-indigo-dark placeholder:text-muted-foreground focus:border-saffron focus:outline-none focus:ring-2 focus:ring-saffron/30"
+          />
+          {searching ? (
+            <button
+              type="button"
+              onClick={() => setQuery("")}
+              className="absolute right-2 top-1/2 -translate-y-1/2 rounded p-1 text-muted-foreground hover:bg-saffron-pale/60 hover:text-indigo-dark"
+              aria-label="Clear search"
+            >
+              <X className="h-3.5 w-3.5" />
+            </button>
+          ) : (
+            <kbd className="pointer-events-none absolute right-2 top-1/2 hidden -translate-y-1/2 rounded border border-saffron-pale px-1.5 font-mono text-[10px] text-muted-foreground md:block">
+              /
+            </kbd>
+          )}
+        </div>
+      )}
+
       <nav className="flex flex-1 flex-col gap-1 overflow-y-auto">
         {visibleNav.length === 0 && (
           <p className="rounded-md bg-marigold-pale/40 px-3 py-2 text-xs text-marigold-dark">
@@ -377,16 +527,21 @@ export function SchoolAdminLayout() {
             mobile app, or ask your school admin to grant page access.
           </p>
         )}
-        {visibleNav.map((item) => {
+        {searching && shownNav.length === 0 && (
+          <p className="px-3 py-2 text-sm text-muted-foreground">
+            No pages match “{query.trim()}”.
+          </p>
+        )}
+        {shownNav.map((item) => {
           if (item.kind === "leaf") {
             return (
-              <NavLink key={item.to} to={item.to} className={leafClass}>
+              <NavLink key={`${item.to}|${item.label}`} to={item.to} className={leafClass}>
                 <item.icon className="h-4 w-4" />
-                {item.label}
+                <Highlight text={item.label} query={query} />
               </NavLink>
             );
           }
-          const forceOpen = item.children.some((c) => {
+          const forceOpen = searching || item.children.some((c) => {
             const path = c.to.split("?")[0];
             return currentPath === path || currentPath.startsWith(path + "/");
           });
@@ -395,6 +550,7 @@ export function SchoolAdminLayout() {
               key={item.key}
               group={item}
               forceOpen={forceOpen}
+              query={query}
             />
           );
         })}
