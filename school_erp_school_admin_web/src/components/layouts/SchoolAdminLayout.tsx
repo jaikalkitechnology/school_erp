@@ -393,13 +393,15 @@ const nestedLeafClass = ({ isActive }: { isActive: boolean }) =>
   );
 
 function NavGroupSection({
-  group, forceOpen, query = "",
+  group, forceOpen, query = "", initiallyOpen = false,
 }: {
   group: NavGroup;
   forceOpen: boolean;
   query?: string;
+  /** Start expanded (eg. its icon was clicked in the collapsed rail). */
+  initiallyOpen?: boolean;
 }) {
-  const [open, setOpen] = useState(forceOpen);
+  const [open, setOpen] = useState(forceOpen || initiallyOpen);
   // If the active route moves *into* the group, auto-expand.
   const effectiveOpen = open || forceOpen;
   return (
@@ -478,10 +480,21 @@ export function SchoolAdminLayout() {
     }
   }, [collapsed]);
 
+  // Section to open when the full menu is expanded from its rail icon.
+  const [openGroup, setOpenGroup] = useState<string | null>(null);
+
   const isPhone = () => window.matchMedia("(max-width: 767px)").matches;
   const onMenuButton = () => {
-    if (isPhone()) setMobileOpen(true);
-    else setCollapsed((c) => !c);
+    if (isPhone()) {
+      setMobileOpen(true);
+      return;
+    }
+    setOpenGroup(null);
+    setCollapsed((c) => !c);
+  };
+  const expandTo = (groupKey: string | null) => {
+    setOpenGroup(groupKey);
+    setCollapsed(false);
   };
 
   const searching = query.trim().length > 0;
@@ -631,6 +644,7 @@ export function SchoolAdminLayout() {
               group={item}
               forceOpen={forceOpen}
               query={query}
+              initiallyOpen={item.key === openGroup}
             />
           );
         })}
@@ -654,20 +668,102 @@ export function SchoolAdminLayout() {
     </>
   );
 
+  // Collapsed desktop sidebar: logo + school name, then one icon per
+  // top-level item. Page icons navigate; section icons open the full menu
+  // with that section expanded.
+  const railItem = (active: boolean) =>
+    cn(
+      "flex h-11 w-11 items-center justify-center rounded-xl transition-colors",
+      active
+        ? "bg-saffron-pale text-saffron-darker"
+        : "text-indigo/70 hover:bg-saffron-pale/60 hover:text-indigo-dark",
+    );
+  const railBody = (
+    <>
+      <button
+        type="button"
+        onClick={() => expandTo(null)}
+        title="Open menu"
+        className="mb-5 flex flex-col items-center gap-2 rounded-lg px-1 py-1 hover:bg-saffron-pale/40"
+      >
+        <SchoolLogo
+          src={branding.data?.logo_url}
+          alt={`${schoolName} logo`}
+          className="h-11 w-11 rounded-xl border border-saffron-pale bg-white object-contain p-1"
+          fallback={
+            <span className="flex h-11 w-11 items-center justify-center rounded-xl bg-saffron font-display text-lg font-semibold text-white">
+              {schoolName.trim().charAt(0).toUpperCase() || "S"}
+            </span>
+          }
+        />
+        <span className="line-clamp-3 text-center font-display text-[11px] font-semibold leading-tight text-indigo-dark">
+          {schoolName}
+        </span>
+      </button>
+
+      <nav aria-label="Main" className="flex flex-1 flex-col items-center gap-2 overflow-y-auto [scrollbar-width:none]">
+        {visibleNav.map((item) => {
+          if (item.kind === "leaf") {
+            return (
+              <NavLink
+                key={`${item.to}|${item.label}`}
+                to={item.to}
+                title={item.label}
+                aria-label={item.label}
+                className={({ isActive }) => railItem(isActive)}
+              >
+                <item.icon className="h-5 w-5" />
+              </NavLink>
+            );
+          }
+          const inside = item.children.some((c) => {
+            const path = c.to.split("?")[0];
+            return currentPath === path || currentPath.startsWith(path + "/");
+          });
+          return (
+            <button
+              key={item.key}
+              type="button"
+              title={item.label}
+              aria-label={`${item.label} — open menu`}
+              onClick={() => expandTo(item.key)}
+              className={railItem(inside)}
+            >
+              <item.icon className="h-5 w-5" />
+            </button>
+          );
+        })}
+      </nav>
+
+      <button
+        type="button"
+        onClick={onLogout}
+        title="Sign out"
+        aria-label="Sign out"
+        className={cn(railItem(false), "mt-3")}
+      >
+        <LogOut className="h-5 w-5" />
+      </button>
+    </>
+  );
+
   return (
     <div className="flex h-full flex-col bg-ivory md:flex-row">
-      {/* Sidebar — on md+ a panel the hamburger slides shut (width → 0);
-          on mobile the drawer below. Inner width is fixed so the content
-          doesn't reflow while it animates. */}
+      {/* Sidebar on md+: full menu, or (☰) a slim icon rail. On mobile the
+          drawer below. Inner width is fixed so content doesn't reflow
+          while the width animates. */}
       <aside
         id="admin-sidebar"
-        inert={collapsed}
         className={cn(
-          "hidden h-full shrink-0 overflow-hidden bg-warm-white transition-[width] duration-200 ease-out motion-reduce:transition-none md:block",
-          collapsed ? "md:w-0" : "md:w-[260px] md:border-r md:border-saffron-pale",
+          "hidden h-full shrink-0 overflow-hidden border-r border-saffron-pale bg-warm-white transition-[width] duration-200 ease-out motion-reduce:transition-none md:block",
+          collapsed ? "md:w-[96px]" : "md:w-[260px]",
         )}
       >
-        <div className="flex h-full w-[260px] flex-col px-5 py-7">{sidebarBody}</div>
+        {collapsed ? (
+          <div className="flex h-full w-[96px] flex-col items-center px-2 py-6">{railBody}</div>
+        ) : (
+          <div className="flex h-full w-[260px] flex-col px-5 py-7">{sidebarBody}</div>
+        )}
       </aside>
 
       {/* Mobile drawer overlay */}
