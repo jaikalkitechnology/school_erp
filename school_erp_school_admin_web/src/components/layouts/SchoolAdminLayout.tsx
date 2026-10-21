@@ -374,6 +374,8 @@ function findCrumb(
   return exact ?? (prefix && { group: prefix.group, label: prefix.label });
 }
 
+const SIDEBAR_KEY = "jaikalki.sidebar.collapsed";
+
 const leafClass = ({ isActive }: { isActive: boolean }) =>
   cn(
     "flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors",
@@ -391,13 +393,15 @@ const nestedLeafClass = ({ isActive }: { isActive: boolean }) =>
   );
 
 function NavGroupSection({
-  group, forceOpen, query = "",
+  group, forceOpen, query = "", initiallyOpen = false,
 }: {
   group: NavGroup;
   forceOpen: boolean;
   query?: string;
+  /** Start expanded (eg. its icon was clicked in the collapsed rail). */
+  initiallyOpen?: boolean;
 }) {
-  const [open, setOpen] = useState(forceOpen);
+  const [open, setOpen] = useState(forceOpen || initiallyOpen);
   // If the active route moves *into* the group, auto-expand.
   const effectiveOpen = open || forceOpen;
   return (
@@ -459,6 +463,40 @@ export function SchoolAdminLayout() {
     setQuery("");
   }, [location.pathname, location.search]);
 
+  // Desktop: the top-bar hamburger hides/shows the sidebar. Remembered
+  // per browser; storage can be unavailable (private mode), so guard it.
+  const [collapsed, setCollapsed] = useState<boolean>(() => {
+    try {
+      return localStorage.getItem(SIDEBAR_KEY) === "1";
+    } catch {
+      return false;
+    }
+  });
+  useEffect(() => {
+    try {
+      localStorage.setItem(SIDEBAR_KEY, collapsed ? "1" : "0");
+    } catch {
+      // not persisted; fine
+    }
+  }, [collapsed]);
+
+  // Section to open when the full menu is expanded from its rail icon.
+  const [openGroup, setOpenGroup] = useState<string | null>(null);
+
+  const isPhone = () => window.matchMedia("(max-width: 767px)").matches;
+  const onMenuButton = () => {
+    if (isPhone()) {
+      setMobileOpen(true);
+      return;
+    }
+    setOpenGroup(null);
+    setCollapsed((c) => !c);
+  };
+  const expandTo = (groupKey: string | null) => {
+    setOpenGroup(groupKey);
+    setCollapsed(false);
+  };
+
   const searching = query.trim().length > 0;
   const shownNav = useMemo(() => searchNav(visibleNav, query), [visibleNav, query]);
 
@@ -484,16 +522,21 @@ export function SchoolAdminLayout() {
       const shortcut = (e.key === "k" && (e.ctrlKey || e.metaKey)) || (e.key === "/" && !typing);
       if (!shortcut) return;
       e.preventDefault();
-      if (window.matchMedia("(max-width: 767px)").matches) setMobileOpen(true);
-      const input = Array.from(
-        document.querySelectorAll<HTMLInputElement>("[data-sidebar-search]"),
-      ).find((i) => i.offsetParent !== null);
-      input?.focus();
-      input?.select();
+      if (isPhone()) setMobileOpen(true);
+      else if (collapsed) setCollapsed(false);
+      // Focus after React re-renders, so a just-reopened sidebar is no
+      // longer inert.
+      window.setTimeout(() => {
+        const input = Array.from(
+          document.querySelectorAll<HTMLInputElement>("[data-sidebar-search]"),
+        ).find((i) => i.offsetParent !== null && !i.closest("[inert]"));
+        input?.focus();
+        input?.select();
+      }, 0);
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, []);
+  }, [collapsed]);
 
   const onLogout = async () => {
     try {
@@ -601,6 +644,7 @@ export function SchoolAdminLayout() {
               group={item}
               forceOpen={forceOpen}
               query={query}
+              initiallyOpen={item.key === openGroup}
             />
           );
         })}
@@ -624,11 +668,102 @@ export function SchoolAdminLayout() {
     </>
   );
 
+  // Collapsed desktop sidebar: logo + school name, then one icon per
+  // top-level item. Page icons navigate; section icons open the full menu
+  // with that section expanded.
+  const railItem = (active: boolean) =>
+    cn(
+      "flex h-11 w-11 items-center justify-center rounded-xl transition-colors",
+      active
+        ? "bg-saffron-pale text-saffron-darker"
+        : "text-indigo/70 hover:bg-saffron-pale/60 hover:text-indigo-dark",
+    );
+  const railBody = (
+    <>
+      <button
+        type="button"
+        onClick={() => expandTo(null)}
+        title="Open menu"
+        className="mb-5 flex flex-col items-center gap-2 rounded-lg px-1 py-1 hover:bg-saffron-pale/40"
+      >
+        <SchoolLogo
+          src={branding.data?.logo_url}
+          alt={`${schoolName} logo`}
+          className="h-11 w-11 rounded-xl border border-saffron-pale bg-white object-contain p-1"
+          fallback={
+            <span className="flex h-11 w-11 items-center justify-center rounded-xl bg-saffron font-display text-lg font-semibold text-white">
+              {schoolName.trim().charAt(0).toUpperCase() || "S"}
+            </span>
+          }
+        />
+        <span className="line-clamp-3 text-center font-display text-[11px] font-semibold leading-tight text-indigo-dark">
+          {schoolName}
+        </span>
+      </button>
+
+      <nav aria-label="Main" className="flex flex-1 flex-col items-center gap-2 overflow-y-auto [scrollbar-width:none]">
+        {visibleNav.map((item) => {
+          if (item.kind === "leaf") {
+            return (
+              <NavLink
+                key={`${item.to}|${item.label}`}
+                to={item.to}
+                title={item.label}
+                aria-label={item.label}
+                className={({ isActive }) => railItem(isActive)}
+              >
+                <item.icon className="h-5 w-5" />
+              </NavLink>
+            );
+          }
+          const inside = item.children.some((c) => {
+            const path = c.to.split("?")[0];
+            return currentPath === path || currentPath.startsWith(path + "/");
+          });
+          return (
+            <button
+              key={item.key}
+              type="button"
+              title={item.label}
+              aria-label={`${item.label} — open menu`}
+              onClick={() => expandTo(item.key)}
+              className={railItem(inside)}
+            >
+              <item.icon className="h-5 w-5" />
+            </button>
+          );
+        })}
+      </nav>
+
+      <button
+        type="button"
+        onClick={onLogout}
+        title="Sign out"
+        aria-label="Sign out"
+        className={cn(railItem(false), "mt-3")}
+      >
+        <LogOut className="h-5 w-5" />
+      </button>
+    </>
+  );
+
   return (
-    <div className="flex h-full flex-col bg-ivory md:grid md:grid-cols-[260px_1fr] md:grid-rows-1">
-      {/* Sidebar — permanent on md+, drawer on mobile */}
-      <aside className="hidden h-full md:flex md:flex-col md:border-r md:border-saffron-pale md:bg-warm-white md:px-5 md:py-7">
-        {sidebarBody}
+    <div className="flex h-full flex-col bg-ivory md:flex-row">
+      {/* Sidebar on md+: full menu, or (☰) a slim icon rail. On mobile the
+          drawer below. Inner width is fixed so content doesn't reflow
+          while the width animates. */}
+      <aside
+        id="admin-sidebar"
+        className={cn(
+          "hidden h-full shrink-0 overflow-hidden border-r border-saffron-pale bg-warm-white transition-[width] duration-200 ease-out motion-reduce:transition-none md:block",
+          collapsed ? "md:w-[96px]" : "md:w-[260px]",
+        )}
+      >
+        {collapsed ? (
+          <div className="flex h-full w-[96px] flex-col items-center px-2 py-6">{railBody}</div>
+        ) : (
+          <div className="flex h-full w-[260px] flex-col px-5 py-7">{sidebarBody}</div>
+        )}
       </aside>
 
       {/* Mobile drawer overlay */}
@@ -661,12 +796,15 @@ export function SchoolAdminLayout() {
       {/* Content column: the top bar sits outside the scrolling <main>,
           so it stays pinned while the page scrolls. */}
       <div className="flex min-h-0 min-w-0 flex-1 flex-col">
-        <header className="z-30 flex h-14 shrink-0 items-center gap-3 border-b border-saffron-pale bg-warm-white px-3 md:px-10">
+        <header className="z-30 flex h-14 shrink-0 items-center gap-3 border-b border-saffron-pale bg-warm-white px-3 md:px-6">
+          {/* Phone: opens the drawer. Desktop: hides / shows the sidebar. */}
           <button
             type="button"
-            className="rounded-md p-2 text-indigo-dark hover:bg-saffron-pale/60 md:hidden"
-            onClick={() => setMobileOpen(true)}
-            aria-label="Open menu"
+            className="rounded-md p-2 text-indigo-dark hover:bg-saffron-pale/60"
+            onClick={onMenuButton}
+            aria-label="Toggle menu"
+            aria-controls="admin-sidebar"
+            title={collapsed ? "Show menu" : "Hide menu"}
           >
             <Menu className="h-5 w-5" />
           </button>
