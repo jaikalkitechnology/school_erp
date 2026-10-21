@@ -374,6 +374,8 @@ function findCrumb(
   return exact ?? (prefix && { group: prefix.group, label: prefix.label });
 }
 
+const SIDEBAR_KEY = "jaikalki.sidebar.collapsed";
+
 const leafClass = ({ isActive }: { isActive: boolean }) =>
   cn(
     "flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors",
@@ -459,6 +461,29 @@ export function SchoolAdminLayout() {
     setQuery("");
   }, [location.pathname, location.search]);
 
+  // Desktop: the top-bar hamburger hides/shows the sidebar. Remembered
+  // per browser; storage can be unavailable (private mode), so guard it.
+  const [collapsed, setCollapsed] = useState<boolean>(() => {
+    try {
+      return localStorage.getItem(SIDEBAR_KEY) === "1";
+    } catch {
+      return false;
+    }
+  });
+  useEffect(() => {
+    try {
+      localStorage.setItem(SIDEBAR_KEY, collapsed ? "1" : "0");
+    } catch {
+      // not persisted; fine
+    }
+  }, [collapsed]);
+
+  const isPhone = () => window.matchMedia("(max-width: 767px)").matches;
+  const onMenuButton = () => {
+    if (isPhone()) setMobileOpen(true);
+    else setCollapsed((c) => !c);
+  };
+
   const searching = query.trim().length > 0;
   const shownNav = useMemo(() => searchNav(visibleNav, query), [visibleNav, query]);
 
@@ -484,16 +509,21 @@ export function SchoolAdminLayout() {
       const shortcut = (e.key === "k" && (e.ctrlKey || e.metaKey)) || (e.key === "/" && !typing);
       if (!shortcut) return;
       e.preventDefault();
-      if (window.matchMedia("(max-width: 767px)").matches) setMobileOpen(true);
-      const input = Array.from(
-        document.querySelectorAll<HTMLInputElement>("[data-sidebar-search]"),
-      ).find((i) => i.offsetParent !== null);
-      input?.focus();
-      input?.select();
+      if (isPhone()) setMobileOpen(true);
+      else if (collapsed) setCollapsed(false);
+      // Focus after React re-renders, so a just-reopened sidebar is no
+      // longer inert.
+      window.setTimeout(() => {
+        const input = Array.from(
+          document.querySelectorAll<HTMLInputElement>("[data-sidebar-search]"),
+        ).find((i) => i.offsetParent !== null && !i.closest("[inert]"));
+        input?.focus();
+        input?.select();
+      }, 0);
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, []);
+  }, [collapsed]);
 
   const onLogout = async () => {
     try {
@@ -625,10 +655,19 @@ export function SchoolAdminLayout() {
   );
 
   return (
-    <div className="flex h-full flex-col bg-ivory md:grid md:grid-cols-[260px_1fr] md:grid-rows-1">
-      {/* Sidebar — permanent on md+, drawer on mobile */}
-      <aside className="hidden h-full md:flex md:flex-col md:border-r md:border-saffron-pale md:bg-warm-white md:px-5 md:py-7">
-        {sidebarBody}
+    <div className="flex h-full flex-col bg-ivory md:flex-row">
+      {/* Sidebar — on md+ a panel the hamburger slides shut (width → 0);
+          on mobile the drawer below. Inner width is fixed so the content
+          doesn't reflow while it animates. */}
+      <aside
+        id="admin-sidebar"
+        inert={collapsed}
+        className={cn(
+          "hidden h-full shrink-0 overflow-hidden bg-warm-white transition-[width] duration-200 ease-out motion-reduce:transition-none md:block",
+          collapsed ? "md:w-0" : "md:w-[260px] md:border-r md:border-saffron-pale",
+        )}
+      >
+        <div className="flex h-full w-[260px] flex-col px-5 py-7">{sidebarBody}</div>
       </aside>
 
       {/* Mobile drawer overlay */}
@@ -661,12 +700,15 @@ export function SchoolAdminLayout() {
       {/* Content column: the top bar sits outside the scrolling <main>,
           so it stays pinned while the page scrolls. */}
       <div className="flex min-h-0 min-w-0 flex-1 flex-col">
-        <header className="z-30 flex h-14 shrink-0 items-center gap-3 border-b border-saffron-pale bg-warm-white px-3 md:px-10">
+        <header className="z-30 flex h-14 shrink-0 items-center gap-3 border-b border-saffron-pale bg-warm-white px-3 md:px-6">
+          {/* Phone: opens the drawer. Desktop: hides / shows the sidebar. */}
           <button
             type="button"
-            className="rounded-md p-2 text-indigo-dark hover:bg-saffron-pale/60 md:hidden"
-            onClick={() => setMobileOpen(true)}
-            aria-label="Open menu"
+            className="rounded-md p-2 text-indigo-dark hover:bg-saffron-pale/60"
+            onClick={onMenuButton}
+            aria-label="Toggle menu"
+            aria-controls="admin-sidebar"
+            title={collapsed ? "Show menu" : "Hide menu"}
           >
             <Menu className="h-5 w-5" />
           </button>
