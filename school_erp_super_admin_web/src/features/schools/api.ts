@@ -16,8 +16,15 @@ export async function createTenant(payload: CreateTenantPayload): Promise<Tenant
   return data;
 }
 
-export async function updateTenant(id: number, payload: Partial<CreateTenantPayload> & Record<string, unknown>): Promise<Tenant> {
+/** PATCH a school. A field set to null clears it; omitted fields are left alone. */
+export async function updateTenant(id: number, payload: Record<string, unknown>): Promise<Tenant> {
   const { data } = await api.patch<Tenant>(`/admin/tenants/${id}`, payload);
+  return data;
+}
+
+/** Soft delete: the school is cancelled (logins blocked, data kept). */
+export async function deleteTenant(id: number): Promise<Tenant> {
+  const { data } = await api.delete<Tenant>(`/admin/tenants/${id}`);
   return data;
 }
 

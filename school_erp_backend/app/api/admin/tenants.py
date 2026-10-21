@@ -111,6 +111,34 @@ async def update_one(
     return tenant
 
 
+@router.delete("/{tenant_id}", response_model=TenantRead)
+async def delete_one(
+    tenant_id: int,
+    request: Request,
+    session: AsyncSession = Depends(platform_session),
+    principal: AuthPrincipal = Depends(require_super_admin()),
+):
+    """Delete a school from the platform. This is a soft delete: the tenant
+    moves to CANCELLED, which blocks every login and API call for it, but
+    its students, fees and other records are kept (a hard delete would
+    orphan rows in tables that have no FK cascade). Cancelled schools
+    can't be re-activated."""
+    tenant = await get_tenant(session, tenant_id)
+    if tenant.status != TenantStatus.CANCELLED:
+        tenant = await set_status(session, tenant_id, TenantStatus.CANCELLED)
+        await audit.record(
+            session,
+            principal=principal,
+            action="tenant.delete",
+            target_type="tenant",
+            target_id=tenant_id,
+            summary=f"Deleted {tenant.school_name} ({tenant.subdomain})",
+            request=request,
+            tenant_id_override=tenant_id,
+        )
+    return tenant
+
+
 @router.post("/{tenant_id}/suspend", response_model=TenantRead)
 async def suspend(
     tenant_id: int,

@@ -140,8 +140,12 @@ class TenantRead(BaseModel):
     affiliation_board: Optional[str]
     school_type: Optional[SchoolType]
     medium: Optional[str]
+    address: Optional[str] = None
     city: Optional[str]
     state: Optional[str]
+    pincode: Optional[str] = None
+    phone: Optional[str] = None
+    email: Optional[str] = None
     timezone: str
     primary_color: str
     secondary_color: str

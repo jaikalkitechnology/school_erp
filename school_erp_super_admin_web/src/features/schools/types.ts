@@ -15,13 +15,24 @@ export interface SubscriptionPlan {
   is_active: boolean;
 }
 
+export type SchoolType = "preschool" | "primary" | "secondary" | "senior_secondary" | "k12";
+
 export interface Tenant {
   id: number;
   school_name: string;
   school_code: string;
   subdomain: string;
+  affiliation_board?: string | null;
+  school_type?: SchoolType | null;
+  medium?: string | null;
+  address?: string | null;
   city: string | null;
   state: string | null;
+  pincode?: string | null;
+  phone?: string | null;
+  email?: string | null;
+  timezone?: string;
+  logo_url?: string | null;
   status: TenantStatus;
   primary_color: string;
   secondary_color: string;

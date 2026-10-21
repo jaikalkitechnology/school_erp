@@ -1,13 +1,22 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Pause, Play, Plus, Search } from "lucide-react";
+import { Pause, Pencil, Play, Plus, Search, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 import { activateTenant, listTenants, suspendTenant } from "./api";
+import { DeleteSchoolDialog, EditSchoolDialog } from "./SchoolDialogs";
 import type { Tenant, TenantStatus } from "./types";
+
+// "cancelled" is what Delete sets, so the list calls it Deleted.
+const STATUS_LABEL: Record<TenantStatus, string> = {
+  trial: "trial",
+  active: "active",
+  suspended: "suspended",
+  cancelled: "deleted",
+};
 
 const STATUS_TONE: Record<TenantStatus, string> = {
   trial: "bg-marigold-pale text-marigold-dark",
@@ -29,6 +38,13 @@ export function SchoolsPage() {
   const suspend = useMutation({ mutationFn: suspendTenant, onSuccess: invalidate });
   const activate = useMutation({ mutationFn: activateTenant, onSuccess: invalidate });
 
+  const [editing, setEditing] = useState<Tenant | null>(null);
+  const [deleting, setDeleting] = useState<Tenant | null>(null);
+  const [showDeleted, setShowDeleted] = useState(false);
+  const all = tenants.data ?? [];
+  const deletedCount = all.filter((t) => t.status === "cancelled").length;
+  const rows = showDeleted ? all : all.filter((t) => t.status !== "cancelled");
+
   return (
     <div className="space-y-6">
       <header className="flex items-end justify-between">
@@ -44,25 +60,38 @@ export function SchoolsPage() {
         <Button asChild>
           <Link to="/schools/new">
             <Plus className="h-4 w-4" />
-            Onboard school
+            Add school
           </Link>
         </Button>
       </header>
 
-      <div className="relative max-w-md">
-        <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-        <Input
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          placeholder="Search by name, subdomain, or code"
-          className="pl-9"
-        />
+      <div className="flex flex-wrap items-center gap-4">
+        <div className="relative w-full max-w-md">
+          <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+          <Input
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Search by name, subdomain, or code"
+            className="pl-9"
+          />
+        </div>
+        {deletedCount > 0 && (
+          <label className="flex cursor-pointer items-center gap-2 text-sm text-muted-foreground">
+            <input
+              type="checkbox"
+              checked={showDeleted}
+              onChange={(e) => setShowDeleted(e.target.checked)}
+              className="h-4 w-4 accent-saffron"
+            />
+            Show deleted ({deletedCount})
+          </label>
+        )}
       </div>
 
       <Card>
         <CardHeader>
-          <CardTitle>All schools ({tenants.data?.length ?? "…"})</CardTitle>
-          <CardDescription>Click a row to drill in.</CardDescription>
+          <CardTitle>All schools ({tenants.data ? rows.length : "…"})</CardTitle>
+          <CardDescription>Click a school's name to drill in.</CardDescription>
         </CardHeader>
         <CardContent className="p-0">
           {tenants.isLoading ? (
@@ -71,9 +100,15 @@ export function SchoolsPage() {
             <p className="px-6 pb-6 text-sm text-destructive">
               Could not reach the backend. Make sure the API is running on port 8000.
             </p>
-          ) : (tenants.data?.length ?? 0) === 0 ? (
+          ) : rows.length === 0 ? (
             <p className="px-6 pb-6 text-sm text-muted-foreground">
-              No schools yet. Click <strong>Onboard school</strong> to add your first tenant.
+              {all.length === 0 ? (
+                <>
+                  No schools yet. Click <strong>Add school</strong> to add your first one.
+                </>
+              ) : (
+                "No schools match."
+              )}
             </p>
           ) : (
             <div className="overflow-x-auto">
@@ -89,12 +124,14 @@ export function SchoolsPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {tenants.data!.map((t) => (
+                  {rows.map((t) => (
                     <TenantRow
                       key={t.id}
                       tenant={t}
                       onSuspend={() => suspend.mutate(t.id)}
                       onActivate={() => activate.mutate(t.id)}
+                      onEdit={() => setEditing(t)}
+                      onDelete={() => setDeleting(t)}
                     />
                   ))}
                 </tbody>
@@ -103,6 +140,9 @@ export function SchoolsPage() {
           )}
         </CardContent>
       </Card>
+
+      {editing && <EditSchoolDialog tenant={editing} onClose={() => setEditing(null)} />}
+      {deleting && <DeleteSchoolDialog tenant={deleting} onClose={() => setDeleting(null)} />}
     </div>
   );
 }
@@ -111,11 +151,16 @@ function TenantRow({
   tenant,
   onSuspend,
   onActivate,
+  onEdit,
+  onDelete,
 }: {
   tenant: Tenant;
   onSuspend: () => void;
   onActivate: () => void;
+  onEdit: () => void;
+  onDelete: () => void;
 }) {
+  const deleted = tenant.status === "cancelled";
   return (
     <tr className="border-b last:border-b-0 hover:bg-saffron-pale/30">
       <td className="px-6 py-3">
@@ -138,21 +183,40 @@ function TenantRow({
             STATUS_TONE[tenant.status],
           )}
         >
-          {tenant.status}
+          {STATUS_LABEL[tenant.status]}
         </span>
       </td>
-      <td className="px-6 py-3 text-right">
-        {tenant.status === "suspended" ? (
-          <Button variant="ghost" size="sm" onClick={onActivate}>
-            <Play className="h-3.5 w-3.5" />
-            Activate
-          </Button>
-        ) : tenant.status !== "cancelled" ? (
-          <Button variant="ghost" size="sm" onClick={onSuspend}>
-            <Pause className="h-3.5 w-3.5" />
-            Suspend
-          </Button>
-        ) : null}
+      <td className="px-6 py-3">
+        {deleted ? (
+          <p className="text-right text-xs text-muted-foreground">—</p>
+        ) : (
+          <div className="flex items-center justify-end gap-1">
+            <Button variant="ghost" size="sm" onClick={onEdit}>
+              <Pencil className="h-3.5 w-3.5" />
+              Edit
+            </Button>
+            {tenant.status === "suspended" ? (
+              <Button variant="ghost" size="sm" onClick={onActivate}>
+                <Play className="h-3.5 w-3.5" />
+                Activate
+              </Button>
+            ) : (
+              <Button variant="ghost" size="sm" onClick={onSuspend}>
+                <Pause className="h-3.5 w-3.5" />
+                Suspend
+              </Button>
+            )}
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={onDelete}
+              className="text-destructive hover:bg-destructive/10 hover:text-destructive"
+            >
+              <Trash2 className="h-3.5 w-3.5" />
+              Delete
+            </Button>
+          </div>
+        )}
       </td>
     </tr>
   );
