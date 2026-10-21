@@ -22,6 +22,16 @@ export async function updateTenant(id: number, payload: Record<string, unknown>)
   return data;
 }
 
+/** Sets a school's logo / profile image (PNG, JPG or SVG). */
+export async function uploadTenantLogo(id: number, file: File): Promise<Tenant> {
+  const form = new FormData();
+  form.append("file", file);
+  const { data } = await api.post<Tenant>(`/admin/tenants/${id}/logo`, form, {
+    headers: { "Content-Type": "multipart/form-data" },
+  });
+  return data;
+}
+
 /** Soft delete: the school is cancelled (logins blocked, data kept). */
 export async function deleteTenant(id: number): Promise<Tenant> {
   const { data } = await api.delete<Tenant>(`/admin/tenants/${id}`);

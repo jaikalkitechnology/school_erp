@@ -9,11 +9,12 @@ from __future__ import annotations
 from datetime import timedelta
 from typing import Optional
 
-from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
+from fastapi import APIRouter, Depends, File, HTTPException, Query, Request, UploadFile, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import settings
 from app.core.auth_deps import AuthPrincipal, require_super_admin
+from app.core.file_storage import save_upload
 from app.core.security import create_access_token
 from app.core.tenant_session import platform_session
 from app.models.tenant import TenantStatus
@@ -109,6 +110,36 @@ async def update_one(
         tenant_id_override=tenant_id,
     )
     return tenant
+
+
+@router.post("/{tenant_id}/logo", response_model=TenantRead)
+async def upload_logo(
+    tenant_id: int,
+    request: Request,
+    file: UploadFile = File(...),
+    session: AsyncSession = Depends(platform_session),
+    principal: AuthPrincipal = Depends(require_super_admin()),
+):
+    """Set a school's logo / profile image (PNG, JPG or SVG). The file is
+    stored in that school's own upload folder — the only place its staff
+    can read it from — and becomes the tenant's logo_url (shown in the
+    school-admin sidebar and on printed ID cards)."""
+    tenant = await get_tenant(session, tenant_id)
+    rel, _size = await save_upload(file, tenant_id, "school", "branding")
+    tenant.logo_url = rel
+    await session.commit()
+    await session.refresh(tenant)
+    await audit.record(
+        session,
+        principal=principal,
+        action="tenant.logo",
+        target_type="tenant",
+        target_id=tenant_id,
+        summary=f"Set logo for {tenant.school_name}",
+        request=request,
+        tenant_id_override=tenant_id,
+    )
+    return await get_tenant(session, tenant_id)
 
 
 @router.delete("/{tenant_id}", response_model=TenantRead)
