@@ -48,6 +48,7 @@ import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { logout as logoutApi } from "@/lib/auth-api";
 import { useAuth } from "@/stores/auth";
+import { NotificationBell } from "./NotificationBell";
 
 // ---- Nav model -----------------------------------------------------------
 // A nav item is either a leaf (has a route) or a group (renders as a
@@ -344,6 +345,32 @@ function Highlight({ text, query }: { text: string; query: string }) {
   );
 }
 
+/** Where the user is, for the top bar: "Fee Management › Fee Collection".
+ *  Exact path (and ?tab=) wins; otherwise the deepest nav path that
+ *  prefixes the URL (eg. /students/42 → Students). */
+function findCrumb(
+  items: NavItem[], pathname: string, search: string,
+): { group?: string; label: string } | null {
+  const tab = new URLSearchParams(search).get("tab");
+  let exact: { group?: string; label: string } | null = null;
+  let prefix: { group?: string; label: string; len: number } | null = null;
+  for (const item of items) {
+    const group = item.kind === "group" ? item.label : undefined;
+    const leaves = item.kind === "leaf" ? [item] : item.children;
+    for (const l of leaves) {
+      const [path, qs] = l.to.split("?");
+      if (path === pathname) {
+        const leafTab = qs ? new URLSearchParams(qs).get("tab") : null;
+        if (leafTab && leafTab === tab) return { group, label: l.label };
+        if (!exact) exact = { group, label: l.label };
+      } else if (pathname.startsWith(path + "/") && (!prefix || path.length > prefix.len)) {
+        prefix = { group, label: l.label, len: path.length };
+      }
+    }
+  }
+  return exact ?? (prefix && { group: prefix.group, label: prefix.label });
+}
+
 const leafClass = ({ isActive }: { isActive: boolean }) =>
   cn(
     "flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors",
@@ -476,6 +503,10 @@ export function SchoolAdminLayout() {
   };
 
   const currentPath = location.pathname;
+  const crumb = useMemo(
+    () => findCrumb(nav, location.pathname, location.search),
+    [location.pathname, location.search],
+  );
 
   const sidebarBody = (
     <>
@@ -575,27 +606,7 @@ export function SchoolAdminLayout() {
   );
 
   return (
-    <div className="flex h-full flex-col bg-ivory md:grid md:grid-cols-[260px_1fr]">
-      {/* Mobile top bar — hamburger + school label */}
-      <header className="flex items-center gap-3 border-b border-saffron-pale bg-warm-white px-4 py-3 md:hidden">
-        <button
-          type="button"
-          className="rounded-md p-2 text-indigo-dark hover:bg-saffron-pale/60"
-          onClick={() => setMobileOpen(true)}
-          aria-label="Open menu"
-        >
-          <Menu className="h-5 w-5" />
-        </button>
-        <div className="min-w-0 flex-1">
-          <p className="truncate font-display text-sm font-semibold text-indigo-dark">
-            {user?.school_name ?? "School Admin"}
-          </p>
-          <p className="truncate font-mono text-[10px] uppercase tracking-widest text-saffron-dark">
-            {user?.tenant_subdomain ?? "your-school"}.jaikalki.com
-          </p>
-        </div>
-      </header>
-
+    <div className="flex h-full flex-col bg-ivory md:grid md:grid-cols-[260px_1fr] md:grid-rows-1">
       {/* Sidebar — permanent on md+, drawer on mobile */}
       <aside className="hidden h-full md:flex md:flex-col md:border-r md:border-saffron-pale md:bg-warm-white md:px-5 md:py-7">
         {sidebarBody}
@@ -628,9 +639,47 @@ export function SchoolAdminLayout() {
         {sidebarBody}
       </aside>
 
-      <main className="min-w-0 flex-1 overflow-y-auto px-4 py-4 md:px-10 md:py-8">
-        <Outlet />
-      </main>
+      {/* Content column: the top bar sits outside the scrolling <main>,
+          so it stays pinned while the page scrolls. */}
+      <div className="flex min-h-0 min-w-0 flex-1 flex-col">
+        <header className="z-30 flex h-14 shrink-0 items-center gap-3 border-b border-saffron-pale bg-warm-white px-3 md:px-10">
+          <button
+            type="button"
+            className="rounded-md p-2 text-indigo-dark hover:bg-saffron-pale/60 md:hidden"
+            onClick={() => setMobileOpen(true)}
+            aria-label="Open menu"
+          >
+            <Menu className="h-5 w-5" />
+          </button>
+
+          {/* Phone: page + school. Desktop: breadcrumb. */}
+          <div className="min-w-0 flex-1 md:hidden">
+            <p className="truncate font-display text-sm font-semibold text-indigo-dark">
+              {crumb?.label ?? user?.school_name ?? "School Admin"}
+            </p>
+            <p className="truncate text-[11px] text-muted-foreground">
+              {user?.school_name ?? "School Admin"}
+            </p>
+          </div>
+          <nav aria-label="Breadcrumb" className="hidden min-w-0 flex-1 items-center gap-1.5 text-sm md:flex">
+            {crumb?.group && (
+              <>
+                <span className="truncate text-muted-foreground">{crumb.group}</span>
+                <ChevronRight className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+              </>
+            )}
+            <span className="truncate font-semibold text-indigo-dark">
+              {crumb?.label ?? user?.school_name ?? "School Admin"}
+            </span>
+          </nav>
+
+          <NotificationBell />
+        </header>
+
+        <main className="min-w-0 flex-1 overflow-y-auto px-4 py-4 md:px-10 md:py-8">
+          <Outlet />
+        </main>
+      </div>
     </div>
   );
 }
