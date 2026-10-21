@@ -48,6 +48,9 @@ import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { logout as logoutApi } from "@/lib/auth-api";
 import { useAuth } from "@/stores/auth";
+import { useQuery } from "@tanstack/react-query";
+import { SchoolLogo } from "@/components/SchoolLogo";
+import { fetchBranding } from "@/lib/branding-api";
 import { NotificationBell } from "./NotificationBell";
 
 // ---- Nav model -----------------------------------------------------------
@@ -502,6 +505,15 @@ export function SchoolAdminLayout() {
     navigate("/login", { replace: true });
   };
 
+  // Logo + current school name (School Profile changes show up without
+  // signing out again).
+  const branding = useQuery({
+    queryKey: ["branding"],
+    queryFn: fetchBranding,
+    staleTime: 5 * 60_000,
+  });
+  const schoolName = branding.data?.school_name ?? user?.school_name ?? "School Admin";
+
   const currentPath = location.pathname;
   const crumb = useMemo(
     () => findCrumb(nav, location.pathname, location.search),
@@ -510,13 +522,20 @@ export function SchoolAdminLayout() {
 
   const sidebarBody = (
     <>
-      <div className="mb-6">
-        <p className="font-mono text-[11px] uppercase tracking-[0.22em] text-saffron-dark">
-          {user?.tenant_subdomain ?? "your-school"}.jaikalki.com
-        </p>
-        <p className="mt-1 font-display text-lg font-semibold text-indigo-dark">
-          {user?.school_name ?? "School Admin"}
-        </p>
+      <div className="mb-6 flex items-center gap-3">
+        <SchoolLogo
+          src={branding.data?.logo_url}
+          alt={`${schoolName} logo`}
+          className="h-12 w-12 shrink-0 rounded-lg border border-saffron-pale bg-white object-contain p-1"
+        />
+        <div className="min-w-0">
+          <p className="truncate font-mono text-[11px] uppercase tracking-[0.22em] text-saffron-dark">
+            {user?.tenant_subdomain ?? "your-school"}.jaikalki.com
+          </p>
+          <p className="mt-1 font-display text-lg font-semibold leading-tight text-indigo-dark">
+            {schoolName}
+          </p>
+        </div>
       </div>
 
       {visibleNav.length > 0 && (
@@ -655,10 +674,10 @@ export function SchoolAdminLayout() {
           {/* Phone: page + school. Desktop: breadcrumb. */}
           <div className="min-w-0 flex-1 md:hidden">
             <p className="truncate font-display text-sm font-semibold text-indigo-dark">
-              {crumb?.label ?? user?.school_name ?? "School Admin"}
+              {crumb?.label ?? schoolName}
             </p>
             <p className="truncate text-[11px] text-muted-foreground">
-              {user?.school_name ?? "School Admin"}
+              {schoolName}
             </p>
           </div>
           <nav aria-label="Breadcrumb" className="hidden min-w-0 flex-1 items-center gap-1.5 text-sm md:flex">
@@ -669,7 +688,7 @@ export function SchoolAdminLayout() {
               </>
             )}
             <span className="truncate font-semibold text-indigo-dark">
-              {crumb?.label ?? user?.school_name ?? "School Admin"}
+              {crumb?.label ?? schoolName}
             </span>
           </nav>
 

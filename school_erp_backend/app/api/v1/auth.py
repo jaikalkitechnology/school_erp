@@ -123,6 +123,21 @@ async def me(
     return await build_current_user(session, principal.user, principal.tenant)
 
 
+@router.get("/branding")
+async def branding(principal: AuthPrincipal = Depends(get_current_principal)):
+    """School name + logo + colours for the signed-in user's school. Open
+    to every signed-in role (unlike /school-admin/settings), so the admin
+    sidebar can show the logo to librarians, accountants, etc."""
+    t = principal.tenant
+    if t is None:
+        return {"school_name": None, "logo_url": None, "primary_color": None}
+    return {
+        "school_name": t.school_name,
+        "logo_url": t.logo_url,
+        "primary_color": t.primary_color,
+    }
+
+
 # ---- multi-child parent ----------------------------------------------------
 
 
