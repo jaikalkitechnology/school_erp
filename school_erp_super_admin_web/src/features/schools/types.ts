@@ -53,6 +53,11 @@ export interface CreateTenantPayload {
   plan_code: string;
   city?: string;
   state?: string;
+  pincode?: string;
+  phone?: string;
+  email?: string;
   affiliation_board?: string;
   medium?: string;
+  primary_color?: string;
+  secondary_color?: string;
 }
