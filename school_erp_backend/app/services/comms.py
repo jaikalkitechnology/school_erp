@@ -497,7 +497,7 @@ async def create_announcement(
     tenant_id: int,
     author_user_id: int,
     payload: AnnouncementWrite,
-) -> tuple[Announcement, int, int, int]:
+) -> tuple[Announcement, int, int, int, int]:
     """Create the announcement row + (if publishing) fan it out to the
     resolved audience AND fire FCM pushes immediately.
 
@@ -562,12 +562,14 @@ async def create_announcement(
     # honest whether or not a separate push worker is running.
     push_sent = 0
     push_failed = 0
+    push_skipped = 0
     if push_outbox_ids:
         result = await drain_pending_push_outbox_ids(session, push_outbox_ids)
         push_sent = result.sent
         push_failed = result.failed
+        push_skipped = result.skipped
 
-    return obj, fanned, push_sent, push_failed
+    return obj, fanned, push_sent, push_failed, push_skipped
 
 
 def _channel_override_for_announcement(

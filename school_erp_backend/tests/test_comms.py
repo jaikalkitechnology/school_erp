@@ -290,3 +290,24 @@ async def test_mark_all_notifications_read(demo_admin_client, class_with_parent)
         assert clear.json()["marked"] >= 2
         leftover = await parent_ac.get("/v1/notifications", params={"only_unread": True})
         assert leftover.json() == []
+
+
+@pytest.mark.asyncio
+async def test_publish_reports_why_push_did_not_go_out(demo_admin_client):
+    """With FCM off (no service-account JSON in tests) the publish result
+    must say so, instead of looking like "no phones registered"."""
+    status = await demo_admin_client.get("/v1/school-admin/communication/push-status")
+    assert status.status_code == 200, status.text
+    assert status.json()["available"] is False
+    assert "not found" in status.json()["reason"]
+    assert status.json()["active_devices"] == 0
+
+    r = await demo_admin_client.post(
+        "/v1/school-admin/communication/announcements",
+        json={"title": "Push check", "body": "Hello", "audience": "parents", "publish": True, "send_push": True},
+    )
+    assert r.status_code == 201, r.text
+    body = r.json()
+    assert body["push_sent"] == 0
+    assert body["push_skipped"] >= 1
+    assert body["push_unavailable_reason"]

@@ -80,6 +80,20 @@ class PublishResult(BaseModel):
     # Surfaces in the admin UI as " - N pushes failed" so silent
     # rot is impossible to miss.
     push_failed: int = 0
+    # Recipients who got no push: no phone signed in to the app, or FCM
+    # is off on the server (then push_unavailable_reason says why).
+    push_skipped: int = 0
+    push_unavailable_reason: Optional[str] = None
+
+
+class PushStatus(BaseModel):
+    """Whether this server can send phone pushes, and how many phones in
+    the school have registered for them."""
+
+    available: bool
+    reason: Optional[str] = None
+    active_devices: int
+    users_with_devices: int
 
 
 # ---- Notifications ---------------------------------------------------------

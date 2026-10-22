@@ -11,6 +11,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.auth_deps import AuthPrincipal, get_current_principal, require_roles
 from app.core.tenant_session import platform_session, tenant_scoped_session
 from app.models.comms import AnnouncementAudience, DeliveryStatus
+from app.services import fcm
 from app.schemas.comms import (
     AnnouncementRead,
     AnnouncementWrite,
@@ -19,6 +20,7 @@ from app.schemas.comms import (
     NotificationOutboxRead,
     NotificationRead,
     PublishResult,
+    PushStatus,
     TemplateRead,
     TemplateWrite,
 )
@@ -111,7 +113,7 @@ async def create_announcement_route(
     principal: AuthPrincipal = Depends(_school_admin),
     session: AsyncSession = Depends(tenant_scoped_session),
 ):
-    obj, fanned, push_sent, push_failed = await create_announcement(
+    obj, fanned, push_sent, push_failed, push_skipped = await create_announcement(
         session, principal.tenant_id, principal.user_id, payload
     )
     return PublishResult(
@@ -119,6 +121,36 @@ async def create_announcement_route(
         fanned_out_to=fanned,
         push_sent=push_sent,
         push_failed=push_failed,
+        push_skipped=push_skipped,
+        push_unavailable_reason=None if fcm.is_available() else fcm.unavailable_reason(),
+    )
+
+
+@sa_router.get("/push-status", response_model=PushStatus)
+async def push_status_route(
+    principal: AuthPrincipal = Depends(get_current_principal),
+    session: AsyncSession = Depends(tenant_scoped_session),
+):
+    """Can this server send phone pushes, and how many phones in the
+    school are signed in to the app to receive them?"""
+    from sqlalchemy import func, select
+
+    from app.models.auth_extras import UserDevice
+
+    active, users = (
+        await session.execute(
+            select(func.count(UserDevice.id), func.count(func.distinct(UserDevice.user_id))).where(
+                UserDevice.tenant_id == principal.tenant_id,
+                UserDevice.is_active.is_(True),
+            )
+        )
+    ).one()
+    available = fcm.is_available()
+    return PushStatus(
+        available=available,
+        reason=None if available else fcm.unavailable_reason(),
+        active_devices=active,
+        users_with_devices=users,
     )
 
 

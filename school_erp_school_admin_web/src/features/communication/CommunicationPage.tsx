@@ -12,6 +12,7 @@ import {
   bulkDeleteAnnouncements,
   createAnnouncement,
   deleteAnnouncement,
+  getPushStatus,
   listAnnouncements,
   listInboxMessages,
   listOutbox,
@@ -25,6 +26,7 @@ import {
   type DeliveryStatus,
   type DirectMessage,
 } from "./api";
+import type { PushStatus } from "./api";
 
 const AUDIENCES: { value: Audience; label: string }[] = [
   { value: "all", label: "Everyone" },
@@ -324,7 +326,8 @@ function AnnouncementsPanel() {
   // Default on: most announcements should buzz the phone.
   const [sendPush, setSendPush] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [lastResult, setLastResult] = useState<string | null>(null);
+  const [lastResult, setLastResult] = useState<{ text: string; warn: boolean } | null>(null);
+  const pushStatus = useQuery({ queryKey: ["push-status"], queryFn: getPushStatus, staleTime: 60_000 });
   // Per-row ticks for bulk delete. Cleared after each successful mutation.
   const [selected, setSelected] = useState<Set<number>>(new Set());
   const [deleteError, setDeleteError] = useState<string | null>(null);
@@ -338,9 +341,10 @@ function AnnouncementsPanel() {
         next.delete(res.deleted);
         return next;
       });
-      setLastResult(
-        `Deleted #${res.deleted} — cleared ${res.notifications_removed} inbox entries.`,
-      );
+      setLastResult({
+        text: `Deleted #${res.deleted} — cleared ${res.notifications_removed} inbox entries.`,
+        warn: false,
+      });
       qc.invalidateQueries({ queryKey: ["announcements"] });
     },
     onError: (e: any) =>
@@ -352,11 +356,12 @@ function AnnouncementsPanel() {
     onSuccess: (res) => {
       setDeleteError(null);
       setSelected(new Set());
-      setLastResult(
-        `Deleted ${res.deleted.length} announcements — cleared ${res.notifications_removed} inbox entries${
+      setLastResult({
+        text: `Deleted ${res.deleted.length} announcements — cleared ${res.notifications_removed} inbox entries${
           res.skipped.length ? ` (skipped ${res.skipped.length})` : ""
         }.`,
-      );
+        warn: false,
+      });
       qc.invalidateQueries({ queryKey: ["announcements"] });
     },
     onError: (e: any) =>
@@ -410,8 +415,12 @@ function AnnouncementsPanel() {
     onSuccess: (res) => {
       const inAppLine = `Notified ${res.fanned_out_to} user${res.fanned_out_to === 1 ? "" : "s"} in-app`;
       let pushLine: string;
+      let warn = false;
       if (!sendPush) {
         pushLine = " · push intentionally off";
+      } else if (res.push_unavailable_reason) {
+        warn = true;
+        pushLine = ` · phone push NOT sent: the server's Firebase isn't set up (${res.push_unavailable_reason})`;
       } else if (res.push_sent > 0) {
         pushLine = `, pushed to ${res.push_sent} phone${res.push_sent === 1 ? "" : "s"}`;
         if (res.push_failed > 0) {
@@ -420,9 +429,11 @@ function AnnouncementsPanel() {
       } else if (res.push_failed > 0) {
         pushLine = ` · ${res.push_failed} push send${res.push_failed === 1 ? "" : "s"} failed`;
       } else {
-        pushLine = " · push skipped (no active devices for the audience)";
+        warn = true;
+        pushLine = " · no phone push: none of these users has signed in to the mobile app on a phone yet";
       }
-      setLastResult(`Published. ${inAppLine}${pushLine}.`);
+      setLastResult({ text: `Published. ${inAppLine}${pushLine}.`, warn });
+      qc.invalidateQueries({ queryKey: ["push-status"] });
       setTitle(""); setBody(""); setPinned(false); setAudienceId("");
       // Don't reset sendPush — admin's preference stays sticky.
       qc.invalidateQueries({ queryKey: ["announcements"] });
@@ -484,9 +495,12 @@ function AnnouncementsPanel() {
                 </span>
               </span>
             </label>
+            {sendPush && pushStatus.data && <PushStatusLine status={pushStatus.data} />}
           </div>
           {error && <p className="text-sm text-destructive">{error}</p>}
-          {lastResult && <p className="text-sm text-teal-dark">{lastResult}</p>}
+          {lastResult && (
+            <p className={cn("text-sm", lastResult.warn ? "text-marigold-dark" : "text-teal-dark")}>{lastResult.text}</p>
+          )}
           <Button onClick={() => create.mutate()} disabled={!title || !body || create.isPending}>
             Publish
           </Button>
@@ -825,5 +839,31 @@ function Select<T extends string | number>({
         ))}
       </select>
     </div>
+  );
+}
+
+/** Under "Also send push notification": can the server push at all, and
+ *  how many phones in the school have signed in to the app. */
+function PushStatusLine({ status }: { status: PushStatus }) {
+  if (!status.available) {
+    return (
+      <p className="rounded-md border border-destructive/30 bg-destructive/5 px-3 py-2 text-xs text-destructive">
+        <strong>Phone push is off on the server.</strong> Announcements still reach the app's
+        Notifications page, but phones won't buzz. Reason: {status.reason ?? "Firebase not configured"}.
+      </p>
+    );
+  }
+  if (status.active_devices === 0) {
+    return (
+      <p className="rounded-md border border-marigold/40 bg-marigold-pale/40 px-3 py-2 text-xs text-indigo-dark">
+        Push is ready, but no phone has signed in to the Jaikalki app yet, so nobody will get a push.
+      </p>
+    );
+  }
+  return (
+    <p className="text-xs text-teal-dark">
+      Push ready · {status.active_devices} phone{status.active_devices === 1 ? "" : "s"} registered for{" "}
+      {status.users_with_devices} user{status.users_with_devices === 1 ? "" : "s"}.
+    </p>
   );
 }
