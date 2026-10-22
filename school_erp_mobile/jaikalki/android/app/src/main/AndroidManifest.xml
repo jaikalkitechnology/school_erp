@@ -31,6 +31,17 @@
             android:name="com.google.firebase.messaging.default_notification_channel_id"
             android:value="jaikalki_default" />
 
+        <!-- Small status-bar icon + accent for pushes FCM shows while the
+             app is in the background. Must be a white-on-transparent
+             silhouette; the full-colour launcher icon renders as a white
+             square. The same drawable is used for foreground banners. -->
+        <meta-data
+            android:name="com.google.firebase.messaging.default_notification_icon"
+            android:resource="@drawable/ic_notification" />
+        <meta-data
+            android:name="com.google.firebase.messaging.default_notification_color"
+            android:resource="@color/notification_accent" />
+
         <!-- Google Maps API key. The release build will refuse to draw
              tiles until a real key with the "Maps SDK for Android" API
              enabled is dropped here. The placeholder lets local builds

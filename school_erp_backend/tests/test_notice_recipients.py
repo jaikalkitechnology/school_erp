@@ -111,3 +111,41 @@ async def test_announcement_to_particular_parents(super_admin_token):
     finally:
         await admin.aclose()
         await parent.aclose()
+
+
+@pytest.mark.asyncio
+async def test_push_carries_link_for_tap(super_admin_token, monkeypatch):
+    """With FCM up, an announcement push reaches the parent's phone and
+    carries the deeplink the app uses to open the right page on tap."""
+    from app.services import fcm
+
+    sent: list[dict] = []
+    monkeypatch.setattr(fcm, "is_available", lambda: True)
+    monkeypatch.setattr(
+        fcm, "send_push",
+        lambda *, token, title, body, data=None: sent.append({"token": token, "title": title, "data": data}) or "m1",
+    )
+
+    admin = await _client_for(DEFAULT_SCHOOL_ADMIN_EMAIL, DEFAULT_SCHOOL_ADMIN_PASSWORD)
+    parent = await _client_for(DEMO_PARENT_EMAIL, DEFAULT_PARENT_PASSWORD)
+    try:
+        r = await parent.post("/v1/auth/devices/register", json={"fcm_token": "parent-phone-token-123", "platform": "android"})
+        assert r.status_code == 201, r.text
+        parent_uid = (await parent.get("/v1/auth/me")).json()["id"]
+
+        r = await admin.post(
+            "/v1/school-admin/communication/announcements",
+            json={"title": "Bus late", "body": "Route 3 is 20 min late", "audience": "parents",
+                  "publish": True, "send_push": True, "recipient_user_ids": [parent_uid]},
+        )
+        assert r.status_code == 201, r.text
+        assert r.json()["push_sent"] == 1, r.json()
+
+        mine = [s for s in sent if s["token"] == "parent-phone-token-123"]
+        assert len(mine) == 1
+        data = mine[0]["data"]
+        assert data["deeplink"] == f"/announcements/{r.json()['announcement_id']}"
+        assert data["kind"] == "announcement" and data["notification_id"]
+    finally:
+        await admin.aclose()
+        await parent.aclose()

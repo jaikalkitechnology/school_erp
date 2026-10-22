@@ -303,6 +303,9 @@ async def notify(
 
     notifs = 0
     push_outbox_rows: list[NotificationOutbox] = []
+    # (in-app notification, outbox row) made for the same person, linked
+    # once ids exist after the flush below.
+    to_link: list[tuple[Notification, NotificationOutbox]] = []
     for user in recipients:
         notification: Optional[Notification] = None
         if Channel.IN_APP.value in channels:
@@ -345,22 +348,15 @@ async def notify(
                 error=None if queued else "missing address",
             )
             session.add(outbox_row)
+            if notification is not None:
+                to_link.append((notification, outbox_row))
             if queued and ch == Channel.PUSH.value:
                 push_outbox_rows.append(outbox_row)
-        # Link outbox rows to the freshly-created notification once flushed.
     await session.flush()
-    if notifs:
-        # Set notification_id on outbox rows that were just queued for the user.
-        latest_id_by_user: dict[int, int] = {}
-        for n in (
-            await session.execute(
-                select(Notification).where(Notification.tenant_id == tenant_id)
-                .order_by(Notification.id.desc()).limit(notifs * 2)
-            )
-        ).scalars().all():
-            if n.recipient_user_id not in latest_id_by_user:
-                latest_id_by_user[n.recipient_user_id] = n.id
-        # Best-effort link (only the newest notif per user counts).
+    # Point each outbox row at its in-app notification, so a push can
+    # carry that notification's deeplink (the app opens it on tap).
+    for notification, outbox_row in to_link:
+        outbox_row.notification_id = notification.id
     await session.commit()
     # After the commit above the queued rows have ids — return them
     # so the caller can pass them to push_dispatch and fire FCM
