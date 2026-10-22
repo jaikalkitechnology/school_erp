@@ -7,6 +7,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 import { activateTenant, listTenants, suspendTenant } from "./api";
+import { SchoolAvatar } from "./SchoolAvatar";
 import { DeleteSchoolDialog, EditSchoolDialog } from "./SchoolDialogs";
 import type { Tenant, TenantStatus } from "./types";
 
@@ -164,11 +165,16 @@ function TenantRow({
   return (
     <tr className="border-b last:border-b-0 hover:bg-saffron-pale/30">
       <td className="px-6 py-3">
-        <Link to={`/schools/${tenant.id}`} className="font-medium text-indigo-dark hover:underline">
-          {tenant.school_name}
-        </Link>
-        <div className="text-xs text-muted-foreground">
-          {[tenant.city, tenant.state].filter(Boolean).join(", ") || tenant.school_code}
+        <div className="flex items-center gap-3">
+          <SchoolAvatar tenant={tenant} editable={!deleted} />
+          <div className="min-w-0">
+            <Link to={`/schools/${tenant.id}`} className="font-medium text-indigo-dark hover:underline">
+              {tenant.school_name}
+            </Link>
+            <div className="text-xs text-muted-foreground">
+              {[tenant.city, tenant.state].filter(Boolean).join(", ") || tenant.school_code}
+            </div>
+          </div>
         </div>
       </td>
       <td className="px-4 py-3 font-mono text-xs text-saffron-dark">{tenant.subdomain}</td>
