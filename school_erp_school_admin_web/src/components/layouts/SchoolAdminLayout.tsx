@@ -574,10 +574,7 @@ export function SchoolAdminLayout() {
           fallback={<JaikalkiIcon className="h-12 w-12 shrink-0 rounded-xl shadow" />}
         />
         <div className="min-w-0">
-          <p className="truncate font-mono text-[11px] uppercase tracking-[0.22em] text-saffron-dark">
-            {user?.tenant_subdomain ?? "your-school"}.jaikalki.com
-          </p>
-          <p className="mt-1 font-display text-lg font-semibold leading-tight text-indigo-dark">
+          <p className="font-display text-lg font-semibold leading-tight text-indigo-dark">
             {schoolName}
           </p>
         </div>
