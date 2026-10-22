@@ -181,6 +181,17 @@ async def my_payslips(
 # ---------------------------------------------------------------------------
 
 
+# Roles that count as "staff" for notices (feed + recipient picker).
+STAFF_NOTICE_ROLES = frozenset({
+    "class_teacher", "subject_teacher", "coordinator", "teacher",
+    "principal", "vice_principal", "hod", "management",
+    "school_admin", "office_admin", "office_staff", "librarian",
+    "transport_manager", "accountant", "accounts", "payroll",
+    "receptionist", "data_entry_operator", "supervisor",
+    "visitor_desk", "hostel_warden",
+})
+
+
 def _notice_audience_for(roles: list[str]) -> list[str]:
     """Which notice-audience buckets the current user should see."""
     role_set = set(roles)
@@ -189,14 +200,7 @@ def _notice_audience_for(roles: list[str]) -> list[str]:
         buckets.append("parents")
     if "student" in role_set:
         buckets.append("students")
-    if role_set & {
-        "class_teacher", "subject_teacher", "coordinator", "teacher",
-        "principal", "vice_principal", "hod", "management",
-        "school_admin", "office_admin", "office_staff", "librarian",
-        "transport_manager", "accountant", "accounts", "payroll",
-        "receptionist", "data_entry_operator", "supervisor",
-        "visitor_desk", "hostel_warden",
-    }:
+    if role_set & STAFF_NOTICE_ROLES:
         buckets.append("staff")
     return buckets
 
@@ -222,10 +226,12 @@ async def list_notices(
                 or_(Notice.expires_at.is_(None), Notice.expires_at >= now),
             )
             .order_by(Notice.is_pinned.desc(), Notice.published_at.desc())
-            .limit(100)
+            .limit(500)
         )
     ).scalars().all()
-    return [_row_to_dict(r) for r in rows]
+    # A notice sent to particular people is shown only to them.
+    rows = [r for r in rows if not r.recipient_user_ids or principal.user_id in r.recipient_user_ids]
+    return [_row_to_dict(r) for r in rows[:100]]
 
 
 @router.get("/sports/houses")

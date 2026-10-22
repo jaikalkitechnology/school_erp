@@ -1,4 +1,5 @@
 import { SimpleCrudPage, type FieldSpec } from "./_crud";
+import { NoticeRecipients } from "./NoticeRecipients";
 
 const FIELDS: FieldSpec[] = [
   { key: "title", label: "Title", required: true },
@@ -12,6 +13,21 @@ const FIELDS: FieldSpec[] = [
       { value: "parents", label: "Parents" },
       { value: "students", label: "Students" },
     ],
+    resets: ["recipient_user_ids"],
+  },
+  {
+    key: "recipient_user_ids",
+    label: "Send to",
+    kind: "json",
+    renderInput: ({ value, values, onChange, invalid }) => (
+      <NoticeRecipients audience={values.audience} value={value} onChange={onChange} invalid={invalid} />
+    ),
+    validate: (raw) => (raw === "[]" ? "Pick at least one person, or choose All." : null),
+    render: (row) => {
+      const ids = Array.isArray(row.recipient_user_ids) ? row.recipient_user_ids : [];
+      if (ids.length) return `${ids.length} ${ids.length === 1 ? "person" : "people"}`;
+      return row.audience && row.audience !== "all" ? `All ${row.audience}` : "Everyone";
+    },
   },
   { key: "is_pinned", label: "Pinned", kind: "checkbox" },
   { key: "published_at", label: "Publish at", kind: "datetime" },
