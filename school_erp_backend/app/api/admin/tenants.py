@@ -7,9 +7,11 @@ All routes are gated behind ``require_super_admin`` and use the unfiltered
 from __future__ import annotations
 
 from datetime import timedelta
+from pathlib import Path
 from typing import Optional
 
 from fastapi import APIRouter, Depends, File, HTTPException, Query, Request, UploadFile, status
+from fastapi.responses import FileResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import settings
@@ -140,6 +142,23 @@ async def upload_logo(
         tenant_id_override=tenant_id,
     )
     return await get_tenant(session, tenant_id)
+
+
+@router.get("/{tenant_id}/logo")
+async def get_logo(tenant_id: int, session: AsyncSession = Depends(platform_session)):
+    """Serve a school's logo to the super admin. /v1/uploads only reads
+    from the caller's own tenant folder, so the Schools list needs this
+    to show other schools' images."""
+    tenant = await get_tenant(session, tenant_id)
+    if not tenant.logo_url:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="No logo")
+    base = (Path(settings.UPLOAD_DIR) / f"tenant_{tenant_id}").resolve()
+    prefix = f"tenant_{tenant_id}/"
+    rel = tenant.logo_url[len(prefix):] if tenant.logo_url.startswith(prefix) else tenant.logo_url
+    target = (base / rel).resolve()
+    if not str(target).startswith(str(base) + "/") or not target.is_file():
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Logo file not found")
+    return FileResponse(target)
 
 
 @router.delete("/{tenant_id}", response_model=TenantRead)

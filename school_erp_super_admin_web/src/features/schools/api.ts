@@ -32,6 +32,12 @@ export async function uploadTenantLogo(id: number, file: File): Promise<Tenant> 
   return data;
 }
 
+/** A school's logo as a Blob (the endpoint needs the bearer, so no <img src>). */
+export async function fetchTenantLogo(id: number): Promise<Blob> {
+  const { data } = await api.get<Blob>(`/admin/tenants/${id}/logo`, { responseType: "blob" });
+  return data;
+}
+
 /** Soft delete: the school is cancelled (logins blocked, data kept). */
 export async function deleteTenant(id: number): Promise<Tenant> {
   const { data } = await api.delete<Tenant>(`/admin/tenants/${id}`);
