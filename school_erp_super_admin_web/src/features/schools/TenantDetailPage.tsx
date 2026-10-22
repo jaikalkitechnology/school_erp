@@ -7,6 +7,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { cn } from "@/lib/utils";
+import { AdminLoginCard } from "./AdminLoginCard";
 import {
   activateTenant,
   changePlan,
@@ -115,6 +116,7 @@ export function TenantDetailPage() {
       </nav>
 
       {tab === "Info" && <InfoTab tenant={t} />}
+      {tab === "Info" && <AdminLoginCard tenant={t} />}
       {tab === "Usage" && <UsageTab usage={usage.data} loading={usage.isLoading} />}
       {tab === "Audit" && <AuditTab rows={audit.data ?? []} loading={audit.isLoading} />}
 

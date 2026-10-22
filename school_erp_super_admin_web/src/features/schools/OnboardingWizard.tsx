@@ -8,6 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { cn } from "@/lib/utils";
 import { createTenant, listPlans, uploadTenantLogo } from "./api";
+import { AdminLoginFields, EMPTY_ADMIN_LOGIN, adminLoginValid, type AdminLoginForm } from "./AdminLoginFields";
 import { ColorField, HEX } from "./ColorField";
 import { LocationFields } from "./LocationFields";
 import type { CreateTenantPayload } from "./types";
@@ -23,7 +24,7 @@ const STEPS: Step[] = [
   { id: "plan", title: "Subscription Plan", description: "Pick a plan; trial starts immediately." },
   { id: "branding", title: "Branding", description: "Colors and logo." },
   { id: "academic", title: "Academic Setup", description: "Affiliation, medium." },
-  { id: "admin", title: "Admin Account", description: "Created in Phase 2 seed; left as placeholder here." },
+  { id: "admin", title: "Admin Account", description: "The school admin's own login." },
   { id: "modules", title: "Modules", description: "Modules included with the plan." },
   { id: "review", title: "Review & Launch", description: "Confirm and create the tenant." },
 ];
@@ -72,6 +73,7 @@ export function OnboardingWizard() {
   const plans = useQuery({ queryKey: ["plans"], queryFn: listPlans });
   const [stepIndex, setStepIndex] = useState(0);
   const [form, setForm] = useState<FormState>(INITIAL);
+  const [admin, setAdmin] = useState<AdminLoginForm>(EMPTY_ADMIN_LOGIN);
   const [error, setError] = useState<string | null>(null);
 
   // Profile image: picked here, previewed locally, uploaded into the new
@@ -163,6 +165,7 @@ export function OnboardingWizard() {
       );
     if (stepIndex === 1) return Boolean(form.plan_code);
     if (stepIndex === 2) return !brandErrors.primary_color && !brandErrors.secondary_color;
+    if (stepIndex === 4) return adminLoginValid(admin);
     return true;
   })();
 
@@ -182,6 +185,11 @@ export function OnboardingWizard() {
       medium: form.medium || undefined,
       primary_color: form.primary_color || undefined,
       secondary_color: form.secondary_color || undefined,
+      admin: {
+        full_name: admin.full_name.trim(),
+        email: admin.email.trim().toLowerCase(),
+        password: admin.password,
+      },
     });
   };
 
@@ -366,9 +374,13 @@ export function OnboardingWizard() {
             )}
 
             {stepIndex === 4 && (
-              <div className="rounded-md border border-dashed border-saffron-pale bg-saffron-pale/40 p-4 text-sm text-indigo-dark">
-                The school admin user is created automatically the first time the school admin signs in via OTP.
-                For now Phase 2 seeds <code className="font-mono">admin@demo.school / School@123</code> for the demo tenant.
+              <div className="space-y-4">
+                <AdminLoginFields idPrefix="onboard-admin" value={admin} onChange={setAdmin} />
+                <p className="rounded-md border border-dashed border-saffron-pale bg-saffron-pale/40 p-3 text-sm text-indigo-dark">
+                  The admin signs in to the school admin panel with School{" "}
+                  <code className="font-mono">{form.subdomain || "<subdomain>"}</code>, this email and this password.
+                  Share the password with them privately; you can reset it later from the school's page.
+                </p>
               </div>
             )}
 
@@ -388,7 +400,7 @@ export function OnboardingWizard() {
             )}
 
             {stepIndex === 6 && (
-              <ReviewBlock form={form} planName={selectedPlan?.name ?? form.plan_code} logoUrl={logoUrl} />
+              <ReviewBlock form={form} admin={admin} planName={selectedPlan?.name ?? form.plan_code} logoUrl={logoUrl} />
             )}
 
             {error && <p className="text-sm text-destructive">{error}</p>}
@@ -530,7 +542,17 @@ function Field({
   );
 }
 
-function ReviewBlock({ form, planName, logoUrl }: { form: FormState; planName: string; logoUrl: string | null }) {
+function ReviewBlock({
+  form,
+  admin,
+  planName,
+  logoUrl,
+}: {
+  form: FormState;
+  admin: AdminLoginForm;
+  planName: string;
+  logoUrl: string | null;
+}) {
   const rows = [
     ["School", form.school_name],
     ["Code", form.school_code],
@@ -541,6 +563,9 @@ function ReviewBlock({ form, planName, logoUrl }: { form: FormState; planName: s
     ["Location", [form.city, form.state, form.pincode].filter(Boolean).join(", ") || "—"],
     ["Contact", [form.phone, form.email].filter(Boolean).join(" · ") || "—"],
     ["Branding", `${form.primary_color} / ${form.secondary_color}`],
+    ["Admin", admin.full_name.trim() || "—"],
+    ["Admin login", admin.email.trim().toLowerCase() || "—"],
+    ["Admin password", admin.password ? "Set (hidden)" : "—"],
   ] as const;
   return (
     <div className="space-y-4">

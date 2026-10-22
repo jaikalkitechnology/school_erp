@@ -1,9 +1,10 @@
 """Pydantic schemas for tenant + plan APIs."""
 
+import re
 from datetime import datetime
 from typing import Any, List, Optional
 
-from pydantic import BaseModel, ConfigDict, EmailStr, Field
+from pydantic import BaseModel, ConfigDict, EmailStr, Field, field_validator
 
 from app.models.tenant import (
     BillingCycle,
@@ -92,6 +93,33 @@ class AuditLogRead(BaseModel):
     created_at: datetime
 
 
+class SchoolAdminSet(BaseModel):
+    """The school admin's login, set by the super admin. If a user with
+    this email already exists in the school, its name and password are
+    updated instead of a second account being created."""
+
+    full_name: str = Field(min_length=2, max_length=180)
+    email: EmailStr
+    password: str = Field(min_length=8, max_length=128)
+
+    @field_validator("password")
+    @classmethod
+    def _strong_enough(cls, v: str) -> str:
+        if not re.search(r"[A-Za-z]", v) or not re.search(r"\d", v):
+            raise ValueError("Password needs at least one letter and one number")
+        return v
+
+
+class SchoolAdminRead(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    full_name: str
+    email: Optional[str]
+    is_active: bool
+    last_login_at: Optional[datetime] = None
+
+
 class TenantCreate(BaseModel):
     school_name: str = Field(min_length=2, max_length=180)
     school_code: str = Field(min_length=2, max_length=40)
@@ -111,6 +139,10 @@ class TenantCreate(BaseModel):
 
     primary_color: str = "#E85D2E"
     secondary_color: str = "#0F766E"
+
+    # The school's first admin login. Optional so scripts (eg. the demo
+    # seed) can create a school without one.
+    admin: Optional[SchoolAdminSet] = None
 
 
 class TenantUpdate(BaseModel):

@@ -15,6 +15,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import settings
 from app.core.file_storage import ensure_tenant_dirs, get_tenant_storage_used_mb
+from app.core.security import hash_password
+from app.models.auth import Role, User, UserRole
 from app.models.tenant import (
     BillingCycle,
     Subscription,
@@ -138,7 +140,102 @@ async def create_tenant(session: AsyncSession, payload: TenantCreate) -> Tenant:
 
     # Materialize the per-tenant upload tree so the first file upload doesn't 500.
     ensure_tenant_dirs(tenant.id)
+
+    # Roles + permissions used to appear only on the next API restart,
+    # so a fresh school couldn't get users until then. Seed them now.
+    from app.services.seed import seed_rbac_for_tenant
+
+    await seed_rbac_for_tenant(session, tenant.id)
+    if payload.admin is not None:
+        await set_school_admin(
+            session,
+            tenant.id,
+            full_name=payload.admin.full_name,
+            email=payload.admin.email,
+            password=payload.admin.password,
+        )
+    await session.refresh(tenant)
     return tenant
+
+
+SCHOOL_ADMIN_ROLE = "school_admin"
+
+
+async def list_school_admins(session: AsyncSession, tenant_id: int) -> list[User]:
+    """Users holding the school_admin role in this school."""
+    stmt = (
+        select(User)
+        .join(UserRole, UserRole.user_id == User.id)
+        .join(Role, Role.id == UserRole.role_id)
+        .where(User.tenant_id == tenant_id, Role.code == SCHOOL_ADMIN_ROLE)
+        .order_by(User.id)
+    )
+    return list((await session.execute(stmt)).scalars().unique().all())
+
+
+async def set_school_admin(
+    session: AsyncSession,
+    tenant_id: int,
+    *,
+    full_name: str,
+    email: str,
+    password: str,
+) -> User:
+    """Create the school's admin login, or — if a user with this email
+    already exists in the school — reset its name and password and make
+    sure it is an active school admin."""
+    from app.core.admin_pages import default_pages_for_roles
+
+    email = email.strip().lower()
+    role = (
+        await session.execute(
+            select(Role).where(Role.tenant_id == tenant_id, Role.code == SCHOOL_ADMIN_ROLE)
+        )
+    ).scalar_one_or_none()
+    if role is None:
+        from app.services.seed import seed_rbac_for_tenant
+
+        await seed_rbac_for_tenant(session, tenant_id)
+        role = (
+            await session.execute(
+                select(Role).where(Role.tenant_id == tenant_id, Role.code == SCHOOL_ADMIN_ROLE)
+            )
+        ).scalar_one()
+
+    user = (
+        await session.execute(
+            select(User).where(User.tenant_id == tenant_id, User.email == email)
+        )
+    ).scalar_one_or_none()
+    if user is None:
+        user = User(
+            tenant_id=tenant_id,
+            full_name=full_name,
+            email=email,
+            password_hash=hash_password(password),
+            is_active=True,
+            is_email_verified=True,
+            granted_admin_pages=default_pages_for_roles([SCHOOL_ADMIN_ROLE]),
+        )
+        session.add(user)
+        await session.flush()
+    else:
+        user.full_name = full_name
+        user.password_hash = hash_password(password)
+        user.is_active = True
+        user.failed_login_count = 0
+
+    has_role = (
+        await session.execute(
+            select(UserRole.id).where(UserRole.user_id == user.id, UserRole.role_id == role.id)
+        )
+    ).first()
+    if not has_role:
+        session.add(UserRole(tenant_id=tenant_id, user_id=user.id, role_id=role.id))
+
+    await session.commit()
+    await session.refresh(user)
+    return user
 
 
 async def update_tenant(session: AsyncSession, tenant_id: int, payload: TenantUpdate) -> Tenant:
