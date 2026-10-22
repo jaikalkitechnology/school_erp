@@ -1,5 +1,5 @@
 import { api } from "@/lib/api";
-import type { CreateTenantPayload, SubscriptionPlan, Tenant } from "./types";
+import type { CreateTenantPayload, SchoolAdmin, SchoolAdminSet, SubscriptionPlan, Tenant } from "./types";
 
 export async function listTenants(search?: string): Promise<Tenant[]> {
   const { data } = await api.get<Tenant[]>("/admin/tenants", { params: search ? { search } : undefined });
@@ -19,6 +19,18 @@ export async function createTenant(payload: CreateTenantPayload): Promise<Tenant
 /** PATCH a school. A field set to null clears it; omitted fields are left alone. */
 export async function updateTenant(id: number, payload: Record<string, unknown>): Promise<Tenant> {
   const { data } = await api.patch<Tenant>(`/admin/tenants/${id}`, payload);
+  return data;
+}
+
+export async function listSchoolAdmins(id: number): Promise<SchoolAdmin[]> {
+  const { data } = await api.get<SchoolAdmin[]>(`/admin/tenants/${id}/admins`);
+  return data;
+}
+
+/** Creates the school admin's login, or resets name + password if that
+ *  email already exists in the school. */
+export async function setSchoolAdmin(id: number, body: SchoolAdminSet): Promise<SchoolAdmin> {
+  const { data } = await api.put<SchoolAdmin>(`/admin/tenants/${id}/admin`, body);
   return data;
 }
 

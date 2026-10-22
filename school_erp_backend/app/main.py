@@ -6,6 +6,7 @@ from contextlib import asynccontextmanager
 from typing import Any
 
 from fastapi import FastAPI, Request
+from fastapi.encoders import jsonable_encoder
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
@@ -394,11 +395,19 @@ async def http_exception_handler(request: Request, exc: StarletteHTTPException) 
 
 @app.exception_handler(RequestValidationError)
 async def validation_exception_handler(request: Request, exc: RequestValidationError) -> JSONResponse:
+    # A field_validator's ValueError lands in ctx["error"] as the exception
+    # object itself, which JSON can't encode (it used to turn every such
+    # 422 into a 500). Send its message instead.
+    errors = []
+    for err in exc.errors():
+        if "ctx" in err:
+            err = {**err, "ctx": {k: str(v) for k, v in err["ctx"].items()}}
+        errors.append(err)
     return JSONResponse(
         status_code=422,
         content={
             "detail": "Validation error",
-            "errors": exc.errors(),
+            "errors": jsonable_encoder(errors),
             "request_id": getattr(request.state, "request_id", None),
         },
     )

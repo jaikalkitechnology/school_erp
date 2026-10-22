@@ -60,4 +60,20 @@ export interface CreateTenantPayload {
   medium?: string;
   primary_color?: string;
   secondary_color?: string;
+  admin?: SchoolAdminSet;
+}
+
+/** The school admin's login, as the super admin sets it. */
+export interface SchoolAdminSet {
+  full_name: string;
+  email: string;
+  password: string;
+}
+
+export interface SchoolAdmin {
+  id: number;
+  full_name: string;
+  email: string | null;
+  is_active: boolean;
+  last_login_at: string | null;
 }

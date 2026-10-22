@@ -25,6 +25,8 @@ from app.schemas.tenant import (
     AuditLogRead,
     ImpersonationToken,
     PlanChange,
+    SchoolAdminRead,
+    SchoolAdminSet,
     SubscriptionPlanRead,
     SubscriptionPlanUpdate,
     SubscriptionPlanWrite,
@@ -43,7 +45,9 @@ from app.services.tenants import (
     extend_trial,
     get_tenant,
     list_plans,
+    list_school_admins,
     list_tenants,
+    set_school_admin,
     set_status,
     update_tenant,
 )
@@ -79,7 +83,11 @@ async def create(
         target_type="tenant",
         target_id=tenant.id,
         summary=f"Onboarded {tenant.school_name} ({tenant.subdomain})",
-        metadata={"plan_code": payload.plan_code},
+        # Never the password.
+        metadata={
+            "plan_code": payload.plan_code,
+            "admin_email": payload.admin.email if payload.admin else None,
+        },
         request=request,
         tenant_id_override=tenant.id,
     )
@@ -112,6 +120,44 @@ async def update_one(
         tenant_id_override=tenant_id,
     )
     return tenant
+
+
+@router.get("/{tenant_id}/admins", response_model=list[SchoolAdminRead])
+async def list_admins(tenant_id: int, session: AsyncSession = Depends(platform_session)):
+    """The school's admin logins (users with the school_admin role)."""
+    await get_tenant(session, tenant_id)
+    return await list_school_admins(session, tenant_id)
+
+
+@router.put("/{tenant_id}/admin", response_model=SchoolAdminRead)
+async def set_admin(
+    tenant_id: int,
+    payload: SchoolAdminSet,
+    request: Request,
+    session: AsyncSession = Depends(platform_session),
+    principal: AuthPrincipal = Depends(require_super_admin()),
+):
+    """Set a school admin's login: creates it, or for an email that
+    already exists in the school, resets its name and password."""
+    tenant = await get_tenant(session, tenant_id)
+    user = await set_school_admin(
+        session,
+        tenant_id,
+        full_name=payload.full_name,
+        email=payload.email,
+        password=payload.password,
+    )
+    await audit.record(
+        session,
+        principal=principal,
+        action="tenant.admin_set",
+        target_type="user",
+        target_id=user.id,
+        summary=f"Set admin login {user.email} for {tenant.school_name}",
+        request=request,
+        tenant_id_override=tenant_id,
+    )
+    return user
 
 
 @router.post("/{tenant_id}/logo", response_model=TenantRead)
