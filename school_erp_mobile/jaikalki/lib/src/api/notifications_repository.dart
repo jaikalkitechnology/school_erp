@@ -2,6 +2,33 @@ import 'package:dio/dio.dart';
 
 import 'api_client.dart';
 
+/// Server timestamps are UTC but sent without a zone ("2026-10-22T09:00:00").
+/// DateTime.parse would read that as phone-local time, so read it as UTC
+/// and convert to local.
+DateTime parseServerTime(String s) {
+  final hasZone = RegExp(r'([zZ]|[+-]\d\d:?\d\d)$').hasMatch(s);
+  return DateTime.parse(hasZone ? s : '${s}Z').toLocal();
+}
+
+/// A load failure the page can show instead of looking empty.
+class LoadError implements Exception {
+  LoadError(this.message);
+  final String message;
+
+  factory LoadError.from(DioException e) {
+    final code = e.response?.statusCode;
+    final data = e.response?.data;
+    final detail = data is Map && data['detail'] is String ? data['detail'] as String : null;
+    if (code == null) {
+      return LoadError("Couldn't reach the server. Check your internet connection.");
+    }
+    return LoadError('Server error $code${detail != null ? ': $detail' : ''}');
+  }
+
+  @override
+  String toString() => message;
+}
+
 class NotificationItem {
   NotificationItem({
     required this.id,
@@ -26,7 +53,7 @@ class NotificationItem {
         title: j['title'] as String,
         body: j['body'] as String,
         kind: j['kind'] as String,
-        createdAt: DateTime.parse(j['created_at'] as String),
+        createdAt: parseServerTime(j['created_at'] as String),
         deeplink: j['deeplink'] as String?,
         read: j['read_at'] != null,
       );
@@ -45,8 +72,9 @@ class NotificationsRepository {
       return (res.data ?? const [])
           .map((e) => NotificationItem.fromJson(e as Map<String, dynamic>))
           .toList();
-    } on DioException {
-      return const [];
+    } on DioException catch (e) {
+      // Surface it: an empty list here used to hide server errors.
+      throw LoadError.from(e);
     }
   }
 
@@ -81,7 +109,7 @@ class Announcement {
         title: j['title'] as String,
         body: j['body'] as String,
         isPinned: (j['is_pinned'] as bool?) ?? false,
-        publishedAt: j['published_at'] == null ? null : DateTime.parse(j['published_at'] as String),
+        publishedAt: j['published_at'] == null ? null : parseServerTime(j['published_at'] as String),
       );
 }
 
@@ -95,8 +123,8 @@ class AnnouncementsRepository {
       return (res.data ?? const [])
           .map((e) => Announcement.fromJson(e as Map<String, dynamic>))
           .toList();
-    } on DioException {
-      return const [];
+    } on DioException catch (e) {
+      throw LoadError.from(e);
     }
   }
 }

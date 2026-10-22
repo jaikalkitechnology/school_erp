@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:intl/intl.dart';
 
 import '../../api/api_client.dart';
 import '../../api/notifications_repository.dart';
@@ -52,7 +53,10 @@ class _NotificationsPageState extends State<NotificationsPage> {
         return RefreshIndicator(
           onRefresh: () async {
             _refresh();
-            await Future.wait([_notifFuture!, _annFuture!]);
+            // Failures are shown by the FutureBuilders below.
+            try {
+              await Future.wait([_notifFuture!, _annFuture!]);
+            } catch (_) {}
           },
           child: ListView(
             physics: const AlwaysScrollableScrollPhysics(),
@@ -61,6 +65,13 @@ class _NotificationsPageState extends State<NotificationsPage> {
               FutureBuilder<List<Announcement>>(
                 future: _annFuture,
                 builder: (context, snap) {
+                  if (snap.hasError) {
+                    return Padding(
+                      padding: const EdgeInsets.only(bottom: 16),
+                      child: Text("Couldn't load the notice board: ${snap.error}",
+                          style: t.bodyMedium?.copyWith(color: Theme.of(context).colorScheme.error)),
+                    );
+                  }
                   final items = snap.data ?? const [];
                   if (items.isEmpty) return const SizedBox.shrink();
                   return Padding(
@@ -98,7 +109,7 @@ class _NotificationsPageState extends State<NotificationsPage> {
                                 if (a.publishedAt != null) ...[
                                   const SizedBox(height: 6),
                                   Text(
-                                    a.publishedAt!.toLocal().toString().split('.').first,
+                                    DateFormat('d MMM yyyy, h:mm a').format(a.publishedAt!),
                                     style: t.bodyMedium?.copyWith(fontSize: 11),
                                   ),
                                 ],
@@ -130,6 +141,9 @@ class _NotificationsPageState extends State<NotificationsPage> {
                       padding: EdgeInsets.all(40),
                       child: Center(child: CircularProgressIndicator()),
                     );
+                  }
+                  if (snap.hasError) {
+                    return _LoadErrorCard(message: '${snap.error}', onRetry: _refresh);
                   }
                   final items = snap.data ?? const [];
                   if (items.isEmpty) {
@@ -195,5 +209,42 @@ class _NotificationsPageState extends State<NotificationsPage> {
     if (diff.inMinutes < 60) return '${diff.inMinutes}m';
     if (diff.inHours < 24) return '${diff.inHours}h';
     return '${diff.inDays}d';
+  }
+}
+
+/// Shown instead of "no notifications" when loading failed, so a server
+/// problem doesn't look like an empty inbox.
+class _LoadErrorCard extends StatelessWidget {
+  const _LoadErrorCard({required this.message, required this.onRetry});
+
+  final String message;
+  final VoidCallback onRetry;
+
+  @override
+  Widget build(BuildContext context) {
+    final t = Theme.of(context).textTheme;
+    final scheme = Theme.of(context).colorScheme;
+    return Container(
+      margin: const EdgeInsets.symmetric(vertical: 16),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: scheme.errorContainer,
+        borderRadius: BorderRadius.circular(16),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text("Couldn't load notifications", style: t.titleMedium?.copyWith(color: scheme.onErrorContainer)),
+          const SizedBox(height: 4),
+          Text(message, style: t.bodyMedium?.copyWith(color: scheme.onErrorContainer)),
+          const SizedBox(height: 8),
+          OutlinedButton.icon(
+            onPressed: onRetry,
+            icon: const Icon(Icons.refresh),
+            label: const Text('Retry'),
+          ),
+        ],
+      ),
+    );
   }
 }

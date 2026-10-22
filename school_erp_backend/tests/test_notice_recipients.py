@@ -99,8 +99,11 @@ async def test_announcement_to_particular_parents(super_admin_token):
         assert {"Just this parent", "Everyone"} <= feed
         assert "Someone else" not in feed
 
-        inbox = {n["title"] for n in (await parent.get("/v1/notifications")).json()}
-        assert "Someone else" not in " ".join(inbox)
+        # What the app's Notifications page lists.
+        inbox = [f'{n["title"]} {n["body"]}' for n in (await parent.get("/v1/notifications")).json()]
+        assert any("Just this parent" in n for n in inbox), inbox
+        assert any("Everyone" in n for n in inbox), inbox
+        assert not any("Someone else" in n for n in inbox), inbox
 
         listed = {a["title"]: a for a in (await admin.get("/v1/school-admin/communication/announcements")).json()}
         assert listed["Just this parent"]["recipient_user_ids"] == [parent_uid]
