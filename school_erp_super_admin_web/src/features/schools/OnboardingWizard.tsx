@@ -8,6 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { cn } from "@/lib/utils";
 import { createTenant, listPlans, uploadTenantLogo } from "./api";
+import { LocationFields } from "./LocationFields";
 import type { CreateTenantPayload } from "./types";
 
 type Step = {
@@ -248,8 +249,13 @@ export function OnboardingWizard() {
                   error={infoErrors.phone}
                 />
                 <Field label="Email" value={form.email} onChange={(v) => set("email", v.trim())} error={infoErrors.email} />
-                <Field label="City" value={form.city} onChange={(v) => set("city", v)} />
-                <Field label="State" value={form.state} onChange={(v) => set("state", v)} />
+                <LocationFields
+                  idPrefix="onboard"
+                  state={form.state}
+                  city={form.city}
+                  onState={(v) => set("state", v)}
+                  onCity={(v) => set("city", v)}
+                />
                 <Field
                   label="PIN"
                   value={form.pincode}

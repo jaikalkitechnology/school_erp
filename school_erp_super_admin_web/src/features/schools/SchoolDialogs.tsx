@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { deleteTenant, updateTenant } from "./api";
+import { LocationFields } from "./LocationFields";
 import type { SchoolType, Tenant } from "./types";
 
 /** Turn an axios error into one readable sentence. */
@@ -28,7 +29,8 @@ function Modal({
 }) {
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") onClose();
+      // A dropdown inside the dialog marks its own Escape as handled.
+      if (e.key === "Escape" && !e.defaultPrevented) onClose();
     };
     document.addEventListener("keydown", onKey);
     return () => document.removeEventListener("keydown", onKey);
@@ -238,8 +240,13 @@ export function EditSchoolDialog({ tenant, onClose }: { tenant: Tenant; onClose:
             className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
           />
         </div>
-        {text("city", "City")}
-        {text("state", "State")}
+        <LocationFields
+          idPrefix="edit"
+          state={form.state}
+          city={form.city}
+          onState={(v) => set("state", v)}
+          onCity={(v) => set("city", v)}
+        />
         {text("pincode", "PIN", {
           inputMode: "numeric",
           maxLength: 6,
