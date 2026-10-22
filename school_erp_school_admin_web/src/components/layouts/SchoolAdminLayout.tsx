@@ -392,6 +392,22 @@ const nestedLeafClass = ({ isActive }: { isActive: boolean }) =>
       : "text-indigo/70 hover:bg-saffron-pale/40 hover:text-indigo-dark",
   );
 
+/** Active state for a leaf whose link carries a query (eg. the Communication
+ *  tabs, which all share /communication). NavLink only compares the path,
+ *  so it would light up every tab at once. With no tab in the URL the page
+ *  shows its first tab, so the first such link counts as active. */
+function queryLeafActive(to: string, loc: { pathname: string; search: string }, siblings: string[]): boolean {
+  const [path, qs = ""] = to.split("?");
+  if (loc.pathname !== path) return false;
+  const have = new URLSearchParams(loc.search);
+  for (const [k, v] of new URLSearchParams(qs)) {
+    const cur = have.get(k);
+    if (cur === null) return siblings.find((x) => x.split("?")[0] === path) === to;
+    if (cur !== v) return false;
+  }
+  return true;
+}
+
 function NavGroupSection({
   group, forceOpen, query = "", initiallyOpen = false,
 }: {
@@ -402,6 +418,8 @@ function NavGroupSection({
   initiallyOpen?: boolean;
 }) {
   const [open, setOpen] = useState(forceOpen || initiallyOpen);
+  const location = useLocation();
+  const siblings = group.children.map((c) => c.to);
   // If the active route moves *into* the group, auto-expand.
   const effectiveOpen = open || forceOpen;
   return (
@@ -427,7 +445,13 @@ function NavGroupSection({
       {effectiveOpen && (
         <div className="mt-1 flex flex-col gap-0.5">
           {group.children.map((c) => (
-            <NavLink key={`${c.to}|${c.label}`} to={c.to} className={nestedLeafClass}>
+            <NavLink
+              key={`${c.to}|${c.label}`}
+              to={c.to}
+              className={({ isActive }) =>
+                nestedLeafClass({ isActive: c.to.includes("?") ? queryLeafActive(c.to, location, siblings) : isActive })
+              }
+            >
               <c.icon className="h-3.5 w-3.5" />
               <Highlight text={c.label} query={query} />
             </NavLink>
