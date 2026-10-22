@@ -38,6 +38,17 @@ export interface PublishResult {
   push_sent: number;
   // Sends FCM rejected (dead token, mismatched-credential, etc).
   push_failed: number;
+  // Recipients who got no push (no phone signed in, or FCM off).
+  push_skipped: number;
+  // Set when the server can't send pushes at all (eg. Firebase key missing).
+  push_unavailable_reason: string | null;
+}
+
+export interface PushStatus {
+  available: boolean;
+  reason: string | null;
+  active_devices: number;
+  users_with_devices: number;
 }
 
 export interface Template {
@@ -73,6 +84,7 @@ export const listTemplates = async () => (await api.get<Template[]>(`${base}/tem
 export const upsertTemplate = async (code: string, payload: Omit<Template, "id" | "is_active">) =>
   (await api.put<Template>(`${base}/templates/${code}`, payload)).data;
 
+export const getPushStatus = async () => (await api.get<PushStatus>(`${base}/push-status`)).data;
 export const listAnnouncements = async () =>
   (await api.get<Announcement[]>(`${base}/announcements`)).data;
 export const createAnnouncement = async (payload: AnnouncementWrite) =>

@@ -2,9 +2,11 @@ import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { formatDistanceToNow } from "date-fns";
-import { Bell, CheckCheck } from "lucide-react";
+import { Bell, CheckCheck, Trash2, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import {
+  clearNotifications,
+  deleteNotification,
   listNotifications,
   markAllNotificationsRead,
   markNotificationRead,
@@ -42,6 +44,19 @@ export function NotificationBell() {
   const refresh = () => qc.invalidateQueries({ queryKey: ["notifications"] });
   const markOne = useMutation({ mutationFn: markNotificationRead, onSuccess: refresh });
   const markAll = useMutation({ mutationFn: markAllNotificationsRead, onSuccess: refresh });
+  const removeOne = useMutation({ mutationFn: deleteNotification, onSuccess: refresh });
+  const clearAll = useMutation({
+    mutationFn: clearNotifications,
+    onSuccess: () => {
+      setConfirmClear(false);
+      refresh();
+    },
+  });
+  // "Clear all" asks once before deleting the whole list.
+  const [confirmClear, setConfirmClear] = useState(false);
+  useEffect(() => {
+    if (!open) setConfirmClear(false);
+  }, [open]);
 
   // Close on outside click or Esc.
   useEffect(() => {
@@ -106,14 +121,45 @@ export function NotificationBell() {
                 {count ? `${count} unread` : "You're all caught up"}
               </p>
             </div>
-            <button
-              type="button"
-              onClick={() => markAll.mutate()}
-              disabled={count === 0 || markAll.isPending}
-              className="flex items-center gap-1 rounded-md px-2 py-1 text-xs font-semibold text-saffron-darker hover:bg-saffron-pale/60 disabled:cursor-default disabled:opacity-40 disabled:hover:bg-transparent"
-            >
-              <CheckCheck className="h-3.5 w-3.5" /> Mark all read
-            </button>
+            {confirmClear ? (
+              <div className="flex items-center gap-1 text-xs">
+                <span className="mr-1 text-muted-foreground">Clear all?</span>
+                <button
+                  type="button"
+                  onClick={() => clearAll.mutate()}
+                  disabled={clearAll.isPending}
+                  className="rounded-md bg-destructive px-2 py-1 font-semibold text-white hover:bg-destructive/90 disabled:opacity-60"
+                >
+                  {clearAll.isPending ? "Clearing…" : "Yes, clear"}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setConfirmClear(false)}
+                  className="rounded-md px-2 py-1 font-semibold text-muted-foreground hover:bg-saffron-pale/60"
+                >
+                  Cancel
+                </button>
+              </div>
+            ) : (
+              <div className="flex items-center gap-1">
+                <button
+                  type="button"
+                  onClick={() => markAll.mutate()}
+                  disabled={count === 0 || markAll.isPending}
+                  className="flex items-center gap-1 rounded-md px-2 py-1 text-xs font-semibold text-saffron-darker hover:bg-saffron-pale/60 disabled:cursor-default disabled:opacity-40 disabled:hover:bg-transparent"
+                >
+                  <CheckCheck className="h-3.5 w-3.5" /> Mark all read
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setConfirmClear(true)}
+                  disabled={!recent.data?.length}
+                  className="flex items-center gap-1 rounded-md px-2 py-1 text-xs font-semibold text-destructive hover:bg-destructive/10 disabled:cursor-default disabled:opacity-40 disabled:hover:bg-transparent"
+                >
+                  <Trash2 className="h-3.5 w-3.5" /> Clear all
+                </button>
+              </div>
+            )}
           </div>
 
           <div className="max-h-[min(420px,70vh)] overflow-y-auto">
@@ -133,12 +179,12 @@ export function NotificationBell() {
                 {recent.data.map((n) => {
                   const isUnread = !n.read_at;
                   return (
-                    <li key={n.id}>
+                    <li key={n.id} className="group relative">
                       <button
                         type="button"
                         onClick={() => openItem(n)}
                         className={cn(
-                          "flex w-full gap-3 px-4 py-3 text-left transition-colors hover:bg-saffron-pale/40",
+                          "flex w-full gap-3 py-3 pl-4 pr-10 text-left transition-colors hover:bg-saffron-pale/40",
                           isUnread && "bg-saffron-pale/25",
                         )}
                       >
@@ -160,6 +206,16 @@ export function NotificationBell() {
                             {timeAgo(n.created_at)}
                           </span>
                         </span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => removeOne.mutate(n.id)}
+                        disabled={removeOne.isPending && removeOne.variables === n.id}
+                        aria-label={`Clear notification: ${n.title}`}
+                        title="Clear"
+                        className="absolute right-2 top-2.5 rounded-md p-1.5 text-muted-foreground opacity-60 transition hover:bg-saffron-pale hover:text-destructive hover:opacity-100 focus-visible:opacity-100 group-hover:opacity-100"
+                      >
+                        <X className="h-3.5 w-3.5" />
                       </button>
                     </li>
                   );

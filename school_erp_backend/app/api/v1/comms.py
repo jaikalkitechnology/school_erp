@@ -11,6 +11,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.auth_deps import AuthPrincipal, get_current_principal, require_roles
 from app.core.tenant_session import platform_session, tenant_scoped_session
 from app.models.comms import AnnouncementAudience, DeliveryStatus
+from app.services import fcm
 from app.schemas.comms import (
     AnnouncementRead,
     AnnouncementWrite,
@@ -19,14 +20,17 @@ from app.schemas.comms import (
     NotificationOutboxRead,
     NotificationRead,
     PublishResult,
+    PushStatus,
     TemplateRead,
     TemplateWrite,
 )
 from app.services.comms import (
     refresh_default_template_channels,
     seed_default_templates,
+    clear_notifications,
     create_announcement,
     delete_announcement,
+    delete_notification,
     inbox_for,
     list_announcements,
     list_notifications_for,
@@ -111,7 +115,7 @@ async def create_announcement_route(
     principal: AuthPrincipal = Depends(_school_admin),
     session: AsyncSession = Depends(tenant_scoped_session),
 ):
-    obj, fanned, push_sent, push_failed = await create_announcement(
+    obj, fanned, push_sent, push_failed, push_skipped = await create_announcement(
         session, principal.tenant_id, principal.user_id, payload
     )
     return PublishResult(
@@ -119,6 +123,36 @@ async def create_announcement_route(
         fanned_out_to=fanned,
         push_sent=push_sent,
         push_failed=push_failed,
+        push_skipped=push_skipped,
+        push_unavailable_reason=None if fcm.is_available() else fcm.unavailable_reason(),
+    )
+
+
+@sa_router.get("/push-status", response_model=PushStatus)
+async def push_status_route(
+    principal: AuthPrincipal = Depends(get_current_principal),
+    session: AsyncSession = Depends(tenant_scoped_session),
+):
+    """Can this server send phone pushes, and how many phones in the
+    school are signed in to the app to receive them?"""
+    from sqlalchemy import func, select
+
+    from app.models.auth_extras import UserDevice
+
+    active, users = (
+        await session.execute(
+            select(func.count(UserDevice.id), func.count(func.distinct(UserDevice.user_id))).where(
+                UserDevice.tenant_id == principal.tenant_id,
+                UserDevice.is_active.is_(True),
+            )
+        )
+    ).one()
+    available = fcm.is_available()
+    return PushStatus(
+        available=available,
+        reason=None if available else fcm.unavailable_reason(),
+        active_devices=active,
+        users_with_devices=users,
     )
 
 
@@ -448,3 +482,23 @@ async def read_all_route(
 ):
     n = await mark_all_read(session, principal.user_id)
     return {"marked": n}
+
+
+@notif_router.delete("/{notif_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_route(
+    notif_id: int,
+    principal: AuthPrincipal = Depends(get_current_principal),
+    session: AsyncSession = Depends(platform_session),
+):
+    """Remove one notification from my list."""
+    await delete_notification(session, notif_id, principal.user_id)
+
+
+@notif_router.delete("")
+async def clear_route(
+    principal: AuthPrincipal = Depends(get_current_principal),
+    session: AsyncSession = Depends(platform_session),
+):
+    """Clear my whole notification list."""
+    n = await clear_notifications(session, principal.user_id)
+    return {"cleared": n}

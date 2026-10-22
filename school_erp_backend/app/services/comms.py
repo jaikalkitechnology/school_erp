@@ -497,7 +497,7 @@ async def create_announcement(
     tenant_id: int,
     author_user_id: int,
     payload: AnnouncementWrite,
-) -> tuple[Announcement, int, int, int]:
+) -> tuple[Announcement, int, int, int, int]:
     """Create the announcement row + (if publishing) fan it out to the
     resolved audience AND fire FCM pushes immediately.
 
@@ -562,12 +562,14 @@ async def create_announcement(
     # honest whether or not a separate push worker is running.
     push_sent = 0
     push_failed = 0
+    push_skipped = 0
     if push_outbox_ids:
         result = await drain_pending_push_outbox_ids(session, push_outbox_ids)
         push_sent = result.sent
         push_failed = result.failed
+        push_skipped = result.skipped
 
-    return obj, fanned, push_sent, push_failed
+    return obj, fanned, push_sent, push_failed, push_skipped
 
 
 def _channel_override_for_announcement(
@@ -722,6 +724,36 @@ async def mark_all_read(session: AsyncSession, user_id: int) -> int:
     now = _now()
     for n in rows:
         n.read_at = now
+    await session.commit()
+    return len(rows)
+
+
+async def delete_notification(session: AsyncSession, notif_id: int, user_id: int) -> None:
+    """Remove one of the user's own notifications from their list."""
+    n = (
+        await session.execute(
+            select(Notification).where(
+                Notification.id == notif_id, Notification.recipient_user_id == user_id
+            )
+        )
+    ).scalar_one_or_none()
+    if n is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Notification not found")
+    await session.delete(n)
+    await session.commit()
+
+
+async def clear_notifications(session: AsyncSession, user_id: int) -> int:
+    """Remove every notification in the user's own list."""
+    rows = list(
+        (
+            await session.execute(
+                select(Notification).where(Notification.recipient_user_id == user_id)
+            )
+        ).scalars().all()
+    )
+    for n in rows:
+        await session.delete(n)
     await session.commit()
     return len(rows)
 
