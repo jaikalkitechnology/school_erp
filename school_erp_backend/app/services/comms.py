@@ -728,6 +728,36 @@ async def mark_all_read(session: AsyncSession, user_id: int) -> int:
     return len(rows)
 
 
+async def delete_notification(session: AsyncSession, notif_id: int, user_id: int) -> None:
+    """Remove one of the user's own notifications from their list."""
+    n = (
+        await session.execute(
+            select(Notification).where(
+                Notification.id == notif_id, Notification.recipient_user_id == user_id
+            )
+        )
+    ).scalar_one_or_none()
+    if n is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Notification not found")
+    await session.delete(n)
+    await session.commit()
+
+
+async def clear_notifications(session: AsyncSession, user_id: int) -> int:
+    """Remove every notification in the user's own list."""
+    rows = list(
+        (
+            await session.execute(
+                select(Notification).where(Notification.recipient_user_id == user_id)
+            )
+        ).scalars().all()
+    )
+    for n in rows:
+        await session.delete(n)
+    await session.commit()
+    return len(rows)
+
+
 # ---- Outbox (admin debug view) -------------------------------------------
 
 

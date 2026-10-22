@@ -311,3 +311,27 @@ async def test_publish_reports_why_push_did_not_go_out(demo_admin_client):
     assert body["push_sent"] == 0
     assert body["push_skipped"] >= 1
     assert body["push_unavailable_reason"]
+
+
+@pytest.mark.asyncio
+async def test_clear_and_delete_own_notifications(demo_admin_client):
+    for i in range(3):
+        r = await demo_admin_client.post(
+            "/v1/school-admin/communication/announcements",
+            json={"title": f"Note {i}", "body": "x", "audience": "staff", "publish": True, "send_push": False},
+        )
+        assert r.status_code == 201, r.text
+    mine = (await demo_admin_client.get("/v1/notifications")).json()
+    assert len(mine) >= 3
+
+    # Delete one.
+    r = await demo_admin_client.delete(f"/v1/notifications/{mine[0]['id']}")
+    assert r.status_code == 204
+    after = (await demo_admin_client.get("/v1/notifications")).json()
+    assert mine[0]["id"] not in [n["id"] for n in after]
+    assert (await demo_admin_client.delete(f"/v1/notifications/{mine[0]['id']}")).status_code == 404
+
+    # Clear the rest.
+    r = await demo_admin_client.delete("/v1/notifications")
+    assert r.status_code == 200 and r.json()["cleared"] == len(after)
+    assert (await demo_admin_client.get("/v1/notifications")).json() == []

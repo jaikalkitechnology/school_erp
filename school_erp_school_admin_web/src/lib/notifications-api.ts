@@ -22,3 +22,10 @@ export const markNotificationRead = async (id: number) =>
 
 export const markAllNotificationsRead = async () =>
   (await api.post<{ marked: number }>("/v1/notifications/read-all")).data;
+
+export const deleteNotification = async (id: number) => {
+  await api.delete(`/v1/notifications/${id}`);
+};
+
+export const clearNotifications = async () =>
+  (await api.delete<{ cleared: number }>("/v1/notifications")).data;

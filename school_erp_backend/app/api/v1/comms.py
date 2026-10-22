@@ -27,8 +27,10 @@ from app.schemas.comms import (
 from app.services.comms import (
     refresh_default_template_channels,
     seed_default_templates,
+    clear_notifications,
     create_announcement,
     delete_announcement,
+    delete_notification,
     inbox_for,
     list_announcements,
     list_notifications_for,
@@ -480,3 +482,23 @@ async def read_all_route(
 ):
     n = await mark_all_read(session, principal.user_id)
     return {"marked": n}
+
+
+@notif_router.delete("/{notif_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_route(
+    notif_id: int,
+    principal: AuthPrincipal = Depends(get_current_principal),
+    session: AsyncSession = Depends(platform_session),
+):
+    """Remove one notification from my list."""
+    await delete_notification(session, notif_id, principal.user_id)
+
+
+@notif_router.delete("")
+async def clear_route(
+    principal: AuthPrincipal = Depends(get_current_principal),
+    session: AsyncSession = Depends(platform_session),
+):
+    """Clear my whole notification list."""
+    n = await clear_notifications(session, principal.user_id)
+    return {"cleared": n}
