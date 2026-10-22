@@ -410,6 +410,9 @@ class Notice(TenantBase):
     published_at = Column(DateTime, nullable=True)
     expires_at = Column(DateTime, nullable=True)
     attachments = Column(JSON, nullable=False, default=list)  # [{name, url}]
+    # Particular people inside the audience who should see it. Empty /
+    # NULL = everyone in the audience bucket.
+    recipient_user_ids = Column(JSON, nullable=True)
     author_user_id = Column(
         Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True,
     )

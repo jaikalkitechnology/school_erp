@@ -21,7 +21,9 @@ export type FieldKind =
   | "picker"
   | "phone"
   | "email"
-  | "gst";
+  | "gst"
+  /** A JSON value (eg. a list of ids) drawn by the field's renderInput. */
+  | "json";
 
 export interface PickerOption {
   id: number;
@@ -42,6 +44,18 @@ export interface FieldSpec {
   hideInForm?: boolean;
   placeholder?: string;
   render?: (row: Record<string, unknown>) => React.ReactNode;
+  /** Draw the form input yourself. `values` are the other fields' current
+   *  (string) values, eg. to depend on what's picked in a select. */
+  renderInput?: (p: {
+    value: string;
+    values: Record<string, string>;
+    onChange: (v: string) => void;
+    invalid: boolean;
+  }) => React.ReactNode;
+  /** Clear these fields whenever this one changes. */
+  resets?: string[];
+  /** Extra check on submit; return a message to block saving. */
+  validate?: (raw: string, values: Record<string, string>) => string | null;
 }
 
 export interface CrudProps {
@@ -74,6 +88,7 @@ const toInputValue = (v: unknown, kind?: FieldKind): string => {
   if (kind === "date" && typeof v === "string") return v.slice(0, 10);
   if (kind === "datetime" && typeof v === "string") return v.slice(0, 16);
   if (kind === "checkbox") return v ? "true" : "false";
+  if (kind === "json") return JSON.stringify(v);
   return String(v);
 };
 
@@ -81,6 +96,11 @@ const fromInputValue = (v: string, kind?: FieldKind): unknown => {
   if (kind === "number" || kind === "picker") return v === "" ? null : Number(v);
   if (kind === "checkbox") return v === "true";
   if (kind === "date" || kind === "datetime") return v || null;
+  if (kind === "json") {
+    if (v === "") return null;
+    const parsed = JSON.parse(v);
+    return Array.isArray(parsed) && parsed.length === 0 ? null : parsed;
+  }
   return v === "" ? null : v;
 };
 
@@ -344,6 +364,11 @@ function FormDialog({
         errs[f.key] = "Required";
         continue;
       }
+      const custom = f.validate?.(raw, values);
+      if (custom) {
+        errs[f.key] = custom;
+        continue;
+      }
       if (raw !== "" && f.kind === "number") {
         const n = Number(raw);
         if (Number.isNaN(n)) errs[f.key] = "Must be a number";
@@ -422,14 +447,29 @@ function FormDialog({
           <div
             key={f.key}
             className={cn(
-              f.kind === "textarea" ? "col-span-2" : "",
+              f.kind === "textarea" || f.renderInput ? "col-span-2" : "",
             )}
           >
             <Label>
               {f.label}
               {f.required && <span className="text-destructive"> *</span>}
             </Label>
-            {f.kind === "textarea" ? (
+            {f.renderInput ? (
+              f.renderInput({
+                value: values[f.key] ?? "",
+                values,
+                invalid: Boolean(fieldErrors[f.key]),
+                onChange: (v) => {
+                  setValues((prev) => ({ ...prev, [f.key]: v }));
+                  setErrorMsg(null);
+                  setFieldErrors((prev) => {
+                    const next = { ...prev };
+                    delete next[f.key];
+                    return next;
+                  });
+                },
+              })
+            ) : f.kind === "textarea" ? (
               <textarea
                 className="mt-1 w-full rounded border border-input bg-transparent p-2 text-sm"
                 rows={3}
@@ -440,7 +480,11 @@ function FormDialog({
               <select
                 className="mt-1 h-9 w-full rounded border border-input bg-transparent px-2 text-sm"
                 value={values[f.key] ?? ""}
-                onChange={(e) => setValues({ ...values, [f.key]: e.target.value })}
+                onChange={(e) => {
+                  const next = { ...values, [f.key]: e.target.value };
+                  for (const r of f.resets ?? []) next[r] = "";
+                  setValues(next);
+                }}
               >
                 <option value="">—</option>
                 {(f.options ?? []).map((o) => (

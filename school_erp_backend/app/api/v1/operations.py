@@ -156,6 +156,10 @@ def _coerce(field: str, col_type_name: str, v: Any) -> Any:
     strings from form inputs; we parse them strictly here."""
     if v is None or (isinstance(v, str) and v.strip() == ""):
         return None
+    if field == "recipient_user_ids":
+        if not isinstance(v, list) or not all(isinstance(x, int) and not isinstance(x, bool) for x in v):
+            raise _FieldError(field, "must be a list of user ids")
+        return sorted(set(v)) or None
     tn = col_type_name.upper()
 
     if tn.startswith("DATETIME"):
@@ -542,7 +546,7 @@ def _register_all():
         Notice,
         {
             "title", "body", "audience", "is_pinned", "published_at",
-            "expires_at", "attachments",
+            "expires_at", "attachments", "recipient_user_ids",
         },
     )
     _simple_list_create_update_delete(
@@ -575,6 +579,89 @@ _register_all()
 # ---------------------------------------------------------------------------
 # Specialised endpoints — beyond flat CRUD
 # ---------------------------------------------------------------------------
+
+
+# --- Notice recipients (people picker for a notice's audience) -----------
+
+
+@router.get("/notices/recipients")
+async def notice_recipients(
+    audience: str = Query(..., pattern="^(staff|parents|students)$"),
+    session: AsyncSession = Depends(tenant_scoped_session),
+    principal: AuthPrincipal = Depends(_staff),
+):
+    """People who can be picked as particular recipients of a notice:
+    [{user_id, name, detail}]. Only people with an app login are listed,
+    since a notice is read in the app."""
+    from app.api.v1.operations_mobile import STAFF_NOTICE_ROLES
+    from app.models.auth import Role, User, UserRole
+    from app.models.parent import Parent, ParentChildMapping, Student
+
+    def class_label(st: "Student") -> str:
+        return st.current_class_label or ""
+
+    out: list[dict] = []
+    if audience == "students":
+        # Logins with the student role (that's what the notice feed checks),
+        # with class / admission number when linked to a student record.
+        rows = (
+            await session.execute(
+                select(User.id, User.full_name, Student)
+                .join(UserRole, UserRole.user_id == User.id)
+                .join(Role, Role.id == UserRole.role_id)
+                .outerjoin(Student, Student.user_id == User.id)
+                .where(User.is_active.is_(True), Role.code == "student")
+                .order_by(User.full_name)
+            )
+        ).all()
+        seen: set[int] = set()
+        for uid, name, st in rows:
+            if uid in seen:
+                continue
+            seen.add(uid)
+            bits = [class_label(st), f"Adm {st.admission_number}"] if st is not None else []
+            out.append({
+                "user_id": uid,
+                "name": st.full_name if st is not None else name,
+                "detail": " · ".join(b for b in bits if b),
+            })
+    elif audience == "parents":
+        parents = (await session.execute(select(Parent).order_by(Parent.full_name))).scalars().all()
+        kids: dict[int, list[str]] = {}
+        maps = (
+            await session.execute(
+                select(ParentChildMapping.parent_id, Student.full_name, Student.current_class_label)
+                .join(Student, Student.id == ParentChildMapping.student_id)
+            )
+        ).all()
+        for pid, name, label in maps:
+            kids.setdefault(pid, []).append(f"{name} ({label})" if label else name)
+        for pa in parents:
+            children = kids.get(pa.id, [])
+            out.append({
+                "user_id": pa.user_id,
+                "name": pa.full_name,
+                "detail": ("Parent of " + ", ".join(children)) if children else (pa.phone or ""),
+            })
+    else:
+        rows = (
+            await session.execute(
+                select(User.id, User.full_name, Role.name, Role.code)
+                .join(UserRole, UserRole.user_id == User.id)
+                .join(Role, Role.id == UserRole.role_id)
+                .where(User.is_active.is_(True), Role.code.in_(list(STAFF_NOTICE_ROLES)))
+                .order_by(User.full_name)
+            )
+        ).all()
+        by_user: dict[int, dict] = {}
+        for uid, name, role_name, _code in rows:
+            entry = by_user.setdefault(uid, {"user_id": uid, "name": name, "roles": []})
+            entry["roles"].append(role_name)
+        out = [
+            {"user_id": e["user_id"], "name": e["name"], "detail": ", ".join(e["roles"])}
+            for e in by_user.values()
+        ]
+    return out
 
 
 # --- Inventory movement (auto-updates on_hand) ---------------------------
