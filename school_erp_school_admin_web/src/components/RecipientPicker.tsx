@@ -26,9 +26,9 @@ export const parseIds = (value: string): number[] => {
   }
 };
 
-/** "Send to" for a notice: everyone in the chosen audience, or particular
- *  people picked from a searchable list. */
-export function NoticeRecipients({
+/** "Send to" for a notice or announcement: everyone in the chosen
+ *  audience, or particular people picked from a searchable list. */
+export function RecipientPicker({
   audience,
   value,
   onChange,
@@ -52,7 +52,7 @@ export function NoticeRecipients({
   });
 
   if (!noun) {
-    return <p className="mt-1 text-sm text-muted-foreground">Everyone in the school sees this notice.</p>;
+    return <p className="mt-1 text-sm text-muted-foreground">Everyone in the school gets it.</p>;
   }
 
   const byId = new Map((people.data ?? []).map((p) => [p.user_id, p]));

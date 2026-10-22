@@ -24,6 +24,7 @@ from sqlalchemy import or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.auth_deps import AuthPrincipal, require_roles
+from app.core.rbac_catalog import STAFF_ROLE_CODES
 from app.core.tenant_session import tenant_scoped_session
 
 
@@ -181,17 +182,6 @@ async def my_payslips(
 # ---------------------------------------------------------------------------
 
 
-# Roles that count as "staff" for notices (feed + recipient picker).
-STAFF_NOTICE_ROLES = frozenset({
-    "class_teacher", "subject_teacher", "coordinator", "teacher",
-    "principal", "vice_principal", "hod", "management",
-    "school_admin", "office_admin", "office_staff", "librarian",
-    "transport_manager", "accountant", "accounts", "payroll",
-    "receptionist", "data_entry_operator", "supervisor",
-    "visitor_desk", "hostel_warden",
-})
-
-
 def _notice_audience_for(roles: list[str]) -> list[str]:
     """Which notice-audience buckets the current user should see."""
     role_set = set(roles)
@@ -200,7 +190,7 @@ def _notice_audience_for(roles: list[str]) -> list[str]:
         buckets.append("parents")
     if "student" in role_set:
         buckets.append("students")
-    if role_set & STAFF_NOTICE_ROLES:
+    if role_set & STAFF_ROLE_CODES:
         buckets.append("staff")
     return buckets
 

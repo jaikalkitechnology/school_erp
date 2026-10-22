@@ -389,11 +389,9 @@ async def _resolve_audience(
 
     role_codes: list[str]
     if audience == AnnouncementAudience.STAFF:
-        role_codes = [
-            "school_admin", "principal", "vice_principal", "coordinator",
-            "class_teacher", "subject_teacher", "office_staff", "accountant",
-            "librarian", "transport_manager", "hostel_warden",
-        ]
+        from app.core.rbac_catalog import STAFF_ROLE_CODES
+
+        role_codes = sorted(STAFF_ROLE_CODES)
     elif audience == AnnouncementAudience.PARENTS:
         role_codes = ["parent"]
     elif audience == AnnouncementAudience.STUDENTS:
@@ -492,6 +490,21 @@ async def list_announcements(
     return list((await session.execute(stmt)).scalars().all())
 
 
+_PICKABLE_AUDIENCES = {
+    AnnouncementAudience.STAFF,
+    AnnouncementAudience.PARENTS,
+    AnnouncementAudience.STUDENTS,
+}
+
+
+def _recipients_for(payload: AnnouncementWrite) -> Optional[list[int]]:
+    """Particular recipients only make sense for staff / parents /
+    students; for everyone / a class / a section they're ignored."""
+    if payload.audience not in _PICKABLE_AUDIENCES or not payload.recipient_user_ids:
+        return None
+    return sorted(set(payload.recipient_user_ids))
+
+
 async def create_announcement(
     session: AsyncSession,
     tenant_id: int,
@@ -527,6 +540,7 @@ async def create_announcement(
         is_pinned=payload.is_pinned,
         expires_at=payload.expires_at,
         published_at=_now() if payload.publish else None,
+        recipient_user_ids=_recipients_for(payload),
     )
     session.add(obj)
     await session.flush()
@@ -537,6 +551,9 @@ async def create_announcement(
         users = await _resolve_audience(
             session, tenant_id=tenant_id, audience=payload.audience, audience_id=payload.audience_id
         )
+        if obj.recipient_user_ids:
+            wanted = set(obj.recipient_user_ids)
+            users = [u for u in users if u.id in wanted]
         if users:
             channel_override = _channel_override_for_announcement(payload.send_push)
             n_created, push_outbox_ids = await notify(

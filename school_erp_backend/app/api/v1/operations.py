@@ -593,7 +593,7 @@ async def notice_recipients(
     """People who can be picked as particular recipients of a notice:
     [{user_id, name, detail}]. Only people with an app login are listed,
     since a notice is read in the app."""
-    from app.api.v1.operations_mobile import STAFF_NOTICE_ROLES
+    from app.core.rbac_catalog import STAFF_ROLE_CODES
     from app.models.auth import Role, User, UserRole
     from app.models.parent import Parent, ParentChildMapping, Student
 
@@ -649,7 +649,7 @@ async def notice_recipients(
                 select(User.id, User.full_name, Role.name, Role.code)
                 .join(UserRole, UserRole.user_id == User.id)
                 .join(Role, Role.id == UserRole.role_id)
-                .where(User.is_active.is_(True), Role.code.in_(list(STAFF_NOTICE_ROLES)))
+                .where(User.is_active.is_(True), Role.code.in_(list(STAFF_ROLE_CODES)))
                 .order_by(User.full_name)
             )
         ).all()

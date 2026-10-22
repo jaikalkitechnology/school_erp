@@ -334,33 +334,36 @@ async def _ensure_google_sub_column() -> None:
         log.exception("google_sub column auto-add failed")
 
 
-async def _ensure_notice_recipients_column() -> None:
-    """Add notices.recipient_user_ids if migration d4b2e6f81a57 hasn't
-    run yet — same pattern as google_sub. MySQL only; idempotent."""
-    try:
-        from sqlalchemy import text
+async def _ensure_recipient_columns() -> None:
+    """Add notices / announcements .recipient_user_ids if migrations
+    d4b2e6f81a57 / e5c3f7a92b68 haven't run yet — same pattern as
+    google_sub. MySQL only; idempotent."""
+    from sqlalchemy import text
 
-        from app.database import AsyncSessionLocal
+    from app.database import AsyncSessionLocal
 
-        async with AsyncSessionLocal() as session:
-            exists = (
-                await session.execute(
-                    text(
-                        "SELECT COUNT(*) FROM information_schema.columns "
-                        "WHERE table_schema = DATABASE() "
-                        "AND table_name = 'notices' "
-                        "AND column_name = 'recipient_user_ids'"
+    for table in ("notices", "announcements"):
+        try:
+            async with AsyncSessionLocal() as session:
+                exists = (
+                    await session.execute(
+                        text(
+                            "SELECT COUNT(*) FROM information_schema.columns "
+                            "WHERE table_schema = DATABASE() "
+                            "AND table_name = :t "
+                            "AND column_name = 'recipient_user_ids'"
+                        ),
+                        {"t": table},
                     )
-                )
-            ).scalar()
-            if not exists:
-                await session.execute(
-                    text("ALTER TABLE notices ADD COLUMN recipient_user_ids JSON NULL")
-                )
-                await session.commit()
-                log.info("Added notices.recipient_user_ids column")
-    except Exception:
-        log.exception("notices.recipient_user_ids column auto-add failed")
+                ).scalar()
+                if not exists:
+                    await session.execute(
+                        text(f"ALTER TABLE {table} ADD COLUMN recipient_user_ids JSON NULL")
+                    )
+                    await session.commit()
+                    log.info("Added %s.recipient_user_ids column", table)
+        except Exception:
+            log.exception("%s.recipient_user_ids column auto-add failed", table)
 
 
 @asynccontextmanager
@@ -371,7 +374,7 @@ async def lifespan(_: FastAPI):
     await _ensure_operations_tables()
     await _ensure_library_extra_tables()
     await _ensure_google_sub_column()
-    await _ensure_notice_recipients_column()
+    await _ensure_recipient_columns()
     # Replay RBAC so new role codes shipped in the catalogue land in
     # every tenant's roles table. Safe + idempotent — runs once per
     # boot before traffic starts hitting the API.

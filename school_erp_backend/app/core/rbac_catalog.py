@@ -368,3 +368,15 @@ def expand_grants(grants: tuple[str, ...]) -> set[str]:
         else:
             expanded.add(g)
     return expanded
+
+
+# Roles that count as "staff" for the staff audience of notices and
+# announcements (who receives them, and who's offered in the people picker).
+STAFF_ROLE_CODES = frozenset({
+    "class_teacher", "subject_teacher", "coordinator", "teacher",
+    "principal", "vice_principal", "hod", "management",
+    "school_admin", "office_admin", "office_staff", "librarian",
+    "transport_manager", "accountant", "accounts", "payroll",
+    "receptionist", "data_entry_operator", "supervisor",
+    "visitor_desk", "hostel_warden",
+})

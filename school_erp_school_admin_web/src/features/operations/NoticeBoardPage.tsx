@@ -1,5 +1,5 @@
 import { SimpleCrudPage, type FieldSpec } from "./_crud";
-import { NoticeRecipients } from "./NoticeRecipients";
+import { RecipientPicker } from "@/components/RecipientPicker";
 
 const FIELDS: FieldSpec[] = [
   { key: "title", label: "Title", required: true },
@@ -20,7 +20,7 @@ const FIELDS: FieldSpec[] = [
     label: "Send to",
     kind: "json",
     renderInput: ({ value, values, onChange, invalid }) => (
-      <NoticeRecipients audience={values.audience} value={value} onChange={onChange} invalid={invalid} />
+      <RecipientPicker audience={values.audience} value={value} onChange={onChange} invalid={invalid} />
     ),
     validate: (raw) => (raw === "[]" ? "Pick at least one person, or choose All." : null),
     render: (row) => {

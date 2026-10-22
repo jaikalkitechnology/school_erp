@@ -8,6 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { cn } from "@/lib/utils";
 import { formatDateTime } from "@/lib/datetime";
+import { RecipientPicker, parseIds } from "@/components/RecipientPicker";
 import { listClasses, listSections } from "@/features/setup/api";
 import {
   bulkDeleteAnnouncements,
@@ -37,6 +38,9 @@ const AUDIENCES: { value: Audience; label: string }[] = [
   { value: "class", label: "Specific class" },
   { value: "section", label: "Specific section" },
 ];
+
+// Audiences where particular people can be picked.
+const PICKABLE = new Set<Audience>(["staff", "parents", "students"]);
 
 const STATUS_TONE: Record<DeliveryStatus, string> = {
   queued: "bg-marigold-pale text-marigold-dark",
@@ -347,6 +351,8 @@ function AnnouncementsPanel({ focusId }: { focusId: number | null }) {
   const [audience, setAudience] = useState<Audience>("all");
   const [audienceId, setAudienceId] = useState<number | "">("");
   const [pinned, setPinned] = useState(false);
+  // "" = everyone in the audience; a JSON id list = particular people.
+  const [recipients, setRecipients] = useState("");
   // Default on: most announcements should buzz the phone.
   const [sendPush, setSendPush] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -435,6 +441,7 @@ function AnnouncementsPanel({ focusId }: { focusId: number | null }) {
         is_pinned: pinned,
         publish: true,
         send_push: sendPush,
+        recipient_user_ids: PICKABLE.has(audience) && recipients ? parseIds(recipients) : null,
       }),
     onSuccess: (res) => {
       const inAppLine = `Notified ${res.fanned_out_to} user${res.fanned_out_to === 1 ? "" : "s"} in-app`;
@@ -458,7 +465,7 @@ function AnnouncementsPanel({ focusId }: { focusId: number | null }) {
       }
       setLastResult({ text: `Published. ${inAppLine}${pushLine}.`, warn });
       qc.invalidateQueries({ queryKey: ["push-status"] });
-      setTitle(""); setBody(""); setPinned(false); setAudienceId("");
+      setTitle(""); setBody(""); setPinned(false); setAudienceId(""); setRecipients("");
       // Don't reset sendPush — admin's preference stays sticky.
       qc.invalidateQueries({ queryKey: ["announcements"] });
     },
@@ -489,7 +496,15 @@ function AnnouncementsPanel({ focusId }: { focusId: number | null }) {
             />
           </div>
           <div className="grid gap-3 lg:grid-cols-2">
-            <Select label="Audience" value={audience} onChange={(v) => setAudience(v as Audience)} options={AUDIENCES} />
+            <Select
+              label="Audience"
+              value={audience}
+              onChange={(v) => {
+                setAudience(v as Audience);
+                setRecipients("");
+              }}
+              options={AUDIENCES}
+            />
             {(audience === "class" || audience === "section") && (
               <Select
                 label={audience === "class" ? "Class" : "Section"}
@@ -499,6 +514,20 @@ function AnnouncementsPanel({ focusId }: { focusId: number | null }) {
               />
             )}
           </div>
+          {PICKABLE.has(audience) && (
+            <div className="space-y-1">
+              <Label>Send to</Label>
+              <RecipientPicker
+                audience={audience}
+                value={recipients}
+                onChange={(v) => {
+                  setRecipients(v);
+                  setError(null);
+                }}
+                invalid={recipients === "[]" && error !== null}
+              />
+            </div>
+          )}
           <div className="space-y-2">
             <label className="flex items-center gap-2 text-sm">
               <input type="checkbox" className="h-4 w-4 accent-saffron" checked={pinned} onChange={(e) => setPinned(e.target.checked)} />
@@ -525,7 +554,16 @@ function AnnouncementsPanel({ focusId }: { focusId: number | null }) {
           {lastResult && (
             <p className={cn("text-sm", lastResult.warn ? "text-marigold-dark" : "text-teal-dark")}>{lastResult.text}</p>
           )}
-          <Button onClick={() => create.mutate()} disabled={!title || !body || create.isPending}>
+          <Button
+            onClick={() => {
+              if (PICKABLE.has(audience) && recipients === "[]") {
+                setError("Pick at least one person, or choose All.");
+                return;
+              }
+              create.mutate();
+            }}
+            disabled={!title || !body || create.isPending}
+          >
             Publish
           </Button>
         </CardContent>
@@ -599,6 +637,9 @@ function AnnouncementsPanel({ focusId }: { focusId: number | null }) {
                       <p className="mt-1 text-[11px] uppercase tracking-wider text-saffron-dark">
                         {a.audience}
                         {a.audience_id ? ` · #${a.audience_id}` : ""}
+                        {a.recipient_user_ids?.length
+                          ? ` · ${a.recipient_user_ids.length} ${a.recipient_user_ids.length === 1 ? "person" : "people"}`
+                          : ""}
                         {a.published_at
                           ? ` · ${formatDateTime(a.published_at)}`
                           : " · draft"}
