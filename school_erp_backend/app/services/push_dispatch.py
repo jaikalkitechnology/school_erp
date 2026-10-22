@@ -28,7 +28,7 @@ from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.auth_extras import UserDevice
-from app.models.comms import Channel, DeliveryStatus, NotificationOutbox
+from app.models.comms import Channel, DeliveryStatus, Notification, NotificationOutbox
 from app.services import fcm
 
 _log = logging.getLogger(__name__)
@@ -192,13 +192,28 @@ async def drain_pending_push_outbox_ids(
         await session.commit()
         return overall
 
+    # What the app needs to open the right place when the push is tapped.
+    notif_ids = [r.notification_id for r in rows if r.notification_id]
+    notifs: dict[int, Notification] = {}
+    if notif_ids:
+        notifs = {
+            n.id: n
+            for n in (
+                await session.execute(select(Notification).where(Notification.id.in_(notif_ids)))
+            ).scalars().all()
+        }
+
     for row in rows:
+        n = notifs.get(row.notification_id) if row.notification_id else None
+        data: dict[str, Any] = {"outbox_id": row.id}
+        if n is not None:
+            data.update(notification_id=n.id, kind=n.kind or "", deeplink=n.deeplink or "")
         per_row = await _send_to_user_devices(
             session,
             user_id=row.recipient_user_id,
             title=row.subject or "",
             body=row.body or "",
-            data={"outbox_id": row.id},
+            data=data,
         )
         overall.merge(per_row)
         if per_row.sent > 0:

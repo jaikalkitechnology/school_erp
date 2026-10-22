@@ -36,7 +36,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import AsyncSessionLocal
 from app.models.auth_extras import UserDevice
-from app.models.comms import Channel, DeliveryStatus, NotificationOutbox
+from app.models.comms import Channel, DeliveryStatus, Notification, NotificationOutbox
 from app.services import fcm
 
 _log = logging.getLogger("push_worker")
@@ -112,6 +112,11 @@ async def _send_one(
     title = (row.subject or "Notification")[:120]
     body = (row.body or "")[:500]
     data = {"outbox_id": str(row.id)}
+    # What the app needs to open the right place when the push is tapped.
+    if row.notification_id:
+        n = await session.get(Notification, row.notification_id)
+        if n is not None:
+            data.update(notification_id=str(n.id), kind=n.kind or "", deeplink=n.deeplink or "")
 
     successes: list[str] = []
     invalid_tokens: list[str] = []

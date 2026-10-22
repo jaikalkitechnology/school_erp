@@ -4,6 +4,7 @@ import 'package:intl/intl.dart';
 
 import '../../api/api_client.dart';
 import '../../api/notifications_repository.dart';
+import '../../core/push_service.dart';
 import '../../core/service_locator.dart';
 import '../../core/settings_cubit.dart';
 import '../../theme/brand.dart';
@@ -27,6 +28,14 @@ class _NotificationsPageState extends State<NotificationsPage> {
     _repo = NotificationsRepository(locator<ApiClient>());
     _announcements = AnnouncementsRepository(locator<ApiClient>());
     _refresh();
+    // A push arriving while this page is open: show it straight away.
+    PushService.instance.received.addListener(_refresh);
+  }
+
+  @override
+  void dispose() {
+    PushService.instance.received.removeListener(_refresh);
+    super.dispose();
   }
 
   void _refresh() {

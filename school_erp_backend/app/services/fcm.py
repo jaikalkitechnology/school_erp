@@ -77,6 +77,25 @@ def unavailable_reason() -> Optional[str]:
     return _unavailable_reason
 
 
+# Must match the channel the app creates (PushService._channelId) and the
+# default in AndroidManifest.xml. High priority + this high-importance
+# channel is what makes Android show a heads-up banner when the app is in
+# the background or closed.
+ANDROID_CHANNEL_ID = "jaikalki_default"
+
+
+def _android_config():
+    return _messaging.AndroidConfig(
+        priority="high",
+        notification=_messaging.AndroidNotification(
+            channel_id=ANDROID_CHANNEL_ID,
+            sound="default",
+            icon="ic_notification",
+            color="#E85D2E",
+        ),
+    )
+
+
 def send_push(
     *,
     token: str,
@@ -100,7 +119,7 @@ def send_push(
         token=token,
         notification=_messaging.Notification(title=title, body=body),
         data={k: str(v) for k, v in (data or {}).items()},
-        android=_messaging.AndroidConfig(priority="high"),
+        android=_android_config(),
         apns=_messaging.APNSConfig(
             headers={"apns-priority": "10"},
             payload=_messaging.APNSPayload(
@@ -136,7 +155,7 @@ def send_multicast(
         tokens=tokens,
         notification=_messaging.Notification(title=title, body=body),
         data={k: str(v) for k, v in (data or {}).items()},
-        android=_messaging.AndroidConfig(priority="high"),
+        android=_android_config(),
     )
     resp = _messaging.send_each_for_multicast(msg)
 

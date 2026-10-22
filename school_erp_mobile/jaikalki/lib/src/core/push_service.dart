@@ -1,4 +1,5 @@
 import 'dart:io' show Platform;
+import 'dart:ui' show Color;
 
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/foundation.dart';
@@ -54,6 +55,18 @@ class PushService {
   final FlutterLocalNotificationsPlugin _local =
       FlutterLocalNotificationsPlugin();
 
+  /// Bumped every time a push arrives while the app is open, so an open
+  /// Notifications page can reload.
+  final ValueNotifier<int> received = ValueNotifier<int>(0);
+
+  /// Bumped when the user taps a notification (foreground banner, tray
+  /// notification while backgrounded, or the one that launched the app).
+  /// The logged-in home screen listens and opens the Notifications page.
+  final ValueNotifier<int> openRequests = ValueNotifier<int>(0);
+
+  /// Small status-bar icon: white silhouette in res/drawable-*dpi.
+  static const String _smallIcon = '@drawable/ic_notification';
+
   Future<void> start() async {
     if (_started) return;
     _started = true;
@@ -97,7 +110,13 @@ class PushService {
           'FCM foreground message: title=${message.notification?.title} '
           'body=${message.notification?.body} data=${message.data}',
         );
-        await _showLocalNotificationFrom(message);
+        received.value++;
+        // iOS already shows the banner itself (see
+        // setForegroundNotificationPresentationOptions above); drawing
+        // our own too would show it twice.
+        if (defaultTargetPlatform == TargetPlatform.android) {
+          await _showLocalNotificationFrom(message);
+        }
       });
 
       // 4) Background / killed: register the top-level handler so the
@@ -109,17 +128,24 @@ class PushService {
       // 5) Optional: log taps on a tray notification while the app was
       //    in the background. Useful later for deep-link routing.
       FirebaseMessaging.onMessageOpenedApp.listen((message) {
-        debugPrint(
-          'FCM notification tapped: data=${message.data}',
-        );
+        debugPrint('FCM notification tapped: data=${message.data}');
+        openRequests.value++;
       });
+
+      // 6) The app was fully closed and the user launched it by tapping
+      //    a notification.
+      final initial = await messaging.getInitialMessage();
+      if (initial != null) {
+        debugPrint('App opened from notification: data=${initial.data}');
+        openRequests.value++;
+      }
     } catch (e, st) {
       debugPrint('PushService.start failed: $e\n$st');
     }
   }
 
   Future<void> _initLocalNotifications() async {
-    const androidInit = AndroidInitializationSettings('@mipmap/ic_launcher');
+    const androidInit = AndroidInitializationSettings(_smallIcon);
     const iosInit = DarwinInitializationSettings(
       requestAlertPermission: false,
       requestBadgePermission: false,
@@ -131,7 +157,7 @@ class PushService {
       init,
       onDidReceiveNotificationResponse: (resp) {
         debugPrint('Local notification tapped: payload=${resp.payload}');
-        // Hook deep-link routing here once we wire payload → screen.
+        openRequests.value++;
       },
     );
 
@@ -159,18 +185,21 @@ class PushService {
       // Data-only push with no human-readable payload — skip.
       return;
     }
-    const androidDetails = AndroidNotificationDetails(
+    // Not const: the expanded (BigText) view needs this message's body.
+    final androidDetails = AndroidNotificationDetails(
       _channelId,
       _channelName,
       channelDescription: _channelDescription,
       importance: Importance.high,
       priority: Priority.high,
-      icon: '@mipmap/ic_launcher',
+      icon: _smallIcon,
+      color: const Color(0xFFE85D2E),
+      styleInformation: BigTextStyleInformation(body ?? ''),
     );
     const iosDetails = DarwinNotificationDetails(
       presentAlert: true, presentBadge: true, presentSound: true,
     );
-    const details = NotificationDetails(android: androidDetails, iOS: iosDetails);
+    final details = NotificationDetails(android: androidDetails, iOS: iosDetails);
 
     final id = (message.messageId?.hashCode ?? DateTime.now().millisecondsSinceEpoch)
         .abs()
@@ -181,7 +210,7 @@ class PushService {
       title ?? '',
       body ?? '',
       details,
-      payload: message.data['screen'] as String?,
+      payload: message.data['deeplink'] as String? ?? message.data['screen'] as String?,
     );
   }
 
