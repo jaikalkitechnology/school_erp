@@ -6,10 +6,11 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { ColorField, HEX } from "@/components/ColorField";
 import { uploadSchoolLogo } from "@/lib/branding-api";
 import { fetchSettings, updateSettings, type SchoolSettings } from "./api";
 
-type FieldKind = "text" | "phone" | "email" | "pincode";
+type FieldKind = "text" | "phone" | "email" | "pincode" | "color";
 const FIELDS: {
   key: keyof SchoolSettings;
   label: string;
@@ -17,8 +18,8 @@ const FIELDS: {
   kind?: FieldKind;
 }[] = [
   { key: "school_name", label: "School name" },
-  { key: "primary_color", label: "Primary colour", placeholder: "#E85D2E" },
-  { key: "secondary_color", label: "Secondary colour", placeholder: "#0F766E" },
+  { key: "primary_color", label: "Primary colour", kind: "color" },
+  { key: "secondary_color", label: "Secondary colour", kind: "color" },
   { key: "timezone", label: "Timezone", placeholder: "Asia/Kolkata" },
   { key: "affiliation_board", label: "Affiliation board", placeholder: "CBSE / ICSE / State" },
   { key: "medium", label: "Medium", placeholder: "English" },
@@ -48,6 +49,8 @@ export function SettingsPage() {
         errs[f.key] = "PIN must be 6 digits";
       if (f.kind === "email" && !/^[a-zA-Z0-9.-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/.test(v))
         errs[f.key] = "Enter a valid email address";
+      if (f.kind === "color" && !HEX.test(v))
+        errs[f.key] = "Use a colour like #E85D2E";
     }
     return errs;
   };
@@ -187,7 +190,25 @@ export function SettingsPage() {
               </div>
             </div>
 
-            {FIELDS.map((f) => (
+            {FIELDS.map((f) =>
+              f.kind === "color" ? (
+                <ColorField
+                  key={f.key}
+                  id={f.key}
+                  label={f.label}
+                  value={(form[f.key] as string | null | undefined) ?? ""}
+                  onChange={(v) => {
+                    setForm((s) => ({ ...s, [f.key]: v }));
+                    if (fieldErrors[f.key])
+                      setFieldErrors((p) => {
+                        const n = { ...p };
+                        delete n[f.key];
+                        return n;
+                      });
+                  }}
+                  error={fieldErrors[f.key]}
+                />
+              ) : (
               <div key={f.key} className="space-y-1.5">
                 <Label htmlFor={f.key}>{f.label}</Label>
                 <Input
@@ -215,12 +236,9 @@ export function SettingsPage() {
                   <p className="text-xs text-destructive">{fieldErrors[f.key]}</p>
                 )}
               </div>
-            ))}
-            <div className="col-span-2 flex items-center justify-between">
-              <div className="flex gap-3">
-                <span className="block h-12 w-24 rounded-md" style={{ background: form.primary_color || "#E85D2E" }} />
-                <span className="block h-12 w-24 rounded-md" style={{ background: form.secondary_color || "#0F766E" }} />
-              </div>
+              ),
+            )}
+            <div className="col-span-2 flex items-center justify-end">
               <div className="flex items-center gap-3">
                 {saved && <span className="text-sm text-teal-dark">Saved.</span>}
                 <Button type="submit" disabled={save.isPending}>
