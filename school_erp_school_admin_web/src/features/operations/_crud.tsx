@@ -6,6 +6,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { cn } from "@/lib/utils";
+import { formatDateTime } from "@/lib/datetime";
 import { api } from "@/lib/api";
 
 // ---- Types ---------------------------------------------------------------
@@ -316,7 +317,8 @@ function renderCell(v: unknown, kind?: FieldKind): React.ReactNode {
   if (v === null || v === undefined || v === "") return <span className="text-muted-foreground">—</span>;
   if (kind === "checkbox") return v ? "Yes" : "No";
   if (kind === "date" && typeof v === "string") return v.slice(0, 10);
-  if (kind === "datetime" && typeof v === "string") return v.slice(0, 16).replace("T", " ");
+  // Typed into a date-time box, so shown as entered (no zone shift).
+  if (kind === "datetime" && typeof v === "string") return formatDateTime(v, "wall");
   if (typeof v === "object") return <span className="font-mono text-xs">{JSON.stringify(v)}</span>;
   return String(v);
 }
