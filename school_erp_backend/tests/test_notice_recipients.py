@@ -70,3 +70,41 @@ async def test_recipient_picker_lists_people(super_admin_token, audience):
         assert all({"user_id", "name", "detail"} <= set(p) for p in r.json())
     finally:
         await admin.aclose()
+
+
+@pytest.mark.asyncio
+async def test_announcement_to_particular_parents(super_admin_token):
+    admin = await _client_for(DEFAULT_SCHOOL_ADMIN_EMAIL, DEFAULT_SCHOOL_ADMIN_PASSWORD)
+    parent = await _client_for(DEMO_PARENT_EMAIL, DEFAULT_PARENT_PASSWORD)
+    try:
+        parent_uid = (await parent.get("/v1/auth/me")).json()["id"]
+        post = lambda title, audience, ids: admin.post(  # noqa: E731
+            "/v1/school-admin/communication/announcements",
+            json={"title": title, "body": "b", "audience": audience, "publish": True,
+                  "send_push": False, "recipient_user_ids": ids},
+        )
+
+        mine = await post("Just this parent", "parents", [parent_uid])
+        assert mine.status_code == 201, mine.text
+        assert mine.json()["fanned_out_to"] == 1
+
+        other = await post("Someone else", "parents", [parent_uid + 100000])
+        assert other.json()["fanned_out_to"] == 0
+
+        # Everyone: a recipient list makes no sense and is ignored.
+        everyone = await post("Everyone", "all", [parent_uid + 100000])
+        assert everyone.json()["fanned_out_to"] >= 1
+
+        feed = {a["title"] for a in (await parent.get("/v1/announcements")).json()}
+        assert {"Just this parent", "Everyone"} <= feed
+        assert "Someone else" not in feed
+
+        inbox = {n["title"] for n in (await parent.get("/v1/notifications")).json()}
+        assert "Someone else" not in " ".join(inbox)
+
+        listed = {a["title"]: a for a in (await admin.get("/v1/school-admin/communication/announcements")).json()}
+        assert listed["Just this parent"]["recipient_user_ids"] == [parent_uid]
+        assert listed["Everyone"]["recipient_user_ids"] is None
+    finally:
+        await admin.aclose()
+        await parent.aclose()

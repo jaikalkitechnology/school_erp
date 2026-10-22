@@ -87,6 +87,9 @@ class Announcement(TenantBase):
     published_at = Column(DateTime, nullable=True)
     expires_at = Column(DateTime, nullable=True)
     is_pinned = Column(Boolean, nullable=False, default=False)
+    # Particular people inside a staff / parents / students audience.
+    # NULL = everyone in the audience.
+    recipient_user_ids = Column(JSON, nullable=True)
 
 
 class Notification(TenantBase):

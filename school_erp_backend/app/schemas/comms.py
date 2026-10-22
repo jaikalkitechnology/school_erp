@@ -54,6 +54,9 @@ class AnnouncementWrite(BaseModel):
     # silence push for one specific announcement (eg. low-priority
     # notice that shouldn't buzz everyone's phone).
     send_push: Optional[bool] = None
+    # Only these people (who must be in the audience) get it. Used with
+    # the staff / parents / students audiences; empty = everyone in it.
+    recipient_user_ids: Optional[List[int]] = None
 
 
 class AnnouncementRead(BaseModel):
@@ -67,6 +70,7 @@ class AnnouncementRead(BaseModel):
     published_at: Optional[datetime]
     expires_at: Optional[datetime]
     is_pinned: bool
+    recipient_user_ids: Optional[List[int]] = None
 
 
 class PublishResult(BaseModel):

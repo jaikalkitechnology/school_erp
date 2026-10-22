@@ -14,6 +14,8 @@ export interface Announcement {
   published_at: string | null;
   expires_at: string | null;
   is_pinned: boolean;
+  // Particular people (staff / parents / students audiences); null = everyone in it.
+  recipient_user_ids?: number[] | null;
 }
 
 export interface AnnouncementWrite {
@@ -27,6 +29,7 @@ export interface AnnouncementWrite {
   // Per-announcement push toggle. Omit / null → use the template
   // default. true / false → force or silence push for this one.
   send_push?: boolean | null;
+  recipient_user_ids?: number[] | null;
 }
 
 export interface PublishResult {

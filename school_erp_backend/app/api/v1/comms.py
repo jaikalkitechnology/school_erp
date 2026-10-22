@@ -309,12 +309,9 @@ async def feed(
             if me.section_id is not None:
                 student_section_ids.add(me.section_id)
 
-    staff_role_codes = {
-        "school_admin", "principal", "vice_principal", "coordinator",
-        "class_teacher", "subject_teacher", "office_staff", "accountant",
-        "librarian", "transport_manager", "hostel_warden",
-    }
-    is_staff = bool(role_codes & staff_role_codes)
+    from app.core.rbac_catalog import STAFF_ROLE_CODES
+
+    is_staff = bool(role_codes & STAFF_ROLE_CODES)
     is_parent = "parent" in role_codes
     is_student = "student" in role_codes
 
@@ -336,6 +333,9 @@ async def feed(
     )
 
     def visible(a: Announcement) -> bool:
+        # Sent to particular people: only they see it.
+        if a.recipient_user_ids and principal.user_id not in a.recipient_user_ids:
+            return False
         aud = a.audience
         if aud == AnnouncementAudience.ALL.value:
             return True
