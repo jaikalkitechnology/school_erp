@@ -57,7 +57,9 @@ const INITIAL: FormState = {
   medium: "English",
   primary_color: "#E85D2E",
   secondary_color: "#0F766E",
-  plan_code: "standard",
+  // No default: the super admin must click a plan, so a school never
+  // lands on one nobody chose.
+  plan_code: "",
 };
 
 const EMAIL = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
@@ -276,18 +278,27 @@ export function OnboardingWizard() {
             {stepIndex === 1 && (
               <div className="space-y-3">
                 <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-                  {(plans.data ?? []).map((p) => (
+                  {(plans.data ?? []).map((p) => {
+                    const chosen = form.plan_code === p.code;
+                    return (
                     <button
                       key={p.code}
                       type="button"
+                      aria-pressed={chosen}
                       onClick={() => set("plan_code", p.code)}
                       className={cn(
-                        "rounded-lg border p-4 text-left transition-colors",
-                        form.plan_code === p.code
-                          ? "border-saffron bg-saffron-pale"
-                          : "border-border hover:border-saffron-light",
+                        "relative rounded-lg border p-4 text-left transition-colors",
+                        chosen
+                          ? "border-2 border-saffron bg-saffron-pale"
+                          : "border-border hover:border-saffron-light hover:bg-saffron-pale/30",
                       )}
                     >
+                      {chosen && (
+                        <span className="absolute right-3 top-3 flex items-center gap-1 rounded-full bg-saffron px-2 py-0.5 text-[11px] font-semibold text-white">
+                          <Check className="h-3 w-3" />
+                          Selected
+                        </span>
+                      )}
                       <p className="text-xs uppercase tracking-wider text-saffron-dark">{p.code}</p>
                       <p className="mt-1 text-lg font-display text-indigo-dark">{p.name}</p>
                       <p className="text-2xl font-mono text-indigo-dark">₹{p.monthly_price}/mo</p>
@@ -295,8 +306,18 @@ export function OnboardingWizard() {
                         {p.student_limit ? `${p.student_limit} students` : "Unlimited students"} · {p.storage_gb}GB
                       </p>
                     </button>
-                  ))}
+                    );
+                  })}
                 </div>
+                <p className={cn("text-sm", selectedPlan ? "text-indigo-dark" : "text-muted-foreground")}>
+                  {selectedPlan ? (
+                    <>
+                      The school will be created on <strong>{selectedPlan.name}</strong>.
+                    </>
+                  ) : (
+                    "Click a plan to continue."
+                  )}
+                </p>
               </div>
             )}
 
