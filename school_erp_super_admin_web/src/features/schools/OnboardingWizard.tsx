@@ -8,6 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { cn } from "@/lib/utils";
 import { createTenant, listPlans, uploadTenantLogo } from "./api";
+import { ColorField, HEX } from "./ColorField";
 import { LocationFields } from "./LocationFields";
 import type { CreateTenantPayload } from "./types";
 
@@ -145,6 +146,10 @@ export function OnboardingWizard() {
     email: form.email && !EMAIL.test(form.email) ? "Enter a valid email address." : null,
     pincode: form.pincode && form.pincode.length !== 6 ? "PIN must be 6 digits." : null,
   };
+  const brandErrors = {
+    primary_color: HEX.test(form.primary_color) ? null : "Use a colour like #E85D2E.",
+    secondary_color: HEX.test(form.secondary_color) ? null : "Use a colour like #0F766E.",
+  };
 
   const canAdvance = (() => {
     if (stepIndex === 0)
@@ -155,6 +160,7 @@ export function OnboardingWizard() {
         !infoErrors.phone && !infoErrors.email && !infoErrors.pincode
       );
     if (stepIndex === 1) return Boolean(form.plan_code);
+    if (stepIndex === 2) return !brandErrors.primary_color && !brandErrors.secondary_color;
     return true;
   })();
 
@@ -296,12 +302,34 @@ export function OnboardingWizard() {
 
             {stepIndex === 2 && (
               <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                <Field label="Primary colour" value={form.primary_color} onChange={(v) => set("primary_color", v)} />
-                <Field label="Secondary colour" value={form.secondary_color} onChange={(v) => set("secondary_color", v)} />
-                <div className="flex flex-wrap items-center gap-3 sm:col-span-2">
-                  <span className="block h-12 w-24 rounded-md" style={{ background: form.primary_color }} />
-                  <span className="block h-12 w-24 rounded-md" style={{ background: form.secondary_color }} />
+                <ColorField
+                  id="onboard-primary_color"
+                  label="Primary colour"
+                  value={form.primary_color}
+                  onChange={(v) => set("primary_color", v)}
+                  error={brandErrors.primary_color}
+                />
+                <ColorField
+                  id="onboard-secondary_color"
+                  label="Secondary colour"
+                  value={form.secondary_color}
+                  onChange={(v) => set("secondary_color", v)}
+                  error={brandErrors.secondary_color}
+                />
+                <div className="flex flex-wrap items-center gap-3 rounded-lg border border-saffron-pale p-3 sm:col-span-2">
                   <LogoThumb url={logoUrl} size="h-12 w-12" />
+                  <span
+                    className="rounded-md px-4 py-2 text-sm font-semibold text-white shadow-sm"
+                    style={{ background: HEX.test(form.primary_color) ? form.primary_color : undefined }}
+                  >
+                    {form.school_name || "School"} button
+                  </span>
+                  <span
+                    className="rounded-full px-3 py-1 text-xs font-medium text-white"
+                    style={{ background: HEX.test(form.secondary_color) ? form.secondary_color : undefined }}
+                  >
+                    Badge
+                  </span>
                   <p className="text-xs text-muted-foreground">
                     {logoUrl ? "Profile image from School Information." : "No profile image — add one in School Information."}
                   </p>

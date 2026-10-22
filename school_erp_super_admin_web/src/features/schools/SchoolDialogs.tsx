@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { deleteTenant, updateTenant } from "./api";
+import { ColorField, HEX } from "./ColorField";
 import { LocationFields } from "./LocationFields";
 import type { SchoolType, Tenant } from "./types";
 
@@ -90,7 +91,6 @@ type EditForm = {
   secondary_color: string;
 };
 
-const HEX = /^#[0-9a-fA-F]{6}$/;
 const EMAIL = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
 
 function validate(f: EditForm): Record<string, string> {
@@ -181,26 +181,7 @@ export function EditSchoolDialog({ tenant, onClose }: { tenant: Tenant; onClose:
   );
 
   const color = (k: "primary_color" | "secondary_color", label: string) => (
-    <div className="space-y-1.5">
-      <Label htmlFor={`edit-${k}`}>{label}</Label>
-      <div className="flex gap-2">
-        <input
-          type="color"
-          aria-label={`${label} picker`}
-          value={HEX.test(form[k]) ? form[k] : "#000000"}
-          onChange={(e) => set(k, e.target.value.toUpperCase())}
-          className="h-10 w-12 shrink-0 cursor-pointer rounded-md border border-input bg-transparent p-1"
-        />
-        <Input
-          id={`edit-${k}`}
-          value={form[k]}
-          maxLength={7}
-          onChange={(e) => set(k, e.target.value)}
-          className={errors[k] ? "border-destructive font-mono" : "font-mono"}
-        />
-      </div>
-      {errors[k] && <p className="text-xs text-destructive">{errors[k]}</p>}
-    </div>
+    <ColorField id={`edit-${k}`} label={label} value={form[k]} onChange={(v) => set(k, v)} error={errors[k]} />
   );
 
   return (
