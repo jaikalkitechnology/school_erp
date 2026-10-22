@@ -4,6 +4,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { formatDistanceToNow } from "date-fns";
 import { Bell, CheckCheck, Trash2, X } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { adminPathFor } from "@/lib/notification-links";
 import {
   clearNotifications,
   deleteNotification,
@@ -80,10 +81,10 @@ export function NotificationBell() {
 
   const openItem = (n: AppNotification) => {
     if (!n.read_at) markOne.mutate(n.id);
-    // Only follow links that point inside this admin app.
-    if (n.deeplink && n.deeplink.startsWith("/") && !n.deeplink.startsWith("//")) {
+    const to = adminPathFor(n);
+    if (to) {
       setOpen(false);
-      navigate(n.deeplink);
+      navigate(to);
     }
   };
 

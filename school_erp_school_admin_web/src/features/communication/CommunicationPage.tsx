@@ -58,6 +58,10 @@ export function CommunicationPage() {
     if (t && TABS.includes(t) && t !== tab) setTab(t);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [params]);
+  // Set by a notification click: open that message's conversation /
+  // highlight that announcement.
+  const focusMessage = Number(params.get("message")) || null;
+  const focusAnnouncement = Number(params.get("announcement")) || null;
   const selectTab = (t: Tab) => {
     setTab(t);
     setParams({ tab: t }, { replace: true });
@@ -87,8 +91,8 @@ export function CommunicationPage() {
           </button>
         ))}
       </nav>
-      {tab === "Announcements" && <AnnouncementsPanel />}
-      {tab === "Messages" && <MessagesPanel />}
+      {tab === "Announcements" && <AnnouncementsPanel focusId={focusAnnouncement} />}
+      {tab === "Messages" && <MessagesPanel focusMessageId={focusMessage} />}
       {tab === "Templates" && <TemplatesPanel />}
       {tab === "Outbox" && <OutboxPanel />}
     </div>
@@ -137,7 +141,7 @@ function buildThreads(
   return Array.from(map.values()).sort((a, b) => (b.lastAt || "").localeCompare(a.lastAt || ""));
 }
 
-function MessagesPanel() {
+function MessagesPanel({ focusMessageId }: { focusMessageId: number | null }) {
   const qc = useQueryClient();
   const inboxQ = useQuery({ queryKey: ["messages-inbox"], queryFn: listInboxMessages });
   const sentQ = useQuery({ queryKey: ["messages-sent"], queryFn: listSentMessages });
@@ -160,6 +164,20 @@ function MessagesPanel() {
   useEffect(() => {
     if (!activePeer && threads.length > 0) setActivePeer(threads[0]);
   }, [activePeer, threads]);
+
+  // Opened from a notification: jump to the conversation that message
+  // belongs to (once per message id, so later clicks still work).
+  const focusedRef = useRef<number | null>(null);
+  useEffect(() => {
+    if (!focusMessageId || focusedRef.current === focusMessageId) return;
+    if (!inboxQ.data || !sentQ.data) return;
+    const inMsg = inboxQ.data.find((m) => m.id === focusMessageId);
+    const outMsg = sentQ.data.find((m) => m.id === focusMessageId);
+    const peer = inMsg?.sender_user_id ?? outMsg?.recipient_user_id;
+    const thread = threads.find((t) => t.peerUserId === peer);
+    if (thread) setActivePeer(thread);
+    focusedRef.current = focusMessageId;
+  }, [focusMessageId, inboxQ.data, sentQ.data, threads]);
 
   const threadMessages = useMemo(() => {
     if (!activePeer) return [] as DirectMessage[];
@@ -312,9 +330,14 @@ function MessagesPanel() {
 
 // ---- Announcements --------------------------------------------------------
 
-function AnnouncementsPanel() {
+function AnnouncementsPanel({ focusId }: { focusId: number | null }) {
   const qc = useQueryClient();
   const list = useQuery({ queryKey: ["announcements"], queryFn: listAnnouncements });
+  // Opened from a notification: scroll the highlighted announcement into view.
+  useEffect(() => {
+    if (!focusId || !list.data) return;
+    document.getElementById(`announcement-${focusId}`)?.scrollIntoView({ block: "center", behavior: "smooth" });
+  }, [focusId, list.data]);
   const classes = useQuery({ queryKey: ["classes"], queryFn: listClasses });
   const sections = useQuery({ queryKey: ["sections"], queryFn: () => listSections() });
 
@@ -552,7 +575,14 @@ function AnnouncementsPanel() {
               </label>
               <ul className="divide-y divide-saffron-pale">
                 {list.data.map((a) => (
-                  <li key={a.id} className="flex items-start gap-3 px-6 py-3 text-sm">
+                  <li
+                    key={a.id}
+                    id={`announcement-${a.id}`}
+                    className={cn(
+                      "flex items-start gap-3 px-6 py-3 text-sm transition-colors",
+                      a.id === focusId && "bg-saffron-pale/60 ring-2 ring-inset ring-saffron",
+                    )}
+                  >
                     <input
                       type="checkbox"
                       className="mt-1 h-4 w-4 accent-saffron"
