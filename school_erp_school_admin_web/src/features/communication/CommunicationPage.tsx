@@ -7,6 +7,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { cn } from "@/lib/utils";
+import { formatDateTime } from "@/lib/datetime";
 import { listClasses, listSections } from "@/features/setup/api";
 import {
   bulkDeleteAnnouncements,
@@ -298,7 +299,7 @@ function MessagesPanel({ focusMessageId }: { focusMessageId: number | null }) {
                   )}
                   <p className="whitespace-pre-wrap">{m.body}</p>
                   <p className={cn("mt-1 text-[10px]", mine ? "text-white/80" : "text-muted-foreground")}>
-                    {m.created_at ? new Date(m.created_at).toLocaleString() : ""}
+                    {formatDateTime(m.created_at)}
                   </p>
                 </div>
               </div>
@@ -599,7 +600,7 @@ function AnnouncementsPanel({ focusId }: { focusId: number | null }) {
                         {a.audience}
                         {a.audience_id ? ` · #${a.audience_id}` : ""}
                         {a.published_at
-                          ? ` · ${new Date(a.published_at).toLocaleString()}`
+                          ? ` · ${formatDateTime(a.published_at)}`
                           : " · draft"}
                       </p>
                     </div>
@@ -808,7 +809,7 @@ function OutboxPanel() {
                         {row.status}
                       </span>
                     </td>
-                    <td className="px-4 py-2 font-mono text-xs">{new Date(row.created_at).toLocaleString()}</td>
+                    <td className="px-4 py-2 font-mono text-xs">{formatDateTime(row.created_at)}</td>
                   </tr>
                 ))}
               </tbody>
