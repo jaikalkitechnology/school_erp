@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, type KeyboardEvent } from "react";
 import { NavLink, Outlet, useLocation, useNavigate } from "react-router-dom";
 import {
   BarChart3,
@@ -8,7 +8,9 @@ import {
   LogOut,
   Megaphone,
   Menu,
+  Plus,
   ScrollText,
+  Search,
   Settings,
   Users2,
   Wallet,
@@ -30,6 +32,39 @@ const nav = [
   { to: "/audit", label: "Audit Logs", icon: ScrollText },
   { to: "/settings", label: "Settings", icon: Settings },
 ];
+
+// Other words people search for, so "tenants" finds Organizations.
+const KEYWORDS: Record<string, string> = {
+  "/dashboard": "home overview analytics mrr revenue stats",
+  "/schools": "schools tenants institutes subdomain onboard edit delete suspend logo admin login",
+  "/plans": "subscription pricing tiers limits modules",
+  "/billing": "invoices payments revenue razorpay money",
+  "/staff": "team users admins people",
+  "/reports": "analytics export charts",
+  "/announcements": "broadcast notice message notify",
+  "/audit": "history activity logs trail",
+  "/settings": "configuration preferences",
+};
+
+// Actions that only show up in search results.
+const SHORTCUTS = [
+  { to: "/schools/new", label: "Onboard a new school", icon: Plus, keywords: "add create school tenant organization" },
+];
+
+function Highlight({ text, query }: { text: string; query: string }) {
+  const q = query.trim().toLowerCase();
+  const i = q ? text.toLowerCase().indexOf(q) : -1;
+  if (i < 0) return <span>{text}</span>;
+  return (
+    <span>
+      {text.slice(0, i)}
+      <mark className="rounded bg-marigold-pale px-0.5 text-inherit">{text.slice(i, i + q.length)}</mark>
+      {text.slice(i + q.length)}
+    </span>
+  );
+}
+
+const isPhone = () => window.matchMedia("(max-width: 767px)").matches;
 
 const SIDEBAR_KEY = "jaikalki.superadmin.sidebar.collapsed";
 
@@ -64,9 +99,56 @@ export function SuperAdminLayout() {
   }, [location.pathname]);
 
   const onMenuButton = () => {
-    if (window.matchMedia("(max-width: 767px)").matches) setMobileOpen(true);
+    if (isPhone()) setMobileOpen(true);
     else setCollapsed((c) => !c);
   };
+
+  // Sidebar search: filters the menu by label or KEYWORDS.
+  const [query, setQuery] = useState("");
+  const q = query.trim().toLowerCase();
+  const searching = q !== "";
+  const hits = (label: string, extra: string) => `${label} ${extra}`.toLowerCase().includes(q);
+  const shownNav = searching ? nav.filter((n) => hits(n.label, KEYWORDS[n.to] ?? "")) : nav;
+  const shownShortcuts = searching ? SHORTCUTS.filter((s) => hits(s.label, s.keywords)) : [];
+  const results = [...shownNav, ...shownShortcuts];
+
+  const onSearchKey = (e: KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === "Enter" && results[0]) {
+      e.preventDefault();
+      navigate(results[0].to);
+      setQuery("");
+    } else if (e.key === "Escape") {
+      setQuery("");
+      e.currentTarget.blur();
+    }
+  };
+
+  const focusSearch = () => {
+    if (isPhone()) setMobileOpen(true);
+    else setCollapsed(false);
+    // After React re-renders, focus whichever search box is on screen.
+    window.setTimeout(() => {
+      const input = Array.from(document.querySelectorAll<HTMLInputElement>("[data-sidebar-search]")).find(
+        (i) => i.offsetParent !== null,
+      );
+      input?.focus();
+      input?.select();
+    }, 0);
+  };
+
+  // "/" or Ctrl/Cmd+K jumps to the search, unless typing in a field.
+  useEffect(() => {
+    const onKey = (e: globalThis.KeyboardEvent) => {
+      const el = e.target as HTMLElement | null;
+      const typing = !!el && (el.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(el.tagName));
+      if ((e.key === "k" && (e.ctrlKey || e.metaKey)) || (e.key === "/" && !typing)) {
+        e.preventDefault();
+        focusSearch();
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, []);
 
   const onLogout = async () => {
     try {
@@ -93,11 +175,45 @@ export function SuperAdminLayout() {
         </div>
       </div>
 
+      <div className="relative mb-4">
+        <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+        <input
+          data-sidebar-search
+          type="text"
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+          onKeyDown={onSearchKey}
+          placeholder="Search menu…"
+          aria-label="Search menu"
+          autoComplete="off"
+          spellCheck={false}
+          className="h-9 w-full rounded-md border border-saffron-pale bg-ivory pl-9 pr-9 text-sm text-indigo-dark placeholder:text-muted-foreground focus:border-saffron focus:outline-none focus:ring-2 focus:ring-saffron/30"
+        />
+        {searching ? (
+          <button
+            type="button"
+            onClick={() => setQuery("")}
+            className="absolute right-2 top-1/2 -translate-y-1/2 rounded p-1 text-muted-foreground hover:bg-saffron-pale/60 hover:text-indigo-dark"
+            aria-label="Clear search"
+          >
+            <X className="h-3.5 w-3.5" />
+          </button>
+        ) : (
+          <kbd className="pointer-events-none absolute right-2 top-1/2 hidden -translate-y-1/2 rounded border border-saffron-pale px-1.5 font-mono text-[10px] text-muted-foreground md:block">
+            /
+          </kbd>
+        )}
+      </div>
+
       <nav className="flex flex-1 flex-col gap-1 overflow-y-auto">
-        {nav.map(({ to, label, icon: Icon }) => (
+        {searching && results.length === 0 && (
+          <p className="px-3 py-2 text-sm text-muted-foreground">No pages match “{query.trim()}”.</p>
+        )}
+        {results.map(({ to, label, icon: Icon }) => (
           <NavLink
             key={to}
             to={to}
+            onClick={() => setQuery("")}
             className={({ isActive }) =>
               cn(
                 "flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors",
@@ -108,7 +224,7 @@ export function SuperAdminLayout() {
             }
           >
             <Icon className="h-4 w-4" />
-            {label}
+            <Highlight text={label} query={query} />
           </NavLink>
         ))}
       </nav>
@@ -152,6 +268,16 @@ export function SuperAdminLayout() {
             Super Admin
           </span>
         </span>
+      </button>
+
+      <button
+        type="button"
+        onClick={focusSearch}
+        title="Search menu ( / )"
+        aria-label="Search menu"
+        className={cn(railItem(false), "mb-2")}
+      >
+        <Search className="h-5 w-5" />
       </button>
 
       <nav aria-label="Main" className="flex flex-1 flex-col items-center gap-2 overflow-y-auto [scrollbar-width:none]">
