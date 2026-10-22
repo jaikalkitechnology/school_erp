@@ -49,7 +49,7 @@ import { cn } from "@/lib/utils";
 import { logout as logoutApi } from "@/lib/auth-api";
 import { useAuth } from "@/stores/auth";
 import { useQuery } from "@tanstack/react-query";
-import { SchoolLogo } from "@/components/SchoolLogo";
+import { JaikalkiIcon, SchoolLogo, useSchoolFavicon } from "@/components/SchoolLogo";
 import { fetchBranding } from "@/lib/branding-api";
 import { NotificationBell } from "./NotificationBell";
 
@@ -556,6 +556,7 @@ export function SchoolAdminLayout() {
     staleTime: 5 * 60_000,
   });
   const schoolName = branding.data?.school_name ?? user?.school_name ?? "School Admin";
+  useSchoolFavicon(branding.data?.logo_url);
 
   const currentPath = location.pathname;
   const crumb = useMemo(
@@ -570,6 +571,7 @@ export function SchoolAdminLayout() {
           src={branding.data?.logo_url}
           alt={`${schoolName} logo`}
           className="h-12 w-12 shrink-0 rounded-lg border border-saffron-pale bg-white object-contain p-1"
+          fallback={<JaikalkiIcon className="h-12 w-12 shrink-0 rounded-xl shadow" />}
         />
         <div className="min-w-0">
           <p className="truncate font-mono text-[11px] uppercase tracking-[0.22em] text-saffron-dark">
@@ -690,11 +692,7 @@ export function SchoolAdminLayout() {
           src={branding.data?.logo_url}
           alt={`${schoolName} logo`}
           className="h-11 w-11 rounded-xl border border-saffron-pale bg-white object-contain p-1"
-          fallback={
-            <span className="flex h-11 w-11 items-center justify-center rounded-xl bg-saffron font-display text-lg font-semibold text-white">
-              {schoolName.trim().charAt(0).toUpperCase() || "S"}
-            </span>
-          }
+          fallback={<JaikalkiIcon className="h-11 w-11 rounded-xl shadow" />}
         />
         <span className="line-clamp-3 text-center font-display text-[11px] font-semibold leading-tight text-indigo-dark">
           {schoolName}
