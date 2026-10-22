@@ -86,9 +86,7 @@ export function SuperAdminLayout() {
   const fullBody = (
     <>
       <div className="mb-8 flex items-center gap-3">
-        <div className="flex h-10 w-10 items-center justify-center rounded-full bg-saffron text-warm-white font-display text-lg font-semibold shadow">
-          J
-        </div>
+        <img src="/favicon-192.png" alt="" className="h-11 w-11 shrink-0 rounded-xl shadow" />
         <div>
           <p className="font-display text-lg font-semibold text-indigo-dark">Jaikalki</p>
           <p className="text-xs uppercase tracking-[0.2em] text-saffron-dark">Super Admin</p>
@@ -147,9 +145,7 @@ export function SuperAdminLayout() {
         title="Open menu"
         className="mb-6 flex flex-col items-center gap-2 rounded-lg px-1 py-1 hover:bg-saffron-pale/40"
       >
-        <span className="flex h-10 w-10 items-center justify-center rounded-full bg-saffron font-display text-lg font-semibold text-warm-white shadow">
-          J
-        </span>
+        <img src="/favicon-192.png" alt="" className="h-11 w-11 rounded-xl shadow" />
         <span className="text-center font-display text-[11px] font-semibold leading-tight text-indigo-dark">
           Jaikalki
           <span className="block text-[9px] font-sans uppercase tracking-[0.14em] text-saffron-dark">
