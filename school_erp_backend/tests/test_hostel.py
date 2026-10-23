@@ -73,7 +73,7 @@ async def test_allocation_capacity_and_idempotent(demo_admin_client, hostel_setu
                  ("Chetan", "+919900000092")]:
         students.append((await demo_admin_client.post(
             "/v1/school-admin/students",
-            json={"full_name": n, "parent_phone": p, "parent_email": f"{n.lower()}@h.test",
+            json={"full_name": n, "parent_phone": p, "parent_email": f"{n.lower()}@gmail.com",
                   "father_name": "P"},
         )).json())
 
@@ -122,7 +122,7 @@ async def test_mess_visitor_disciplinary(demo_admin_client, hostel_setup):
     student = (await demo_admin_client.post(
         "/v1/school-admin/students",
         json={"full_name": "Dev", "parent_phone": "+919900000093",
-              "parent_email": "dev@h.test", "father_name": "P"},
+              "parent_email": "dev@gmail.com", "father_name": "P"},
     )).json()
     today = date.today().isoformat()
 
@@ -168,7 +168,7 @@ async def test_leave_lifecycle_and_parent(demo_admin_client, hostel_setup):
     student = (await demo_admin_client.post(
         "/v1/school-admin/students",
         json={"full_name": "Esha", "parent_phone": "+919900000094",
-              "parent_email": "esha@h.test", "father_name": "P"},
+              "parent_email": "esha@gmail.com", "father_name": "P"},
     )).json()
     today = date.today()
     await demo_admin_client.post(
@@ -216,10 +216,10 @@ async def test_leave_lifecycle_and_parent(demo_admin_client, hostel_setup):
     # Parent view.
     await demo_admin_client.post(
         "/v1/auth/reset-password",
-        json={"identifier": "esha@h.test", "subdomain": "demo",
+        json={"identifier": "esha@gmail.com", "subdomain": "demo",
               "otp": "1234", "new_password": "Parent@123"},
     )
-    parent_token = await _login("demo", "esha@h.test", "Parent@123")
+    parent_token = await _login("demo", "esha@gmail.com", "Parent@123")
     async with AsyncClient(
         transport=ASGITransport(app=app),
         base_url="http://localhost",
@@ -250,3 +250,47 @@ async def test_super_admin_blocked(super_admin_token):
     ) as ac:
         r = await ac.get("/v1/school-admin/hostel/hostels")
         assert r.status_code == 403
+
+
+@pytest.mark.asyncio
+async def test_edit_and_delete_hostels_and_rooms(demo_admin_client):
+    c = demo_admin_client
+    h = (await c.post("/v1/school-admin/hostel/hostels", json={"code": "TMP1", "name": "Temp Hostel", "kind": "boys"})).json()
+    other = (await c.post("/v1/school-admin/hostel/hostels", json={"code": "TMP2", "name": "Other", "kind": "girls"})).json()
+
+    # Edit hostel; a duplicate code is a clean 409, not a 500.
+    r = await c.patch(f"/v1/school-admin/hostel/hostels/{h['id']}",
+                      json={"code": "TMP1", "name": "Tagore House", "kind": "girls", "is_active": False})
+    assert r.status_code == 200 and r.json()["name"] == "Tagore House" and r.json()["is_active"] is False
+    r = await c.patch(f"/v1/school-admin/hostel/hostels/{h['id']}", json={"code": "TMP2", "name": "x", "kind": "boys"})
+    assert r.status_code == 409
+
+    # Rooms: edit, capacity floor, delete rules.
+    room = (await c.post(f"/v1/school-admin/hostel/hostels/{h['id']}/rooms", json={"number": "101", "capacity": 2})).json()
+    spare = (await c.post(f"/v1/school-admin/hostel/hostels/{h['id']}/rooms", json={"number": "102", "capacity": 1})).json()
+    r = await c.patch(f"/v1/school-admin/hostel/rooms/{room['id']}",
+                      json={"number": "101A", "floor": "1", "capacity": 3, "monthly_fee": 2500, "status": "available"})
+    assert r.status_code == 200 and r.json()["number"] == "101A" and r.json()["capacity"] == 3
+    r = await c.patch(f"/v1/school-admin/hostel/rooms/{spare['id']}", json={"number": "101A", "capacity": 1})
+    assert r.status_code == 409
+
+    for name, phone in (("Hari", "+919900000095"), ("Ravi", "+919900000096")):
+        kid = (await c.post("/v1/school-admin/students", json={
+            "full_name": name, "parent_phone": phone, "parent_email": f"{name.lower()}@gmail.com",
+            "father_name": "P"})).json()
+        r = await c.post("/v1/school-admin/hostel/allocations",
+                         json={"student_id": kid["id"], "room_id": room["id"], "occupied_from": "2026-06-01"})
+        assert r.status_code == 200, r.text
+    # Two students live there: capacity can't go below 2.
+    r = await c.patch(f"/v1/school-admin/hostel/rooms/{room['id']}", json={"number": "101A", "capacity": 1})
+    assert r.status_code == 400 and "below 2" in r.json()["detail"]
+    r = await c.delete(f"/v1/school-admin/hostel/rooms/{room['id']}")
+    assert r.status_code == 409 and "Move them out" in r.json()["detail"]
+    assert (await c.delete(f"/v1/school-admin/hostel/rooms/{spare['id']}")).status_code == 204
+
+    # Hostel with a student stay can't be deleted; an empty one can.
+    r = await c.delete(f"/v1/school-admin/hostel/hostels/{h['id']}")
+    assert r.status_code == 409 and "inactive" in r.json()["detail"]
+    assert (await c.delete(f"/v1/school-admin/hostel/hostels/{other['id']}")).status_code == 204
+    names = [x["name"] for x in (await c.get("/v1/school-admin/hostel/hostels")).json()]
+    assert "Other" not in names and "Tagore House" in names

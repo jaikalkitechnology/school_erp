@@ -75,9 +75,39 @@ async def update_hostel(session: AsyncSession, hostel_id: int, payload: HostelWr
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Hostel not found")
     for k, v in payload.model_dump().items():
         setattr(obj, k, v.value if hasattr(v, "value") else v)
-    await session.commit()
+    try:
+        await session.commit()
+    except IntegrityError:
+        await session.rollback()
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Duplicate hostel code")
     await session.refresh(obj)
     return obj
+
+
+async def delete_hostel(session: AsyncSession, hostel_id: int) -> None:
+    """Delete a hostel that has no student records. Its rooms and mess
+    menus go with it. A hostel that has had stays, leaves, visitors or
+    discipline entries is refused — those would be lost (they cascade) —
+    and should be marked inactive instead."""
+    obj = (await session.execute(select(Hostel).where(Hostel.id == hostel_id))).scalar_one_or_none()
+    if obj is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Hostel not found")
+    for model, what in (
+        (HostelAllocation, "student stays"),
+        (HostelLeave, "leave records"),
+        (VisitorLog, "visitor records"),
+        (DisciplinaryRecord, "discipline records"),
+    ):
+        n = (
+            await session.execute(select(func.count(model.id)).where(model.hostel_id == hostel_id))
+        ).scalar() or 0
+        if n:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail=f"{obj.name} has {what}, so it can't be deleted. Mark it inactive instead.",
+            )
+    await session.delete(obj)
+    await session.commit()
 
 
 # ---- Rooms ----------------------------------------------------------------
@@ -132,6 +162,59 @@ async def create_room(
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Duplicate room number")
     await session.refresh(obj)
     return obj
+
+
+async def _room_or_404(session: AsyncSession, room_id: int) -> Room:
+    room = (await session.execute(select(Room).where(Room.id == room_id))).scalar_one_or_none()
+    if room is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Room not found")
+    return room
+
+
+async def _room_occupants(session: AsyncSession, room_id: int, *, active_only: bool) -> int:
+    stmt = select(func.count(HostelAllocation.id)).where(HostelAllocation.room_id == room_id)
+    if active_only:
+        stmt = stmt.where(HostelAllocation.is_active.is_(True))
+    return (await session.execute(stmt)).scalar() or 0
+
+
+async def update_room(session: AsyncSession, room_id: int, payload: RoomWrite) -> Room:
+    room = await _room_or_404(session, room_id)
+    occupied = await _room_occupants(session, room_id, active_only=True)
+    if payload.capacity < occupied:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"{occupied} students live in this room, so capacity can't be below {occupied}.",
+        )
+    for k, v in payload.model_dump().items():
+        setattr(room, k, v.value if hasattr(v, "value") else v)
+    try:
+        await session.commit()
+    except IntegrityError:
+        await session.rollback()
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Duplicate room number")
+    await session.refresh(room)
+    return room
+
+
+async def delete_room(session: AsyncSession, room_id: int) -> None:
+    """Delete an empty room that has never been lived in. Past stays would
+    be lost with it (they cascade), so such a room should be set to
+    Under maintenance instead."""
+    room = await _room_or_404(session, room_id)
+    living = await _room_occupants(session, room_id, active_only=True)
+    if living:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=f"{living} student{'s live' if living != 1 else ' lives'} in room {room.number}. Move them out first.",
+        )
+    if await _room_occupants(session, room_id, active_only=False):
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=f"Room {room.number} has past stay records, so it can't be deleted. Set it to Under maintenance instead.",
+        )
+    await session.delete(room)
+    await session.commit()
 
 
 async def room_detail(session: AsyncSession, room_id: int) -> dict:

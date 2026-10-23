@@ -39,6 +39,8 @@ from app.services.hostel import (
     create_hostel,
     create_room,
     decide_leave,
+    delete_hostel,
+    delete_room,
     list_disciplinary,
     list_hostels,
     list_leaves,
@@ -50,6 +52,7 @@ from app.services.hostel import (
     reports,
     room_detail,
     update_hostel,
+    update_room,
     upsert_allocation,
     upsert_mess,
     vacate,
@@ -103,6 +106,15 @@ async def update_hostel_route(
     return await update_hostel(session, hostel_id, payload)
 
 
+@router.delete("/hostels/{hostel_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_hostel_route(
+    hostel_id: int,
+    principal: AuthPrincipal = Depends(_school_admin),
+    session: AsyncSession = Depends(tenant_scoped_session),
+):
+    await delete_hostel(session, hostel_id)
+
+
 # ---- Rooms ----------------------------------------------------------------
 
 
@@ -123,6 +135,25 @@ async def create_room_route(
     session: AsyncSession = Depends(tenant_scoped_session),
 ):
     return await create_room(session, principal.tenant_id, hostel_id, payload)
+
+
+@router.patch("/rooms/{room_id}", response_model=RoomRead)
+async def update_room_route(
+    room_id: int,
+    payload: RoomWrite,
+    principal: AuthPrincipal = Depends(_warden),
+    session: AsyncSession = Depends(tenant_scoped_session),
+):
+    return await update_room(session, room_id, payload)
+
+
+@router.delete("/rooms/{room_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_room_route(
+    room_id: int,
+    principal: AuthPrincipal = Depends(_warden),
+    session: AsyncSession = Depends(tenant_scoped_session),
+):
+    await delete_room(session, room_id)
 
 
 @router.get("/rooms/{room_id}", response_model=RoomDetail)
