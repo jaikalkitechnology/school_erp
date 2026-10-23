@@ -7,19 +7,11 @@ import { Label } from "@/components/ui/label";
 import { login as loginApi } from "@/lib/auth-api";
 import { useAuth } from "@/stores/auth";
 
-const SCHOOL_ROLES = new Set([
-  "school_admin",
-  "principal",
-  "vice_principal",
-  "coordinator",
-  "class_teacher",
-  "subject_teacher",
-  "accountant",
-  "librarian",
-  "transport_manager",
-  "hostel_warden",
-  "office_staff",
-]);
+// Parents and students use the mobile app. Every staff role may sign in
+// here — which pages each one sees is decided by their granted admin pages
+// (eg. visitor desk → dashboard + visitor logs). An allow-list of staff
+// roles kept missing new ones (receptionist, visitor desk, supervisor, HOD…).
+const APP_ONLY_ROLES = new Set(["parent", "student"]);
 
 // Hosts that serve the school admin web itself rather than a per-tenant
 // subdomain. When the user lands on one of these, we don't try to read a
@@ -57,7 +49,7 @@ export function LoginPage() {
     res: Awaited<ReturnType<typeof loginApi>>,
     cleanSubdomain: string,
   ): boolean => {
-    const allowed = res.user.roles.some((r) => SCHOOL_ROLES.has(r));
+    const allowed = res.user.roles.some((r) => !APP_ONLY_ROLES.has(r));
     if (!allowed) {
       setError("This console is for school staff. Use the mobile app to sign in as parent/student.");
       return false;
