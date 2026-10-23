@@ -19,7 +19,7 @@ import '../teacher/teacher_calendar_page.dart';
 import 'work_pages.dart';
 
 /// Shell for non-teaching staff (accountant, librarian, hostel warden,
-/// office staff, receptionist, visitor desk, supervisor, ...): the
+/// office staff, ...): the
 /// self-service every staff member needs (notices, messages, leave,
 /// calendar, payslips), plus a work tab for roles that have one —
 /// Fees for accountants, Library for librarians, Hostel for wardens.

@@ -14,12 +14,15 @@ import 'home_shell.dart';
 import 'principal_shell.dart';
 import 'transport_shell.dart';
 import 'web_only_page.dart';
+import '../../models/user_role.dart';
 
 /// Picks the right shell based on the logged-in user's primary role.
 ///
 ///   * Parent                       → HomeShell (dashboard, attendance,
 ///                                     fees, homework, more).
 ///   * super_admin                  → WebOnlyPage (use the website).
+///   * receptionist / visitor_desk / supervisor only
+///                                  → WebOnlyPage (school admin website).
 ///   * principal / vice_principal / school_admin → PrincipalShell.
 ///   * coordinator / hod            → CoordinatorShell.
 ///   * class_teacher / subject_teacher → TeacherShell.
@@ -43,6 +46,8 @@ class RoleHome extends StatelessWidget {
     'school_admin',
     'management',
   };
+
+  static const _webOnlyRoles = <String>{'receptionist', 'visitor_desk', 'supervisor'};
 
   static const _teacherRoles = <String>{
     'teacher',
@@ -68,7 +73,15 @@ class RoleHome extends StatelessWidget {
   Widget _shellFor(Set<String> roles) {
     // The platform super admin has no school to show; their tools are on
     // the super admin website.
-    if (roles.contains('super_admin')) return const WebOnlyPage(roleName: 'Super Admin');
+    if (roles.contains('super_admin')) {
+      return const WebOnlyPage(roleName: 'Super Admin', websiteName: 'Super Admin');
+    }
+    // Front-office roles work only on the school admin website (their
+    // dashboard there); they don't use the app. Someone who also holds an
+    // app role (eg. parent, accountant) still gets that role's screens.
+    if (roles.isNotEmpty && roles.every(_webOnlyRoles.contains)) {
+      return WebOnlyPage(roleName: roleLabelFor(roles.first), websiteName: 'school admin');
+    }
     // Parent role wins over any other (parents who also happen to be
     // staff get the parent shell — staff workflows live on the admin
     // web).
