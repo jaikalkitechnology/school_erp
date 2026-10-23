@@ -52,6 +52,7 @@ ASSIGNABLE_ROLES: set[str] = {
     "accountant",
     "librarian",
     "transport_manager",
+    "bus_staff",
     "hostel_warden",
     "supervisor",
     "visitor_desk",

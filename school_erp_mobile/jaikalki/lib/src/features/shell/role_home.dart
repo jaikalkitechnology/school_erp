@@ -6,6 +6,7 @@ import '../../core/push_service.dart';
 import '../../core/service_locator.dart';
 import '../../core/settings_cubit.dart';
 import '../notifications/notifications_page.dart';
+import '../staff/staff_shell.dart';
 import '../student/student_shell.dart';
 import '../teacher/teacher_shell.dart';
 import 'home_shell.dart';
@@ -23,7 +24,11 @@ import 'transport_shell.dart';
 ///                                     2-tab shell with just the Bus
 ///                                     screen + a More tab. No
 ///                                     attendance / fees / homework.
-///   * Anyone else (eg. accountant) → HomeShell fallback.
+///   * transport_manager / bus_staff → TransportShell.
+///   * Other staff (accountant, librarian, hostel warden, office staff,
+///     receptionist, visitor desk, supervisor, school admin, ...)
+///                                  → StaffShell.
+///   * Anyone else                  → HomeShell fallback.
 class RoleHome extends StatelessWidget {
   const RoleHome({super.key});
 
@@ -64,7 +69,7 @@ class RoleHome extends StatelessWidget {
     // Checked BEFORE teacher / fallback so a user holding only
     // transport_manager doesn't accidentally fall into the parent
     // shell with empty data.
-    if (roles.contains('transport_manager')) {
+    if (roles.contains('transport_manager') || roles.contains('bus_staff')) {
       return const TransportShell();
     }
     // Principal / vice_principal get their own dashboard shell —
@@ -78,6 +83,9 @@ class RoleHome extends StatelessWidget {
     // homework, results, profile) — never the parent shell, which is
     // built around a child-switcher and "your child" framing.
     if (roles.contains('student')) return const StudentShell();
+    // Any other staff role: self-service staff screens instead of the
+    // parent screens (which only make sense with linked children).
+    if (roles.isNotEmpty) return const StaffShell();
     return const HomeShell();
   }
 }

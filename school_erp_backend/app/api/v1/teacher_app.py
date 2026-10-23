@@ -824,21 +824,12 @@ async def teacher_holidays_route(
     days_forward: int = Query(180, ge=1, le=365),
     session: AsyncSession = Depends(tenant_scoped_session),
 ):
-    from app.services.parents import list_holidays_for_parent
+    from app.services.parents import holiday_to_dict, list_holidays_for_parent
 
     rows = await list_holidays_for_parent(
         session, days_back=days_back, days_forward=days_forward,
     )
-    return [
-        {
-            "id": r.id,
-            "date": r.date.isoformat(),
-            "name": r.name,
-            "kind": r.kind,
-            "description": r.description,
-        }
-        for r in rows
-    ]
+    return [holiday_to_dict(r) for r in rows]
 
 
 @router.get("/events")
@@ -847,24 +838,12 @@ async def teacher_events_route(
     days_forward: int = Query(180, ge=1, le=365),
     session: AsyncSession = Depends(tenant_scoped_session),
 ):
-    from app.services.parents import list_events_for_parent
+    from app.services.parents import event_to_dict, list_events_for_parent
 
     rows = await list_events_for_parent(
         session, days_back=days_back, days_forward=days_forward,
     )
-    return [
-        {
-            "id": r.id,
-            "title": r.title,
-            "description": r.description,
-            "kind": r.kind,
-            "starts_at": r.starts_at.isoformat() if r.starts_at else "",
-            "ends_at": r.ends_at.isoformat() if r.ends_at else None,
-            "is_all_day": r.is_all_day,
-            "audience": r.audience,
-        }
-        for r in rows
-    ]
+    return [event_to_dict(r) for r in rows]
 
 
 @router.get("/exams")

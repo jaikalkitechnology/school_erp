@@ -283,10 +283,15 @@ class TeacherRepository {
   }
 
   // ---- My own staff leave ----------------------------------------------
+  //
+  // [staff] = use the /v1/staff routes, open to every staff role (the
+  // /v1/teacher ones only admit teaching roles).
 
-  Future<List<StaffLeaveRow>> myLeaves() async {
+  static String _base(bool staff) => staff ? '/v1/staff' : '/v1/teacher';
+
+  Future<List<StaffLeaveRow>> myLeaves({bool staff = false}) async {
     try {
-      final res = await _api.dio.get<List<dynamic>>('/v1/teacher/my-leaves');
+      final res = await _api.dio.get<List<dynamic>>('${_base(staff)}/my-leaves');
       return (res.data ?? const [])
           .map((e) => StaffLeaveRow.fromJson(e as Map<String, dynamic>))
           .toList();
@@ -300,9 +305,10 @@ class TeacherRepository {
     required String endDate,
     required String reason,
     String kind = 'casual',
+    bool staff = false,
   }) async {
     final res = await _api.dio.post<Map<String, dynamic>>(
-      '/v1/teacher/my-leaves',
+      '${_base(staff)}/my-leaves',
       data: {
         'start_date': startDate,
         'end_date': endDate,
@@ -343,9 +349,9 @@ class TeacherRepository {
 
   // ---- Holidays + events -----------------------------------------------
 
-  Future<List<Holiday>> holidays() async {
+  Future<List<Holiday>> holidays({bool staff = false}) async {
     try {
-      final res = await _api.dio.get<List<dynamic>>('/v1/teacher/holidays');
+      final res = await _api.dio.get<List<dynamic>>('${_base(staff)}/holidays');
       return (res.data ?? const [])
           .map((e) => Holiday.fromJson(e as Map<String, dynamic>))
           .toList();
@@ -354,9 +360,9 @@ class TeacherRepository {
     }
   }
 
-  Future<List<SchoolEvent>> events() async {
+  Future<List<SchoolEvent>> events({bool staff = false}) async {
     try {
-      final res = await _api.dio.get<List<dynamic>>('/v1/teacher/events');
+      final res = await _api.dio.get<List<dynamic>>('${_base(staff)}/events');
       return (res.data ?? const [])
           .map((e) => SchoolEvent.fromJson(e as Map<String, dynamic>))
           .toList();

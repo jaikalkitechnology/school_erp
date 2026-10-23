@@ -34,15 +34,7 @@ _teacher = require_roles(
     "principal", "vice_principal", "hod", "school_admin",
     "management",
 )
-_any = require_roles(
-    "parent", "student",
-    "class_teacher", "subject_teacher", "coordinator", "teacher",
-    "principal", "vice_principal", "hod", "management",
-    "school_admin", "office_admin", "office_staff", "librarian",
-    "transport_manager", "accountant", "accounts", "payroll",
-    "receptionist", "data_entry_operator", "supervisor",
-    "visitor_desk", "hostel_warden",
-)
+_any = require_roles("parent", "student", *sorted(STAFF_ROLE_CODES))
 
 
 router = APIRouter(prefix="/mobile", tags=["mobile"])
@@ -159,9 +151,14 @@ async def parent_certificates(
 # ---------------------------------------------------------------------------
 
 
+# Any staff member reads their own slips (the path predates non-teaching
+# staff having app screens).
+_payslip_reader = require_roles(*sorted(STAFF_ROLE_CODES))
+
+
 @router.get("/teacher/me/payslips")
 async def my_payslips(
-    principal: AuthPrincipal = Depends(_teacher),
+    principal: AuthPrincipal = Depends(_payslip_reader),
     session: AsyncSession = Depends(tenant_scoped_session),
 ):
     from app.models.operations import Payslip

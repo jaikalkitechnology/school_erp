@@ -68,15 +68,18 @@ _transport_staff = require_roles(
 )
 _reader = require_roles(
     "school_admin", "principal", "vice_principal", "transport_manager",
-    "coordinator", "class_teacher", "subject_teacher",
+    "coordinator", "class_teacher", "subject_teacher", "bus_staff",
 )
+# Logins that drive a bus: transport_manager (what schools use today) or
+# the catalogue's bus_staff role.
+DRIVER_ROLES = ("transport_manager", "bus_staff")
+
 _driver_or_staff = require_roles(
-    # Bus / driver functionality is now gated to the single
-    # ``transport_manager`` role. Senior staff (school_admin /
-    # principal / vice_principal / coordinator) still manage routes
-    # and buses through the admin web — they don't need to start
-    # trips or push GPS pings, so they're intentionally left out.
-    "transport_manager",
+    # Bus / driver functionality is gated to the driver roles. Senior
+    # staff (school_admin / principal / vice_principal / coordinator)
+    # still manage routes and buses through the admin web — they don't
+    # need to start trips or push GPS pings, so they're left out.
+    *DRIVER_ROLES,
 )
 _parent = require_roles("parent")
 
@@ -1222,7 +1225,7 @@ async def driver_routes_for_me_route(
 
     from app.models.transport import Driver, Route, StudentTransport, Stop
 
-    is_driver_only = principal.has_role("transport_manager") and not (
+    is_driver_only = any(principal.has_role(r) for r in DRIVER_ROLES) and not (
         principal.has_role("school_admin")
         or principal.has_role("principal")
         or principal.has_role("vice_principal")
@@ -1294,7 +1297,7 @@ async def driver_user_candidates_route(
     principal: AuthPrincipal = Depends(_transport_staff),
     session: AsyncSession = Depends(tenant_scoped_session),
 ):
-    """Users in the tenant who hold the ``transport_manager`` role and
+    """Users in the tenant who hold a driver role (DRIVER_ROLES) and
     do NOT already have a Driver row pointing at them. Powers the
     "Driver account" dropdown on the admin Fleet form so the admin
     doesn't accidentally re-link the same user twice (the Driver model
@@ -1313,7 +1316,7 @@ async def driver_user_candidates_route(
                 .where(
                     User.tenant_id == principal.tenant_id,
                     User.is_active.is_(True),
-                    Role.code == "transport_manager",
+                    Role.code.in_(DRIVER_ROLES),
                 )
             )
         ).unique().scalars().all()

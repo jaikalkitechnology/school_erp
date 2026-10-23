@@ -9,8 +9,12 @@ import 'exam_timetable_page.dart';
 /// for the teacher. The Exams tab pairs with the "Upcoming exams"
 /// counter on the Today screen so the dashboard count and the calendar
 /// agree.
+/// Events, exams and holidays. With [staffApi] (non-teaching staff,
+/// principal shell) it reads the /v1/staff calendar and has no Exams tab.
 class TeacherCalendarPage extends StatefulWidget {
-  const TeacherCalendarPage({super.key});
+  const TeacherCalendarPage({super.key, this.staffApi = false});
+
+  final bool staffApi;
 
   @override
   State<TeacherCalendarPage> createState() => _TeacherCalendarPageState();
@@ -26,15 +30,15 @@ class _TeacherCalendarPageState extends State<TeacherCalendarPage>
   @override
   void initState() {
     super.initState();
-    _tab = TabController(length: 3, vsync: this);
+    _tab = TabController(length: widget.staffApi ? 2 : 3, vsync: this);
     _reload();
   }
 
   void _reload() {
     final r = locator<TeacherRepository>();
-    _holidays = r.holidays();
-    _events = r.events();
-    _exams = r.exams();
+    _holidays = r.holidays(staff: widget.staffApi);
+    _events = r.events(staff: widget.staffApi);
+    if (!widget.staffApi) _exams = r.exams();
   }
 
   @override
@@ -48,10 +52,10 @@ class _TeacherCalendarPageState extends State<TeacherCalendarPage>
     return Scaffold(
       appBar: AppBar(
         title: const Text('Calendar'),
-        bottom: TabBar(controller: _tab, tabs: const [
-          Tab(text: 'Events'),
-          Tab(text: 'Exams'),
-          Tab(text: 'Holidays'),
+        bottom: TabBar(controller: _tab, tabs: [
+          const Tab(text: 'Events'),
+          if (!widget.staffApi) const Tab(text: 'Exams'),
+          const Tab(text: 'Holidays'),
         ]),
       ),
       body: TabBarView(
@@ -61,10 +65,11 @@ class _TeacherCalendarPageState extends State<TeacherCalendarPage>
             setState(_reload);
             await _events;
           }),
-          _ExamsTab(future: _exams, onRefresh: () async {
-            setState(_reload);
-            await _exams;
-          }),
+          if (!widget.staffApi)
+            _ExamsTab(future: _exams, onRefresh: () async {
+              setState(_reload);
+              await _exams;
+            }),
           _HolidaysTab(future: _holidays, onRefresh: () async {
             setState(_reload);
             await _holidays;
