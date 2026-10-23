@@ -137,12 +137,18 @@ export const updateRoute = async (
   id: number,
   p: Partial<Route> & { code: string; name: string },
 ) => (await api.patch<Route>(`${base}/routes/${id}`, p)).data;
+/** Refused (409, reason in `detail`) while students ride the route or
+ *  once it has run trips — mark it inactive instead. */
+export const deleteRoute = async (id: number) => {
+  await api.delete(`${base}/routes/${id}`);
+};
 
 export const listStops = async (routeId: number) =>
   (await api.get<Stop[]>(`${base}/routes/${routeId}/stops`)).data;
 export const replaceStops = async (
   routeId: number,
-  stops: Array<Omit<Stop, "id" | "route_id">>,
+  // `id` for a stop that's already saved (updated in place); none for a new one.
+  stops: Array<Omit<Stop, "id" | "route_id"> & { id?: number }>,
 ) => (await api.put<Stop[]>(`${base}/routes/${routeId}/stops`, { stops })).data;
 
 export const listAllocations = async (routeId: number) =>

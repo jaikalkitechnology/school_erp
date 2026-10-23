@@ -83,6 +83,9 @@ class StopRead(BaseModel):
 
 
 class StopWrite(BaseModel):
+    # Set for a stop that already exists, so it's updated in place and the
+    # students picked up there keep it; leave out for a new stop.
+    id: Optional[int] = None
     sequence: int = Field(ge=1)
     name: str = Field(min_length=1, max_length=120)
     latitude: Optional[Decimal] = None

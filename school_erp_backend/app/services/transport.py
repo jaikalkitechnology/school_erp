@@ -8,7 +8,8 @@ from decimal import Decimal
 from typing import Optional
 
 from fastapi import HTTPException, status
-from sqlalchemy import func, select
+from sqlalchemy import delete, func, select, update
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.parent import Student
@@ -171,9 +172,44 @@ async def update_route(session: AsyncSession, route_id: int, payload: RouteWrite
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Route not found")
     for k, v in payload.model_dump().items():
         setattr(obj, k, v)
-    await session.commit()
+    try:
+        await session.commit()
+    except IntegrityError:
+        await session.rollback()
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Duplicate route code")
     await session.refresh(obj)
     return obj
+
+
+async def delete_route(session: AsyncSession, route_id: int) -> None:
+    """Delete a route and its stops. Refused while students ride it (move
+    them to another route first) or once it has run trips, since the trip
+    and boarding history would be lost with it — mark it inactive instead."""
+    obj = (await session.execute(select(Route).where(Route.id == route_id))).scalar_one_or_none()
+    if obj is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Route not found")
+    riders = (
+        await session.execute(
+            select(func.count(StudentTransport.id)).where(StudentTransport.route_id == route_id)
+        )
+    ).scalar() or 0
+    if riders:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=f"{riders} student{'s are' if riders != 1 else ' is'} assigned to {obj.name}. "
+            "Move them to another route first.",
+        )
+    trips = (
+        await session.execute(select(func.count(Trip.id)).where(Trip.route_id == route_id))
+    ).scalar() or 0
+    if trips:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=f"{obj.name} has trip history, so it can't be deleted. Mark it inactive instead.",
+        )
+    await session.execute(delete(Stop).where(Stop.route_id == route_id))
+    await session.delete(obj)
+    await session.commit()
 
 
 async def list_stops(session: AsyncSession, route_id: int) -> list[Stop]:
@@ -199,17 +235,46 @@ async def replace_stops(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Duplicate sequence in stops",
         )
-    existing = list(
-        (
+    existing = {
+        s.id: s
+        for s in (
             await session.execute(select(Stop).where(Stop.route_id == route_id))
         ).scalars().all()
-    )
-    for s in existing:
-        await session.delete(s)
+    }
+    unknown = [s.id for s in payload.stops if s.id is not None and s.id not in existing]
+    if unknown:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Stop does not belong to this route",
+        )
+    # Stops sent with their id are updated in place, so students' pickup /
+    # drop stops survive a re-save. Stops left out are removed and anyone
+    # picked up there is left without a stop.
+    kept = {s.id for s in payload.stops if s.id is not None}
+    removed = [sid for sid in existing if sid not in kept]
+    if removed:
+        await session.execute(
+            update(StudentTransport)
+            .where(StudentTransport.pickup_stop_id.in_(removed))
+            .values(pickup_stop_id=None)
+        )
+        await session.execute(
+            update(StudentTransport)
+            .where(StudentTransport.drop_stop_id.in_(removed))
+            .values(drop_stop_id=None)
+        )
+        for sid in removed:
+            await session.delete(existing[sid])
     out: list[Stop] = []
     for s in payload.stops:
-        obj = Stop(tenant_id=tenant_id, route_id=route_id, **s.model_dump())
-        session.add(obj)
+        fields = s.model_dump(exclude={"id"})
+        if s.id is not None:
+            obj = existing[s.id]
+            for k, v in fields.items():
+                setattr(obj, k, v)
+        else:
+            obj = Stop(tenant_id=tenant_id, route_id=route_id, **fields)
+            session.add(obj)
         out.append(obj)
     await session.commit()
     for o in out:

@@ -266,3 +266,56 @@ async def test_super_admin_blocked(super_admin_token):
     ) as ac:
         r = await ac.get("/v1/school-admin/transport/buses")
         assert r.status_code == 403
+
+
+@pytest.mark.asyncio
+async def test_edit_and_delete_routes(demo_admin_client):
+    c, base = demo_admin_client, "/v1/school-admin/transport/routes"
+    a = (await c.post(base, json={"code": "E1", "name": "East loop"})).json()
+    b = (await c.post(base, json={"code": "E2", "name": "West loop"})).json()
+
+    # Edit: rename + deactivate; reusing another route's code is refused.
+    r = await c.patch(f"{base}/{a['id']}", json={"code": "E1", "name": "East loop (new)", "is_active": False})
+    assert r.status_code == 200 and r.json()["name"] == "East loop (new)" and r.json()["is_active"] is False
+    r = await c.patch(f"{base}/{a['id']}", json={"code": "E2", "name": "East loop"})
+    assert r.status_code == 409 and r.json()["detail"] == "Duplicate route code"
+
+    # Re-saving stops with their ids updates them in place, so the
+    # students picked up there keep their stop; a removed stop is cleared.
+    gate, market = (await c.put(f"{base}/{a['id']}/stops", json={"stops": [
+        {"sequence": 1, "name": "Gate"}, {"sequence": 2, "name": "Market"}]})).json()
+    student = (await c.post("/v1/school-admin/students", json={"full_name": "Rider One"})).json()
+    r = await c.post("/v1/school-admin/transport/allocations", json={
+        "student_id": student["id"], "route_id": a["id"], "pickup_stop_id": gate["id"], "drop_stop_id": market["id"]})
+    assert r.status_code == 200, r.text
+    r = await c.put(f"{base}/{a['id']}/stops", json={"stops": [
+        {"id": gate["id"], "sequence": 1, "name": "Main gate"}, {"sequence": 2, "name": "Park"}]})
+    assert r.status_code == 200, r.text
+    assert [(s["id"] == gate["id"], s["name"]) for s in r.json()] == [(True, "Main gate"), (False, "Park")]
+    alloc = (await c.get(f"{base}/{a['id']}/allocations")).json()[0]
+    assert alloc["pickup_stop_id"] == gate["id"] and alloc["drop_stop_id"] is None
+    r = await c.put(f"{base}/{b['id']}/stops", json={"stops": [{"id": gate["id"], "sequence": 1, "name": "x"}]})
+    assert r.status_code == 400
+
+    # A route students ride can't be deleted until they're moved off it.
+    r = await c.delete(f"{base}/{a['id']}")
+    assert r.status_code == 409 and "Move them to another route first" in r.json()["detail"]
+    assert (await c.delete(f"/v1/school-admin/transport/allocations/{student['id']}")).status_code == 204
+
+    # Empty now: deleted along with its stops.
+    assert (await c.delete(f"{base}/{a['id']}")).status_code == 204
+    assert all(x["id"] != a["id"] for x in (await c.get(base)).json())
+    assert (await c.delete(f"{base}/{a['id']}")).status_code == 404
+
+    # A route that has run trips keeps its history: mark inactive instead.
+    from app.database import AsyncSessionLocal
+    from app.models.tenant import Tenant
+    from app.models.transport import Trip
+    from sqlalchemy import select
+
+    async with AsyncSessionLocal() as s:
+        tid = (await s.execute(select(Tenant.id).where(Tenant.subdomain == "demo"))).scalar_one()
+        s.add(Trip(tenant_id=tid, route_id=b["id"], trip_date=date.today(), direction="pickup"))
+        await s.commit()
+    r = await c.delete(f"{base}/{b['id']}")
+    assert r.status_code == 409 and "Mark it inactive instead" in r.json()["detail"]
