@@ -24,6 +24,7 @@ from app.api.v1 import (
     subscription,
     sis,
     student_app,
+    coordinator,
     staff_app,
     teacher_app,
     teachers,
@@ -70,6 +71,7 @@ router.include_router(subscription.router)
 router.include_router(admin_users.router)
 router.include_router(teacher_app.router)
 router.include_router(staff_app.router)
+router.include_router(coordinator.router)
 router.include_router(principal.router)
 router.include_router(operations.router)
 router.include_router(operations_mobile.router)

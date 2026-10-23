@@ -5,6 +5,7 @@ import '../../core/auth_cubit.dart';
 import '../../core/push_service.dart';
 import '../../core/service_locator.dart';
 import '../../core/settings_cubit.dart';
+import '../coordinator/coordinator_shell.dart';
 import '../notifications/notifications_page.dart';
 import '../staff/staff_shell.dart';
 import '../student/student_shell.dart';
@@ -17,9 +18,8 @@ import 'transport_shell.dart';
 ///
 ///   * Parent                       → HomeShell (dashboard, attendance,
 ///                                     fees, homework, more).
-///   * Teacher-shaped roles
-///     (class_teacher / subject_teacher / coordinator / vice_principal /
-///     principal)                   → TeacherShell.
+///   * coordinator                  → CoordinatorShell.
+///   * class_teacher / subject_teacher → TeacherShell.
 ///   * transport_manager            → TransportShell — a stripped-down
 ///                                     2-tab shell with just the Bus
 ///                                     screen + a More tab. No
@@ -78,6 +78,9 @@ class RoleHome extends StatelessWidget {
     if (roles.any(_principalRoles.contains)) {
       return const PrincipalShell();
     }
+    // Coordinators oversee the whole school's day (cover, attendance)
+    // and get the teacher tools under More.
+    if (roles.contains('coordinator')) return const CoordinatorShell();
     if (roles.any(_teacherRoles.contains)) return const TeacherShell();
     // Students get their own self-service shell (own attendance,
     // homework, results, profile) — never the parent shell, which is

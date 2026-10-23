@@ -2,6 +2,7 @@ import 'package:get_it/get_it.dart';
 
 import '../api/api_client.dart';
 import '../api/auth_repository.dart';
+import '../api/coordinator_repository.dart';
 import '../api/driver_repository.dart';
 import '../api/messages_repository.dart';
 import '../api/operations_repository.dart';
@@ -49,6 +50,11 @@ void registerDependencies() {
   if (!locator.isRegistered<PrincipalRepository>()) {
     locator.registerLazySingleton<PrincipalRepository>(
       () => PrincipalRepository(locator<ApiClient>()),
+    );
+  }
+  if (!locator.isRegistered<CoordinatorRepository>()) {
+    locator.registerLazySingleton<CoordinatorRepository>(
+      () => CoordinatorRepository(locator<ApiClient>()),
     );
   }
   if (!locator.isRegistered<OperationsRepository>()) {
