@@ -103,6 +103,36 @@ export const listHostels = async () => (await api.get<Hostel[]>(`${base}/hostels
 export const createHostel = async (p: Partial<Hostel> & { code: string; name: string }) =>
   (await api.post<Hostel>(`${base}/hostels`, p)).data;
 
+export interface HostelWrite {
+  code: string;
+  name: string;
+  kind: HostelKind;
+  is_active: boolean;
+  warden_user_id?: number | null;
+  address?: string | null;
+}
+export const updateHostel = async (id: number, p: HostelWrite) =>
+  (await api.patch<Hostel>(`${base}/hostels/${id}`, p)).data;
+/** Refused (409) when the hostel has student stays / leaves / visitors /
+ *  discipline records — mark it inactive instead. */
+export const deleteHostel = async (id: number) => {
+  await api.delete(`${base}/hostels/${id}`);
+};
+
+export interface RoomWrite {
+  number: string;
+  floor: string | null;
+  capacity: number;
+  monthly_fee: number;
+  status: RoomStatus;
+}
+export const updateRoom = async (id: number, p: RoomWrite) =>
+  (await api.patch<Room>(`${base}/rooms/${id}`, p)).data;
+/** Refused (409) while students live in it or when it has past stays. */
+export const deleteRoom = async (id: number) => {
+  await api.delete(`${base}/rooms/${id}`);
+};
+
 export const listRooms = async (hostelId: number) =>
   (await api.get<Room[]>(`${base}/hostels/${hostelId}/rooms`)).data;
 export const createRoom = async (

@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Building, ChefHat, ClipboardList, DoorOpen, FileWarning, Plus, UserCheck, UserMinus } from "lucide-react";
+import { Building, ChefHat, ClipboardList, DoorOpen, FileWarning, Pencil, Plus, Trash2, UserCheck, UserMinus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { StudentPicker } from "@/components/StudentPicker";
@@ -29,7 +29,10 @@ import {
   type HostelKind,
   type HostelLeaveStatus,
   type MealType,
+  type Hostel,
+  type Room,
 } from "./api";
+import { DeleteDialog, EditHostelDialog, EditRoomDialog, apiError } from "./SetupDialogs";
 
 const TABS = ["Setup", "Allocations", "Mess", "Visitors", "Discipline", "Leaves", "Reports"] as const;
 type Tab = (typeof TABS)[number];
@@ -115,12 +118,18 @@ export function HostelPage() {
 
 // ---- Setup ---------------------------------------------------------------
 
-function SetupPanel({ hostelId, onSelect }: { hostelId: number | null; onSelect: (id: number) => void }) {
+function SetupPanel({ hostelId, onSelect }: { hostelId: number | null; onSelect: (id: number | null) => void }) {
   const qc = useQueryClient();
   const { data: hostels = [] } = useQuery({ queryKey: ["hostels"], queryFn: listHostels });
   const [code, setCode] = useState("");
   const [name, setName] = useState("");
   const [kind, setKind] = useState<HostelKind>("boys");
+
+  const [editingHostel, setEditingHostel] = useState<Hostel | null>(null);
+  const [editingRoom, setEditingRoom] = useState<Room | null>(null);
+  const [deleting, setDeleting] = useState<{ kind: "hostel"; item: Hostel } | { kind: "room"; item: Room } | null>(null);
+  const refreshHostels = () => qc.invalidateQueries({ queryKey: ["hostels"] });
+  const refreshRooms = () => qc.invalidateQueries({ queryKey: ["rooms", hostelId] });
 
   const newHostel = useMutation({
     mutationFn: () => createHostel({ code, name, kind }),
@@ -170,10 +179,39 @@ function SetupPanel({ hostelId, onSelect }: { hostelId: number | null; onSelect:
                 )}
                 onClick={() => onSelect(h.id)}
               >
-                <span className="font-medium text-indigo-dark">
+                <span className={cn("font-medium text-indigo-dark", !h.is_active && "opacity-60")}>
                   {h.name} <span className="text-xs text-muted-foreground">({h.code})</span>
                 </span>
-                <span className="rounded bg-teal-pale px-2 py-0.5 text-xs text-teal-dark">{h.kind}</span>
+                <span className="flex items-center gap-1">
+                  {!h.is_active && (
+                    <span className="rounded bg-muted px-2 py-0.5 text-xs text-muted-foreground">inactive</span>
+                  )}
+                  <span className="rounded bg-teal-pale px-2 py-0.5 text-xs text-teal-dark">{h.kind}</span>
+                  <button
+                    type="button"
+                    title="Edit hostel"
+                    aria-label={`Edit ${h.name}`}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setEditingHostel(h);
+                    }}
+                    className="rounded p-1.5 text-muted-foreground hover:bg-saffron-pale hover:text-indigo-dark"
+                  >
+                    <Pencil className="h-3.5 w-3.5" />
+                  </button>
+                  <button
+                    type="button"
+                    title="Delete hostel"
+                    aria-label={`Delete ${h.name}`}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setDeleting({ kind: "hostel", item: h });
+                    }}
+                    className="rounded p-1.5 text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
+                  >
+                    <Trash2 className="h-3.5 w-3.5" />
+                  </button>
+                </span>
               </li>
             ))}
           </ul>
@@ -194,6 +232,9 @@ function SetupPanel({ hostelId, onSelect }: { hostelId: number | null; onSelect:
               Add
             </Button>
           </div>
+          {newHostel.isError && (
+            <p className="mt-2 text-xs text-destructive">{apiError(newHostel.error, "Could not add the hostel.")}</p>
+          )}
         </CardContent>
       </Card>
       <Card>
@@ -212,6 +253,7 @@ function SetupPanel({ hostelId, onSelect }: { hostelId: number | null; onSelect:
                     <th>Occupied</th>
                     <th>Fee</th>
                     <th>Status</th>
+                    <th className="text-right">Actions</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -228,7 +270,27 @@ function SetupPanel({ hostelId, onSelect }: { hostelId: number | null; onSelect:
                         </span>
                       </td>
                       <td>₹{r.monthly_fee}</td>
-                      <td>{r.status}</td>
+                      <td>{r.status.replace("_", " ")}</td>
+                      <td className="text-right whitespace-nowrap">
+                        <button
+                          type="button"
+                          title="Edit room"
+                          aria-label={`Edit room ${r.number}`}
+                          onClick={() => setEditingRoom(r)}
+                          className="rounded p-1.5 text-muted-foreground hover:bg-saffron-pale hover:text-indigo-dark"
+                        >
+                          <Pencil className="h-3.5 w-3.5" />
+                        </button>
+                        <button
+                          type="button"
+                          title="Delete room"
+                          aria-label={`Delete room ${r.number}`}
+                          onClick={() => setDeleting({ kind: "room", item: r })}
+                          className="rounded p-1.5 text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
+                        >
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </button>
+                      </td>
                     </tr>
                   ))}
                 </tbody>
@@ -246,10 +308,32 @@ function SetupPanel({ hostelId, onSelect }: { hostelId: number | null; onSelect:
                   Room
                 </Button>
               </div>
+              {newRoom.isError && (
+                <p className="mt-2 text-xs text-destructive">{apiError(newRoom.error, "Could not add the room.")}</p>
+              )}
             </>
           )}
         </CardContent>
       </Card>
+      {editingHostel && (
+        <EditHostelDialog hostel={editingHostel} onClose={() => setEditingHostel(null)} onSaved={refreshHostels} />
+      )}
+      {editingRoom && (
+        <EditRoomDialog room={editingRoom} onClose={() => setEditingRoom(null)} onSaved={refreshRooms} />
+      )}
+      {deleting && (
+        <DeleteDialog
+          what={deleting}
+          onClose={() => setDeleting(null)}
+          onDeleted={() => {
+            if (deleting.kind === "hostel") {
+              refreshHostels();
+              // The deleted hostel was the one picked: clear the pick.
+              if (deleting.item.id === hostelId) onSelect(null);
+            } else refreshRooms();
+          }}
+        />
+      )}
     </div>
   );
 }
