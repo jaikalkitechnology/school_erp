@@ -4,9 +4,12 @@ import '../../api/teacher_repository.dart';
 import '../../core/service_locator.dart';
 import '../../theme/brand.dart';
 
-/// Teacher's own leave applications — list + apply.
+/// Own leave applications — list + apply. Teachers use the /v1/teacher
+/// routes; other staff pass [staffApi] to use /v1/staff.
 class MyLeavesPage extends StatefulWidget {
-  const MyLeavesPage({super.key});
+  const MyLeavesPage({super.key, this.staffApi = false});
+
+  final bool staffApi;
 
   @override
   State<MyLeavesPage> createState() => _MyLeavesPageState();
@@ -18,12 +21,12 @@ class _MyLeavesPageState extends State<MyLeavesPage> {
   @override
   void initState() {
     super.initState();
-    _future = locator<TeacherRepository>().myLeaves();
+    _future = locator<TeacherRepository>().myLeaves(staff: widget.staffApi);
   }
 
   Future<void> _reload() async {
     setState(() {
-      _future = locator<TeacherRepository>().myLeaves();
+      _future = locator<TeacherRepository>().myLeaves(staff: widget.staffApi);
     });
     await _future;
   }
@@ -31,7 +34,7 @@ class _MyLeavesPageState extends State<MyLeavesPage> {
   Future<void> _apply() async {
     final res = await showDialog<bool>(
       context: context,
-      builder: (_) => const _ApplyLeaveDialog(),
+      builder: (_) => _ApplyLeaveDialog(staffApi: widget.staffApi),
     );
     if (res == true) _reload();
   }
@@ -172,7 +175,9 @@ class _LeaveCard extends StatelessWidget {
 }
 
 class _ApplyLeaveDialog extends StatefulWidget {
-  const _ApplyLeaveDialog();
+  const _ApplyLeaveDialog({required this.staffApi});
+
+  final bool staffApi;
 
   @override
   State<_ApplyLeaveDialog> createState() => _ApplyLeaveDialogState();
@@ -235,6 +240,7 @@ class _ApplyLeaveDialogState extends State<_ApplyLeaveDialog> {
         endDate: _fmt(_end),
         reason: _reason.text.trim(),
         kind: _kind,
+        staff: widget.staffApi,
       );
       if (!mounted) return;
       Navigator.of(context).pop(true);

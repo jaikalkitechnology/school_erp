@@ -4,7 +4,7 @@ import 'package:go_router/go_router.dart';
 
 import '../../core/auth_cubit.dart';
 import '../../theme/brand.dart';
-import '../calendar/calendar_page.dart';
+import '../teacher/teacher_calendar_page.dart';
 import '../messages/messages_page.dart';
 import '../notifications/notifications_page.dart';
 import '../operations/my_payslips_page.dart';
@@ -154,11 +154,9 @@ class _PrincipalMorePage extends StatelessWidget {
             context,
             icon: Icons.calendar_today_outlined,
             title: 'Calendar',
-            subtitle: 'Holidays, events, exams',
-            builder: (_) => Scaffold(
-              appBar: AppBar(title: const Text('Calendar')),
-              body: const CalendarPage(),
-            ),
+            subtitle: 'Holidays and events',
+            // The parent calendar endpoints don't admit principals.
+            builder: (_) => const TeacherCalendarPage(staffApi: true),
           ),
           _tile(
             context,

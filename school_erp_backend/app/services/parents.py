@@ -1093,3 +1093,28 @@ async def directory_for_parent(
         seen_teacher_ids.add(teacher.id)
 
     return entries
+
+
+def holiday_to_dict(r) -> dict:
+    """JSON shape the staff / teacher calendars use for a holiday."""
+    return {
+        "id": r.id,
+        "date": r.date.isoformat(),
+        "name": r.name,
+        "kind": r.kind,
+        "description": r.description,
+    }
+
+
+def event_to_dict(r) -> dict:
+    """JSON shape the staff / teacher calendars use for an event."""
+    return {
+        "id": r.id,
+        "title": r.title,
+        "description": r.description,
+        "kind": r.kind,
+        "starts_at": r.starts_at.isoformat() if r.starts_at else "",
+        "ends_at": r.ends_at.isoformat() if r.ends_at else None,
+        "is_all_day": r.is_all_day,
+        "audience": r.audience,
+    }

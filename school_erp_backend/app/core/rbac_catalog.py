@@ -378,5 +378,5 @@ STAFF_ROLE_CODES = frozenset({
     "school_admin", "office_admin", "office_staff", "librarian",
     "transport_manager", "accountant", "accounts", "payroll",
     "receptionist", "data_entry_operator", "supervisor",
-    "visitor_desk", "hostel_warden",
+    "visitor_desk", "hostel_warden", "bus_staff",
 })

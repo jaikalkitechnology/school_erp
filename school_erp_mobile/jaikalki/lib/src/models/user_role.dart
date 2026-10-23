@@ -48,3 +48,28 @@ extension UserRoleLabel on UserRole {
     }
   }
 }
+
+/// Readable name for a backend role code ("hostel_warden" → "Hostel
+/// Warden"), including codes that aren't in [UserRole].
+String roleLabelFor(String code) {
+  const extra = <String, String>{
+    'school_admin': 'School Admin',
+    'vice_principal': 'Vice Principal',
+    'class_teacher': 'Class Teacher',
+    'subject_teacher': 'Subject Teacher',
+    'transport_manager': 'Transport Manager',
+    'hostel_warden': 'Hostel Warden',
+    'office_staff': 'Office Staff',
+    'office_admin': 'Office Admin',
+    'bus_staff': 'Bus Staff',
+    'visitor_desk': 'Visitor Desk',
+    'hod': 'HOD',
+  };
+  final known = extra[code];
+  if (known != null) return known;
+  return code
+      .split('_')
+      .where((w) => w.isNotEmpty)
+      .map((w) => '${w[0].toUpperCase()}${w.substring(1)}')
+      .join(' ');
+}

@@ -144,7 +144,7 @@ async def _accessible_sections(
 
     * Regular teachers: sections where they're the in-charge or the
       subject teacher of any subject.
-    * Senior staff (principal / vice-principal / coordinator /
+    * Senior staff (principal / vice-principal / coordinator / HOD /
       school admin): every section in the tenant — they oversee the
       whole school.
     """
@@ -173,11 +173,11 @@ async def _accessible_sections(
     return sorted({*in_charge_ids, *teach_ids})
 
 
-_SENIOR_STAFF_ROLES = {"principal", "vice_principal", "coordinator", "school_admin"}
+_SENIOR_STAFF_ROLES = {"principal", "vice_principal", "coordinator", "hod", "school_admin"}
 
 
 async def _user_has_senior_role(session: AsyncSession, user_id: int) -> bool:
-    """Senior staff (principal / vice-principal / coordinator /
+    """Senior staff (principal / vice-principal / coordinator / HOD /
     school admin) oversee every section in the school. They don't need
     to be the in-charge or a subject teacher to view a roster — they
     have blanket access."""

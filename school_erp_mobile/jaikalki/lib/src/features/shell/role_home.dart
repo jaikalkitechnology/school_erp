@@ -5,32 +5,42 @@ import '../../core/auth_cubit.dart';
 import '../../core/push_service.dart';
 import '../../core/service_locator.dart';
 import '../../core/settings_cubit.dart';
+import '../coordinator/coordinator_shell.dart';
 import '../notifications/notifications_page.dart';
+import '../staff/staff_shell.dart';
 import '../student/student_shell.dart';
 import '../teacher/teacher_shell.dart';
 import 'home_shell.dart';
 import 'principal_shell.dart';
 import 'transport_shell.dart';
+import 'web_only_page.dart';
 
 /// Picks the right shell based on the logged-in user's primary role.
 ///
 ///   * Parent                       → HomeShell (dashboard, attendance,
 ///                                     fees, homework, more).
-///   * Teacher-shaped roles
-///     (class_teacher / subject_teacher / coordinator / vice_principal /
-///     principal)                   → TeacherShell.
+///   * super_admin                  → WebOnlyPage (use the website).
+///   * principal / vice_principal / school_admin → PrincipalShell.
+///   * coordinator / hod            → CoordinatorShell.
+///   * class_teacher / subject_teacher → TeacherShell.
 ///   * transport_manager            → TransportShell — a stripped-down
 ///                                     2-tab shell with just the Bus
 ///                                     screen + a More tab. No
 ///                                     attendance / fees / homework.
-///   * Anyone else (eg. accountant) → HomeShell fallback.
+///   * transport_manager / bus_staff → TransportShell.
+///   * Other staff (accountant, librarian, hostel warden, office staff,
+///     receptionist, visitor desk, supervisor, school admin, ...)
+///                                  → StaffShell.
+///   * Anyone else                  → HomeShell fallback.
 class RoleHome extends StatelessWidget {
   const RoleHome({super.key});
 
+  // School admin gets the leadership screens: the /v1/principal routes
+  // admit it, and it's the closest fit to running the school.
   static const _principalRoles = <String>{
     'principal',
     'vice_principal',
-    'hod',
+    'school_admin',
     'management',
   };
 
@@ -56,6 +66,9 @@ class RoleHome extends StatelessWidget {
   }
 
   Widget _shellFor(Set<String> roles) {
+    // The platform super admin has no school to show; their tools are on
+    // the super admin website.
+    if (roles.contains('super_admin')) return const WebOnlyPage(roleName: 'Super Admin');
     // Parent role wins over any other (parents who also happen to be
     // staff get the parent shell — staff workflows live on the admin
     // web).
@@ -64,7 +77,7 @@ class RoleHome extends StatelessWidget {
     // Checked BEFORE teacher / fallback so a user holding only
     // transport_manager doesn't accidentally fall into the parent
     // shell with empty data.
-    if (roles.contains('transport_manager')) {
+    if (roles.contains('transport_manager') || roles.contains('bus_staff')) {
       return const TransportShell();
     }
     // Principal / vice_principal get their own dashboard shell —
@@ -73,11 +86,17 @@ class RoleHome extends StatelessWidget {
     if (roles.any(_principalRoles.contains)) {
       return const PrincipalShell();
     }
+    // Coordinators and HODs oversee the school's / department's day
+    // (cover, attendance by class) and get the teacher tools under More.
+    if (roles.contains('coordinator') || roles.contains('hod')) return const CoordinatorShell();
     if (roles.any(_teacherRoles.contains)) return const TeacherShell();
     // Students get their own self-service shell (own attendance,
     // homework, results, profile) — never the parent shell, which is
     // built around a child-switcher and "your child" framing.
     if (roles.contains('student')) return const StudentShell();
+    // Any other staff role: self-service staff screens instead of the
+    // parent screens (which only make sense with linked children).
+    if (roles.isNotEmpty) return const StaffShell();
     return const HomeShell();
   }
 }
