@@ -767,14 +767,14 @@ export function SchoolAdminLayout() {
   );
 
   return (
-    <div className="flex h-full flex-col bg-ivory md:flex-row">
+    <div className="flex h-full flex-col bg-ivory md:flex-row print:block print:h-auto print:bg-white">
       {/* Sidebar on md+: full menu, or (☰) a slim icon rail. On mobile the
           drawer below. Inner width is fixed so content doesn't reflow
           while the width animates. */}
       <aside
         id="admin-sidebar"
         className={cn(
-          "hidden h-full shrink-0 overflow-hidden border-r border-saffron-pale bg-warm-white transition-[width] duration-200 ease-out motion-reduce:transition-none md:block",
+          "hidden h-full shrink-0 overflow-hidden border-r border-saffron-pale bg-warm-white transition-[width] duration-200 ease-out motion-reduce:transition-none md:block print:!hidden",
           collapsed ? "md:w-[96px]" : "md:w-[260px]",
         )}
       >
@@ -795,7 +795,7 @@ export function SchoolAdminLayout() {
       )}
       <aside
         className={cn(
-          "fixed inset-y-0 left-0 z-50 flex w-72 max-w-[85%] transform flex-col border-r border-saffron-pale bg-warm-white px-5 py-5 transition-transform md:hidden",
+          "fixed inset-y-0 left-0 z-50 flex w-72 max-w-[85%] transform flex-col border-r border-saffron-pale bg-warm-white px-5 py-5 transition-transform md:hidden print:hidden",
           mobileOpen ? "translate-x-0" : "-translate-x-full",
         )}
       >
@@ -814,8 +814,8 @@ export function SchoolAdminLayout() {
 
       {/* Content column: the top bar sits outside the scrolling <main>,
           so it stays pinned while the page scrolls. */}
-      <div className="flex min-h-0 min-w-0 flex-1 flex-col">
-        <header className="z-30 flex h-14 shrink-0 items-center gap-3 border-b border-saffron-pale bg-warm-white px-3 md:px-6">
+      <div className="flex min-h-0 min-w-0 flex-1 flex-col print:block">
+        <header className="z-30 flex h-14 shrink-0 items-center gap-3 border-b border-saffron-pale bg-warm-white px-3 md:px-6 print:hidden">
           {/* Phone: opens the drawer. Desktop: hides / shows the sidebar. */}
           <button
             type="button"
@@ -852,7 +852,7 @@ export function SchoolAdminLayout() {
           <NotificationBell />
         </header>
 
-        <main className="min-w-0 flex-1 overflow-y-auto px-4 py-4 md:px-10 md:py-8">
+        <main className="min-w-0 flex-1 overflow-y-auto px-4 py-4 md:px-10 md:py-8 print:overflow-visible print:p-0">
           <Outlet />
         </main>
       </div>
