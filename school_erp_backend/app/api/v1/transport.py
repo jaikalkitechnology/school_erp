@@ -41,6 +41,7 @@ from app.services.transport import (
     create_driver,
     create_route,
     deallocate,
+    delete_route,
     list_allocations_for_route,
     list_boardings,
     list_buses,
@@ -220,6 +221,15 @@ async def update_route_route(
     session: AsyncSession = Depends(tenant_scoped_session),
 ):
     return await update_route(session, route_id, payload)
+
+
+@router.delete("/routes/{route_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_route_route(
+    route_id: int,
+    principal: AuthPrincipal = Depends(_transport_staff),
+    session: AsyncSession = Depends(tenant_scoped_session),
+):
+    await delete_route(session, route_id)
 
 
 @router.get("/routes/{route_id}/stops", response_model=list[StopRead])

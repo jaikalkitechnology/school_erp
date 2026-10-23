@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Bus as BusIcon, MapPin, Plus, Play, Square, Trash2, Wrench, Fuel } from "lucide-react";
+import { Bus as BusIcon, MapPin, Pencil, Plus, Play, Square, Trash2, Wrench, Fuel } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -32,11 +32,14 @@ import {
   tripView,
   upsertAllocation,
   type AllocationOverviewRow,
+  type Route,
   type TripDirection,
   type TripPhase,
 } from "./api";
 import { listStudents } from "@/features/students/api";
 import { api } from "@/lib/api";
+import { apiError } from "@/components/Modal";
+import { DeleteRouteDialog, EditRouteDialog } from "./RouteDialogs";
 
 const TABS = ["Fleet", "Routes", "Students", "Live map", "Live trip", "Billing", "History", "Logs"] as const;
 type Tab = (typeof TABS)[number];
@@ -411,28 +414,59 @@ function RoutesPanel() {
     },
   });
 
-  const [activeRoute, setActiveRoute] = useState<number | null>(null);
+  const [activeRoute, setActiveRouteRaw] = useState<number | null>(null);
+  const [editing, setEditing] = useState<Route | null>(null);
+  const [deleting, setDeleting] = useState<Route | null>(null);
+  const refreshRoutes = () => qc.invalidateQueries({ queryKey: ["transport-routes"] });
+  const busReg = (id: number | null) => buses.find((b) => b.id === id)?.registration_number;
+  const driverName = (id: number | null) => drivers.find((d) => d.id === id)?.full_name;
   const { data: stops = [] } = useQuery({
     queryKey: ["transport-stops", activeRoute],
     queryFn: () => (activeRoute ? listStops(activeRoute) : Promise.resolve([])),
     enabled: activeRoute !== null,
   });
 
-  const [stopRows, setStopRows] = useState<{ name: string; pickup_time: string; lat: string; lng: string }[]>([]);
+  // id / drop_time ride along so a re-save updates saved stops in place
+  // (students keep their pickup stop) and keeps drop times not shown here.
+  type StopRow = { id?: number; drop_time?: string | null; name: string; pickup_time: string; lat: string; lng: string };
+  // Unsaved stop edits; null = not edited, show the saved stops.
+  const [stopRows, setStopRows] = useState<StopRow[] | null>(null);
+  const rows: StopRow[] =
+    stopRows ??
+    stops.map((s) => ({
+      id: s.id,
+      drop_time: s.drop_time,
+      name: s.name,
+      pickup_time: s.pickup_time ?? "",
+      lat: s.latitude?.toString() ?? "",
+      lng: s.longitude?.toString() ?? "",
+    }));
+  const editRow = (i: number, patch: Partial<StopRow>) =>
+    setStopRows(rows.map((r, j) => (j === i ? { ...r, ...patch } : r)));
+  // Unsaved stop edits belong to the route they were made on.
+  const setActiveRoute = (id: number | null) => {
+    setActiveRouteRaw(id);
+    setStopRows(null);
+  };
   const saveStops = useMutation({
     mutationFn: () =>
       replaceStops(
         activeRoute!,
-        stopRows.map((r, i) => ({
+        rows.map((r, i) => ({
+          id: r.id,
           sequence: i + 1,
           name: r.name,
           pickup_time: r.pickup_time || null,
-          drop_time: null,
+          drop_time: r.drop_time ?? null,
           latitude: r.lat ? Number(r.lat) : null,
           longitude: r.lng ? Number(r.lng) : null,
         })),
       ),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ["transport-stops", activeRoute] }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["transport-stops", activeRoute] });
+      refreshRoutes();
+      setStopRows(null);
+    },
   });
 
   const [studentId, setStudentId] = useState("");
@@ -472,19 +506,26 @@ function RoutesPanel() {
                 <th>Driver</th>
                 <th>Stops</th>
                 <th>Students</th>
-                <th></th>
+                <th className="text-right">Actions</th>
               </tr>
             </thead>
             <tbody>
               {routes.map((r) => (
                 <tr key={r.id} className="border-t border-saffron-pale">
                   <td className="py-2 font-medium">{r.code}</td>
-                  <td>{r.name}</td>
-                  <td>{r.bus_id ?? "—"}</td>
-                  <td>{r.driver_id ?? "—"}</td>
+                  <td>
+                    {r.name}
+                    {!r.is_active && (
+                      <span className="ml-2 rounded bg-muted px-1.5 py-0.5 text-[10px] font-bold uppercase text-muted-foreground">
+                        inactive
+                      </span>
+                    )}
+                  </td>
+                  <td>{busReg(r.bus_id) ?? "—"}</td>
+                  <td>{driverName(r.driver_id) ?? "—"}</td>
                   <td>{r.stop_count}</td>
                   <td>{r.student_count}</td>
-                  <td className="text-right">
+                  <td className="whitespace-nowrap text-right">
                     <Button
                       size="sm"
                       variant="ghost"
@@ -492,11 +533,20 @@ function RoutesPanel() {
                     >
                       {activeRoute === r.id ? "Hide" : "Stops + alloc"}
                     </Button>
+                    <Button variant="ghost" size="icon" aria-label={`Edit route ${r.code}`} title="Edit route" onClick={() => setEditing(r)}>
+                      <Pencil className="h-4 w-4" />
+                    </Button>
+                    <Button variant="ghost" size="icon" aria-label={`Delete route ${r.code}`} title="Delete route" onClick={() => setDeleting(r)}>
+                      <Trash2 className="h-4 w-4 text-destructive" />
+                    </Button>
                   </td>
                 </tr>
               ))}
             </tbody>
           </table>
+          {routes.length === 0 && (
+            <p className="py-3 text-sm text-muted-foreground">No routes yet. Add one below.</p>
+          )}
           <div className="mt-3 grid grid-cols-5 gap-2">
             <Input placeholder="Code" value={code} onChange={(e) => setCode(e.target.value)} />
             <Input placeholder="Name" value={name} onChange={(e) => setName(e.target.value)} />
@@ -525,107 +575,82 @@ function RoutesPanel() {
               Route
             </Button>
           </div>
+          {newRoute.isError && (
+            <p className="mt-2 text-xs text-destructive">{apiError(newRoute.error, "Could not add the route.")}</p>
+          )}
         </CardContent>
       </Card>
+
+      {editing && (
+        <EditRouteDialog
+          route={editing}
+          buses={buses}
+          drivers={drivers}
+          onClose={() => setEditing(null)}
+          onSaved={refreshRoutes}
+        />
+      )}
+      {deleting && (
+        <DeleteRouteDialog
+          route={deleting}
+          onClose={() => setDeleting(null)}
+          onDeleted={() => {
+            if (activeRoute === deleting.id) setActiveRoute(null);
+            refreshRoutes();
+          }}
+        />
+      )}
 
       {activeRoute && (
         <div className="grid gap-4 md:grid-cols-2">
           <Card>
             <CardHeader>
               <CardTitle>Stops</CardTitle>
-              <CardDescription>Sequence is row order; replaces all on save.</CardDescription>
+              <CardDescription>Sequence is row order. Students keep their pickup stop when you rename or reorder stops.</CardDescription>
             </CardHeader>
             <CardContent>
               <ul className="space-y-2">
-                {(stopRows.length === 0 ? stops.map((s) => ({
-                  name: s.name,
-                  pickup_time: s.pickup_time ?? "",
-                  lat: s.latitude?.toString() ?? "",
-                  lng: s.longitude?.toString() ?? "",
-                })) : stopRows).map((row, i) => (
-                  <li key={i} className="grid grid-cols-5 gap-2 text-sm">
+                {rows.map((row, i) => (
+                  <li key={i} className="grid grid-cols-[2rem_2fr_1.4fr_1fr_1fr_auto] items-center gap-2 text-sm">
                     <span className="text-xs text-muted-foreground">#{i + 1}</span>
-                    <Input
-                      placeholder="Stop name"
-                      value={row.name}
-                      onChange={(e) => {
-                        const next = [...(stopRows.length ? stopRows : stops.map((s) => ({
-                          name: s.name,
-                          pickup_time: s.pickup_time ?? "",
-                          lat: s.latitude?.toString() ?? "",
-                          lng: s.longitude?.toString() ?? "",
-                        })))];
-                        next[i] = { ...next[i], name: e.target.value };
-                        setStopRows(next);
-                      }}
-                    />
-                    <Input
-                      placeholder="07:30:00"
-                      value={row.pickup_time}
-                      onChange={(e) => {
-                        const next = [...(stopRows.length ? stopRows : stops.map((s) => ({
-                          name: s.name,
-                          pickup_time: s.pickup_time ?? "",
-                          lat: s.latitude?.toString() ?? "",
-                          lng: s.longitude?.toString() ?? "",
-                        })))];
-                        next[i] = { ...next[i], pickup_time: e.target.value };
-                        setStopRows(next);
-                      }}
-                    />
-                    <Input
-                      placeholder="Lat"
-                      value={row.lat}
-                      onChange={(e) => {
-                        const next = [...(stopRows.length ? stopRows : stops.map((s) => ({
-                          name: s.name,
-                          pickup_time: s.pickup_time ?? "",
-                          lat: s.latitude?.toString() ?? "",
-                          lng: s.longitude?.toString() ?? "",
-                        })))];
-                        next[i] = { ...next[i], lat: e.target.value };
-                        setStopRows(next);
-                      }}
-                    />
-                    <Input
-                      placeholder="Lng"
-                      value={row.lng}
-                      onChange={(e) => {
-                        const next = [...(stopRows.length ? stopRows : stops.map((s) => ({
-                          name: s.name,
-                          pickup_time: s.pickup_time ?? "",
-                          lat: s.latitude?.toString() ?? "",
-                          lng: s.longitude?.toString() ?? "",
-                        })))];
-                        next[i] = { ...next[i], lng: e.target.value };
-                        setStopRows(next);
-                      }}
-                    />
+                    <Input placeholder="Stop name" value={row.name} onChange={(e) => editRow(i, { name: e.target.value })} />
+                    <Input placeholder="07:30:00" value={row.pickup_time} onChange={(e) => editRow(i, { pickup_time: e.target.value })} />
+                    <Input placeholder="Lat" value={row.lat} onChange={(e) => editRow(i, { lat: e.target.value })} />
+                    <Input placeholder="Lng" value={row.lng} onChange={(e) => editRow(i, { lng: e.target.value })} />
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      aria-label={`Remove stop ${i + 1}`}
+                      title="Remove stop"
+                      onClick={() => setStopRows(rows.filter((_, j) => j !== i))}
+                    >
+                      <Trash2 className="h-4 w-4 text-destructive" />
+                    </Button>
                   </li>
                 ))}
+                {rows.length === 0 && <li className="text-sm text-muted-foreground">No stops yet.</li>}
               </ul>
+              {stopRows && (
+                <p className="mt-2 text-xs text-marigold-dark">Unsaved changes — click Save stops.</p>
+              )}
               <div className="mt-3 flex gap-2">
                 <Button
                   variant="outline"
-                  onClick={() =>
-                    setStopRows([
-                      ...(stopRows.length ? stopRows : stops.map((s) => ({
-                        name: s.name,
-                        pickup_time: s.pickup_time ?? "",
-                        lat: s.latitude?.toString() ?? "",
-                        lng: s.longitude?.toString() ?? "",
-                      }))),
-                      { name: "", pickup_time: "", lat: "", lng: "" },
-                    ])
-                  }
+                  onClick={() => setStopRows([...rows, { name: "", pickup_time: "", lat: "", lng: "" }])}
                 >
                   <Plus className="mr-1 h-4 w-4" />
                   Add row
                 </Button>
-                <Button onClick={() => saveStops.mutate()} disabled={saveStops.isPending}>
-                  Save stops
+                <Button
+                  onClick={() => saveStops.mutate()}
+                  disabled={!stopRows || stopRows.some((r) => !r.name.trim()) || saveStops.isPending}
+                >
+                  {saveStops.isPending ? "Saving…" : "Save stops"}
                 </Button>
               </div>
+              {saveStops.isError && (
+                <p className="mt-2 text-xs text-destructive">{apiError(saveStops.error, "Could not save the stops.")}</p>
+              )}
             </CardContent>
           </Card>
           <Card>

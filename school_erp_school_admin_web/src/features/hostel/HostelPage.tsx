@@ -32,7 +32,8 @@ import {
   type Hostel,
   type Room,
 } from "./api";
-import { DeleteDialog, EditHostelDialog, EditRoomDialog, apiError } from "./SetupDialogs";
+import { apiError } from "@/components/Modal";
+import { DeleteDialog, EditHostelDialog, EditRoomDialog } from "./SetupDialogs";
 
 const TABS = ["Setup", "Allocations", "Mess", "Visitors", "Discipline", "Leaves", "Reports"] as const;
 type Tab = (typeof TABS)[number];
