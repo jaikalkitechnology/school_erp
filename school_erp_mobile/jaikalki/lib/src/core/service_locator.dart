@@ -8,6 +8,7 @@ import '../api/messages_repository.dart';
 import '../api/operations_repository.dart';
 import '../api/parent_repository.dart';
 import '../api/principal_repository.dart';
+import '../api/staff_work_repository.dart';
 import '../api/student_repository.dart';
 import '../api/teacher_repository.dart';
 import 'attendance_cubit.dart';
@@ -55,6 +56,11 @@ void registerDependencies() {
   if (!locator.isRegistered<CoordinatorRepository>()) {
     locator.registerLazySingleton<CoordinatorRepository>(
       () => CoordinatorRepository(locator<ApiClient>()),
+    );
+  }
+  if (!locator.isRegistered<StaffWorkRepository>()) {
+    locator.registerLazySingleton<StaffWorkRepository>(
+      () => StaffWorkRepository(locator<ApiClient>()),
     );
   }
   if (!locator.isRegistered<OperationsRepository>()) {

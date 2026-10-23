@@ -16,12 +16,14 @@ import '../operations/sports_page.dart';
 import '../settings/settings_page.dart';
 import '../teacher/my_leaves_page.dart';
 import '../teacher/teacher_calendar_page.dart';
+import 'work_pages.dart';
 
 /// Shell for non-teaching staff (accountant, librarian, hostel warden,
-/// office staff, receptionist, visitor desk, supervisor, ...). Their
-/// day-to-day work tools live on the admin website; in the app they get
-/// the self-service every staff member needs: notices, messages, leave,
-/// calendar and payslips.
+/// office staff, receptionist, visitor desk, supervisor, ...): the
+/// self-service every staff member needs (notices, messages, leave,
+/// calendar, payslips), plus a work tab for roles that have one —
+/// Fees for accountants, Library for librarians, Hostel for wardens.
+/// Everything else in their job lives on the admin website.
 class StaffShell extends StatefulWidget {
   const StaffShell({super.key});
 
@@ -34,8 +36,13 @@ class _StaffShellState extends State<StaffShell> {
 
   @override
   Widget build(BuildContext context) {
+    final auth = context.watch<AuthCubit>().state;
+    final roles = auth is AuthAuthenticated ? auth.user.roles.toSet() : <String>{};
+    final work = workTabFor(roles);
+    final leaveIndex = work == null ? 2 : 3;
     final pages = [
-      StaffHomePage(onOpenLeave: () => setState(() => _index = 2)),
+      StaffHomePage(onOpenLeave: () => setState(() => _index = leaveIndex)),
+      if (work != null) work.page,
       const MessagesPage(),
       const MyLeavesPage(staffApi: true),
       const _StaffMorePage(),
@@ -50,23 +57,24 @@ class _StaffShellState extends State<StaffShell> {
         bottomNavigationBar: NavigationBar(
           selectedIndex: _index,
           onDestinationSelected: (i) => setState(() => _index = i),
-          destinations: const [
-            NavigationDestination(
+          destinations: [
+            const NavigationDestination(
               icon: Icon(Icons.home_outlined),
               selectedIcon: Icon(Icons.home_rounded),
               label: 'Home',
             ),
-            NavigationDestination(
+            if (work != null) NavigationDestination(icon: Icon(work.icon), label: work.label),
+            const NavigationDestination(
               icon: Icon(Icons.chat_bubble_outline),
               selectedIcon: Icon(Icons.chat_bubble),
               label: 'Messages',
             ),
-            NavigationDestination(
+            const NavigationDestination(
               icon: Icon(Icons.beach_access_outlined),
               selectedIcon: Icon(Icons.beach_access),
               label: 'Leave',
             ),
-            NavigationDestination(
+            const NavigationDestination(
               icon: Icon(Icons.menu),
               label: 'More',
             ),
@@ -217,6 +225,8 @@ class _StaffHomePageState extends State<StaffHomePage> {
             ),
             _Section(
               title: 'MY LEAVE',
+              onMore: widget.onOpenLeave,
+              moreLabel: 'Apply / view',
               child: FutureBuilder<List<StaffLeaveRow>>(
                 future: _leaves,
                 builder: (context, snap) {
@@ -232,8 +242,6 @@ class _StaffHomePageState extends State<StaffHomePage> {
                   );
                 },
               ),
-              onMore: widget.onOpenLeave,
-              moreLabel: 'Apply / view',
             ),
           ],
         ),
