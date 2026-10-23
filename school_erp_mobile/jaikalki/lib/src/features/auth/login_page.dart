@@ -1,23 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
-import 'package:google_sign_in/google_sign_in.dart';
 
 import '../../api/auth_repository.dart';
 import '../../core/auth_cubit.dart';
 import '../../core/service_locator.dart';
 import '../../theme/brand.dart';
 import 'forgot_password_page.dart';
-
-// Web OAuth client ID — passed as serverClientId so the Google ID
-// token's audience is the web client, which our backend accepts.
-// Override at build time with:
-//   flutter run --dart-define=GOOGLE_SERVER_CLIENT_ID=...
-const _googleServerClientId = String.fromEnvironment(
-  'GOOGLE_SERVER_CLIENT_ID',
-  defaultValue:
-      '158812707380-i6f00ih0imbt2dh75s9dr849481joqap.apps.googleusercontent.com',
-);
 
 /// Modes available on the sign-in screen. Both share the same identifier
 /// + subdomain block; only the credential changes.
@@ -63,50 +52,6 @@ class _LoginPageState extends State<LoginPage> {
       password: _password.text,
       subdomain: _subdomain.text,
     );
-  }
-
-  bool _googleBusy = false;
-
-  Future<void> _signInWithGoogle() async {
-    final subdomain = _subdomain.text.trim();
-    if (subdomain.isEmpty) {
-      setState(() => _otpError =
-          'Enter your school subdomain first, then continue with Google.');
-      return;
-    }
-    setState(() => _googleBusy = true);
-    try {
-      final gsi = GoogleSignIn(
-        serverClientId: _googleServerClientId,
-        scopes: const ['email', 'profile'],
-      );
-      // Sign out first so the account chooser always shows — avoids a
-      // silent re-auth as a stale account.
-      await gsi.signOut();
-      final account = await gsi.signIn();
-      if (account == null) {
-        // User cancelled the chooser.
-        setState(() => _googleBusy = false);
-        return;
-      }
-      final auth = await account.authentication;
-      final idToken = auth.idToken;
-      if (idToken == null || idToken.isEmpty) {
-        setState(() {
-          _googleBusy = false;
-          _otpError = 'Google did not return a sign-in token. Try again.';
-        });
-        return;
-      }
-      await locator<AuthCubit>().loginWithGoogle(
-        idToken: idToken,
-        subdomain: subdomain,
-      );
-    } catch (e) {
-      setState(() => _otpError = 'Google sign-in failed. Please try again.');
-    } finally {
-      if (mounted) setState(() => _googleBusy = false);
-    }
   }
 
   Future<void> _requestOtp() async {
@@ -255,43 +200,6 @@ class _LoginPageState extends State<LoginPage> {
                             ..._passwordFields(t, busy, errorMessage)
                           else
                             ..._otpFields(t, busy, errorMessage),
-                          const SizedBox(height: 16),
-                          Row(
-                            children: [
-                              const Expanded(child: Divider()),
-                              Padding(
-                                padding: const EdgeInsets.symmetric(
-                                    horizontal: 10),
-                                child: Text(
-                                  'OR',
-                                  style: t.labelSmall?.copyWith(
-                                    color: JaikalkiBrand.textSecondary,
-                                  ),
-                                ),
-                              ),
-                              const Expanded(child: Divider()),
-                            ],
-                          ),
-                          const SizedBox(height: 12),
-                          OutlinedButton.icon(
-                            onPressed: (busy || _googleBusy)
-                                ? null
-                                : _signInWithGoogle,
-                            icon: _googleBusy
-                                ? const SizedBox(
-                                    width: 16,
-                                    height: 16,
-                                    child: CircularProgressIndicator(
-                                        strokeWidth: 2),
-                                  )
-                                : const Icon(Icons.login),
-                            label: Text(_googleBusy
-                                ? 'Signing in…'
-                                : 'Continue with Google'),
-                            style: OutlinedButton.styleFrom(
-                              minimumSize: const Size.fromHeight(48),
-                            ),
-                          ),
                         ],
                       ),
                     ),
