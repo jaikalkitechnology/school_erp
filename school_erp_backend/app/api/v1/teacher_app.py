@@ -73,6 +73,7 @@ _teacher = require_roles(
     "class_teacher",
     "subject_teacher",
     "coordinator",
+    "hod",
     "vice_principal",
     "principal",
     "school_admin",

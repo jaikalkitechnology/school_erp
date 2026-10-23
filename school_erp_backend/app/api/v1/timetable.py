@@ -38,10 +38,10 @@ from app.services.timetable import (
 
 
 _school_admin = require_roles(
-    "school_admin", "principal", "vice_principal", "coordinator"
+    "school_admin", "principal", "vice_principal", "coordinator", "hod",
 )
 _school_view = require_roles(
-    "school_admin", "principal", "vice_principal", "coordinator",
+    "school_admin", "principal", "vice_principal", "coordinator", "hod",
     "class_teacher", "subject_teacher", "office_staff",
 )
 

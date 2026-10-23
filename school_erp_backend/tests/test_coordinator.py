@@ -98,3 +98,24 @@ async def test_teacher_cannot_open_coordinator_view(super_admin_token):
         assert (await t.get("/v1/coordinator/today")).status_code == 403
     finally:
         await t.aclose()
+
+
+@pytest.mark.asyncio
+async def test_hod_gets_coordinator_and_teacher_tools(super_admin_token):
+    """HOD logins open the Coordinator screens, whose More / My classes /
+    cover actions use the teacher and timetable routes."""
+    admin = await _client_for(DEFAULT_SCHOOL_ADMIN_EMAIL, DEFAULT_SCHOOL_ADMIN_PASSWORD)
+    r = await admin.post(
+        "/v1/school-admin/users",
+        json={"full_name": "Head of Science", "email": "hod@demo.school", "password": "Hod@1234", "role_codes": ["hod"]},
+    )
+    assert r.status_code == 201, r.text
+    hod = await _client_for("hod@demo.school", "Hod@1234")
+    try:
+        assert (await hod.get("/v1/coordinator/today")).status_code == 200
+        assert (await hod.get("/v1/teacher/my-leaves")).status_code == 200
+        today = date.today().isoformat()
+        assert (await hod.get("/v1/school-admin/timetable/substitutions", params={"target_date": today})).status_code == 200
+    finally:
+        await admin.aclose()
+        await hod.aclose()
