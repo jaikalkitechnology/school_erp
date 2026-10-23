@@ -63,6 +63,7 @@ String roleLabelFor(String code) {
     'office_admin': 'Office Admin',
     'bus_staff': 'Bus Staff',
     'visitor_desk': 'Visitor Desk',
+    'supervisor': 'Area Supervisor',
     'hod': 'HOD',
   };
   final known = extra[code];

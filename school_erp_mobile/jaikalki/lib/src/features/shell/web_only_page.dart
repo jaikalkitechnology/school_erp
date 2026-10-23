@@ -5,12 +5,18 @@ import 'package:go_router/go_router.dart';
 import '../../core/auth_cubit.dart';
 import '../../theme/brand.dart';
 
-/// For logins whose work is only on a website (the platform super admin):
-/// says where to go instead of showing school screens that would all fail.
+/// For logins whose work is only on a website — the platform super admin,
+/// and front-office roles (receptionist, visitor desk, area supervisor)
+/// whose dashboard is the school admin website: says where to go instead
+/// of showing app screens that aren't meant for them.
 class WebOnlyPage extends StatelessWidget {
-  const WebOnlyPage({super.key, required this.roleName});
+  const WebOnlyPage({super.key, required this.roleName, required this.websiteName});
 
+  /// eg. "Receptionist".
   final String roleName;
+
+  /// eg. "school admin" / "Super Admin".
+  final String websiteName;
 
   @override
   Widget build(BuildContext context) {
@@ -30,17 +36,11 @@ class WebOnlyPage extends StatelessWidget {
               children: [
                 const Icon(Icons.desktop_windows_outlined, size: 56, color: JaikalkiBrand.saffron),
                 const SizedBox(height: 20),
-                Text('Use the $roleName website', style: t.headlineSmall, textAlign: TextAlign.center),
+                Text('Use the $websiteName website', style: t.headlineSmall, textAlign: TextAlign.center),
                 const SizedBox(height: 12),
                 Text(
-                  'The $roleName tools are on the web. Sign in to the $roleName website on a computer.',
+                  'Your work as $roleName is on the $websiteName website. Sign in there on a computer.',
                   style: t.bodyLarge,
-                  textAlign: TextAlign.center,
-                ),
-                const SizedBox(height: 12),
-                Text(
-                  'This app is for school staff, parents and students.',
-                  style: t.bodyMedium,
                   textAlign: TextAlign.center,
                 ),
                 const SizedBox(height: 32),
