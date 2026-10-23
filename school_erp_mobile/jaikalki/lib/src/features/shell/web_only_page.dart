@@ -43,12 +43,6 @@ class WebOnlyPage extends StatelessWidget {
                   style: t.bodyLarge,
                   textAlign: TextAlign.center,
                 ),
-                const SizedBox(height: 12),
-                Text(
-                  'This app is for school staff, parents and students.',
-                  style: t.bodyMedium,
-                  textAlign: TextAlign.center,
-                ),
                 const SizedBox(height: 32),
                 OutlinedButton.icon(
                   icon: const Icon(Icons.logout),
